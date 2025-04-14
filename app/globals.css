@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Resets */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Apply base styles to body for full page background and font */
+body {
+    background-color: #121212; /* Match module background */
+    font-family: 'Arial', sans-serif; /* Match module font */
+    overflow: hidden; /* Match module overflow if needed globally */
+}
+
+/* You can add other global styles or imports here */
+
+/* Global Keyframes for Ripple Effect */
+@keyframes ripple {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    80% {
+        transform: scale(3.5);
+        opacity: 0.3;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 210 40% 98%;
+
+    --card: 0 0% 0%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 0 0% 0%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 263 70% 60%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 240 35% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 240 25% 10%;
+    --muted-foreground: 215 25% 70%;
+
+    --accent: 263 65% 25%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 80% 45%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 240 30% 15%;
+    --input: 240 25% 15%;
+    --ring: 263 70% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .dark .dark-glow {
+    box-shadow: 0 0 15px rgba(var(--primary) / 0.25);
+    transition: box-shadow 0.3s ease;
+  }
+  
+  .dark .dark-glow:hover {
+    box-shadow: 0 0 25px rgba(var(--primary) / 0.4);
+  }
+  
+  .dark .dark-border {
+    border-color: rgba(var(--primary) / 0.15);
+  }
+  
+  .dark .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+}
