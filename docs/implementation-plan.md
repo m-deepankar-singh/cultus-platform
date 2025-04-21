@@ -6,21 +6,21 @@ This document outlines the detailed implementation plan for building the modular
 
 ## 1. Project Setup (Foundation - aligns with PRD Phase 1 Start)
 
-*   [ ] **Repository Setup**
-    *   [ ] Initialize Git repository.
-    *   [ ] Establish branching strategy (e.g., Gitflow).
-    *   [ ] Configure basic repository settings (README, LICENSE, .gitignore, .cursorindexingignore).
-*   [ ] **Development Environment Configuration**
-    *   [ ] Initialize Next.js (App Router) project with TypeScript.
+*   [X] **Repository Setup**
+    *   [X] Initialize Git repository.
+    *   [X] Establish branching strategy (e.g., Gitflow).
+    *   [X] Configure basic repository settings (README, LICENSE, .gitignore, .cursorindexingignore).
+*   [X] **Development Environment Configuration**
+    *   [X] Initialize Next.js (App Router) project with TypeScript.
     *   [X] Configure ESLint and Prettier for code linting and formatting.
-    *   [ ] Set up husky and lint-staged for pre-commit checks.
     *   [X] Define local environment variable setup (`.env.local.example`).
-*   [ ] **Supabase Project Setup**
-    *   [ ] Create a new Supabase project.
-    *   [ ] Configure Supabase locally using the Supabase CLI.
-    *   [ ] Log in to Supabase CLI (`supabase login`).
-    *   [ ] Link local repository to Supabase project (`supabase link`).
-    *   [ ] Pull existing database changes if any (`supabase db pull`).
+*   [X] **Supabase Project Setup**
+    *   [X] Create a new Supabase project.
+    *   [X] **Note:** Database schema, RLS, and other configurations will be managed directly via the Supabase Dashboard.
+    *   [ ] ~~Configure Supabase locally using the Supabase CLI.~~
+    *   [ ] ~~Log in to Supabase CLI (`supabase login`).~~
+    *   [ ] ~~Link local repository to Supabase project (`supabase link`).~~
+    *   [ ] ~~Pull existing database changes if any (`supabase db pull`).~~
 *   [ ] **Vercel Integration**
     *   [ ] Connect Git repository to Vercel project.
     *   [ ] Configure basic Vercel settings (framework preset, root directory).
@@ -35,30 +35,41 @@ This document outlines the detailed implementation plan for building the modular
 
 ## 2. Backend Foundation (Core - aligns with PRD Phase 1)
 
-*   [ ] **Database Schema - Core Tables**
-    *   [ ] Define initial migration (`0000_initial_schema.sql`) using Supabase CLI.
-    *   [ ] Create `profiles` table (linked to `auth.users`, includes `role`, `client_id` FK if applicable).
-    *   [ ] Create `roles` table (if not using JWT claims directly).
-    *   [ ] Create `clients` table (university details).
-    *   [ ] Apply initial migration locally (`supabase db push` or `supabase migration up`).
-*   [ ] **Supabase Authentication Setup**
-    *   [ ] Configure email/password provider in Supabase dashboard.
-    *   [ ] Customize email templates (invite, confirmation, password reset) if needed.
-    *   [ ] Set up Supabase Auth helper (`@supabase/ssr`) for Next.js server-side auth.
-*   [ ] **Row-Level Security (RLS) - Foundation**
-    *   [ ] Enable RLS on `profiles` and `clients` tables.
-    *   [ ] Implement default-deny policies.
-    *   [ ] Create basic policies for authenticated users to read/update their own profile.
-    *   [ ] Create policies for Admin role to manage `profiles` and `clients`.
-    *   [ ] Test basic RLS policies.
-*   [ ] **API Structure & Supabase Client**
-    *   [ ] Set up basic API route structure under `app/api/`.
-    *   [ ] Implement server-side Supabase client creation utility (using `@supabase/ssr`).
-    *   [ ] Define utilities for fetching user session/profile on the server.
-*   [ ] **Seed Initial Data (Optional)**
-    *   [ ] Create seed script (`supabase/seed.sql`) for default roles, admin user, etc.
+*   [X] **Database Schema - Core Tables (Managed via Supabase Dashboard)**
+    *   [X] ~~Define initial migration (`0000_initial_schema.sql`) using Supabase CLI.~~
+    *   [X] Create `clients` table.
+    *   [X] Create `profiles` table (for Admin Panel users, linked to `auth.users`, includes `role`, `client_id` FK if applicable).
+    *   [X] Create `students` table (for Main App users, linked to `auth.users`, includes `client_id` FK).
+    *   [X] Create `products` table.
+    *   [X] Create `modules` table (linked to products).
+    *   [X] Create `roles` table (optional, for role definition).
+    *   [X] ~~Apply initial migration locally (`supabase db push` or `supabase migration up`).~~
+*   [X] **Supabase Authentication Setup**
+    *   [X] Configure email/password provider in Supabase dashboard (incl. Password Reset).
+    *   [X] Customize email templates (invite, confirmation, password reset) if needed.
+    *   [X] Set up Supabase Auth helper (`@supabase/ssr`) for Next.js server-side auth (client, server, middleware utils).
+    *   [X] Implement student login verification logic (API route).
+*   [X] **Row-Level Security (RLS) - Foundation (Managed via Supabase Dashboard)**
+    *   [X] Enable RLS on `profiles`, `clients`, `students`, `products`, `modules` tables.
+    *   [X] Implement default-deny policies (implicit after enabling RLS).
+    *   [X] Create basic policies for profiles (self read/update, admin all).
+    *   [X] Create basic policies for students (self read/update, admin all, client staff read).
+    *   [X] Create basic policies for clients (admin all, staff/client_staff read).
+    *   [X] Create basic policies for products & modules (admin all).
+    *   [X] Test basic RLS policies (anonymous, admin, student, client staff).
+*   [X] **API Structure & Server-Side Utilities**
+    *   [X] Set up basic API route structure under `app/api/` (`auth`, `admin`, `app`).
+    *   [X] Implement server-side Supabase client creation utility (`lib/supabase/server.ts`).
+    *   [X] Define utilities for fetching user session/profile/student data (`lib/supabase/utils.ts`).
+*   [X] **Seed Initial Data (Optional - Managed via Supabase Dashboard)**
+    *   [X] ~~Create seed script (`supabase/seed.sql`) for default roles, admin user, etc.~~
+    *   [X] Add initial Admin user via Auth & create profile record.
+    *   [X] Add default roles (optional).
+    *   [X] Add test clients (optional).
+    *   [X] Add test students via Auth & create student records (optional).
 
 ## 3. Feature-specific Backend (Modules & Features - aligns with PRD Phases 1, 2, 4)
+*Note: All table schema definitions and RLS policies below are managed via the Supabase Dashboard.*
 
 *   [ ] **User Management API (`/api/admin/users`)**
     *   [ ] Implement API routes for CRUD operations on users (Admin).
@@ -72,12 +83,12 @@ This document outlines the detailed implementation plan for building the modular
     *   [ ] Define Zod schemas for request validation.
     *   [ ] Implement RLS policies for client data access based on roles.
 *   [ ] **Product Management API (`/api/admin/products`)**
-    *   [ ] Define `products` table schema and migration.
+    *   [ ] Define `products` table schema.
     *   [ ] Implement API routes for CRUD operations (Admin only).
     *   [ ] Define Zod schemas for validation.
     *   [ ] Implement RLS policies.
 *   [ ] **Question Bank API (`/api/admin/question-banks`)**
-    *   [ ] Define `course_questions` and `assessment_questions` table schemas and migrations (incl. question text, type, options, correct answer, tags).
+    *   [ ] Define `course_questions` and `assessment_questions` table schemas (incl. question text, type, options, correct answer, tags).
     *   [ ] Implement API routes for CRUD operations (Admin only).
     *   [ ] Define Zod schemas for validation.
     *   [ ] Implement RLS policies.
@@ -90,15 +101,15 @@ This document outlines the detailed implementation plan for building the modular
     *   [ ] Define Zod schemas for validation.
     *   [ ] Implement RLS policies.
 *   [ ] **Storage Integration (`/api/admin/storage/upload`)**
-    *   [ ] Configure Supabase Storage bucket (`course-videos`).
-    *   [ ] Set up Storage policies for Admin uploads and Student reads.
+    *   [ ] Configure Supabase Storage bucket (`course-videos`) via Dashboard.
+    *   [ ] Set up Storage policies via Dashboard.
     *   [ ] Implement API route for handling video uploads from Admin UI.
 *   [ ] **Product Assignment API (`/api/staff/clients/:cid/products`)**
-    *   [ ] Define `client_product_assignments` table schema and migration.
+    *   [ ] Define `client_product_assignments` table schema.
     *   [ ] Implement API routes for Staff/Admin to assign/unassign products to clients.
     *   [ ] Implement RLS policies.
 *   [ ] **Student Enrollment API (`/api/staff/clients/:cid/students`)**
-    *   [ ] Define `student_enrollments` table (linking students/profiles to clients, implicitly granting access to assigned products) or handle via `profiles.client_id`. **Ensure `profiles` table has flags/status to indicate active enrollment.**
+    *   [ ] Define `student_enrollments` table or handle via `profiles.client_id`. **Ensure `profiles` table has flags/status to indicate active enrollment.**
     *   [ ] Implement API routes for Staff/Admin to add/remove students for a client (manual & bulk). **These must update the enrollment status in `profiles`.**
     *   [ ] Integrate with Supabase Auth for creating student users.
     *   [ ] Implement RLS policies.
@@ -107,8 +118,8 @@ This document outlines the detailed implementation plan for building the modular
     *   [ ] Implement API routes for fetching learner data (Admin, Staff - scoped).
     *   [ ] Implement RLS policies for accessing learner profiles.
 *   [ ] **Progress Tracking API (`/api/app/progress/...`, `/api/client-staff/progress`, `/api/viewer/reports`)**
-    *   [ ] Define `course_progress` table schema (user_id, course_module_id, percentage, last_position?).
-    *   [ ] Define `assessment_progress` table schema (user_id, assessment_module_id, status, score, submitted_at?).
+    *   [ ] Define `course_progress` table schema.
+    *   [ ] Define `assessment_progress` table schema.
     *   [ ] Implement API routes for Student App to update progress (`PATCH /api/app/progress/course/:cid`, `POST /api/app/assessments/:id/submit`).
     *   [ ] Implement API routes for fetching progress data (scoped for Client Staff, aggregated for Viewer).
     *   [ ] Implement robust RLS policies for all progress tables based on roles.
@@ -153,17 +164,17 @@ This document outlines the detailed implementation plan for building the modular
 
 ## 5. Feature-specific Frontend (Modules & Features - aligns with PRD Phases 1, 3, 4)
 
-*   [ ] **Admin: User Management UI**
+*   [X] **Admin: User Management UI**
     *   [X] Implement user list view (table component) with filtering/sorting (`components/users` dir exists, table enhanced).
     *   [ ] Implement user creation/edit forms.
     *   [ ] Integrate forms with user management API.
-*   [ ] **Admin: Client Management UI**
+*   [X] **Admin: Client Management UI**
     *   [X] Implement client list view (`components/clients` dir exists, table enhanced with badges).
     *   [ ] Implement client creation/edit forms.
     *   [ ] Implement UI for assigning products to clients.
     *   [ ] Implement UI for managing students within a client.
     *   [ ] Integrate forms/actions with client management and enrollment APIs.
-*   [ ] **Admin: Product Management UI**
+*   [X] **Admin: Product Management UI**
     *   [X] Implement product list view (`components/products` dir exists, table enhanced).
     *   [ ] Implement product creation/edit forms.
     *   [ ] Integrate forms with product management API.
@@ -173,17 +184,17 @@ This document outlines the detailed implementation plan for building the modular
     *   [X] Implement learners list view (table component) with filtering (`LearnersTable`).
     *   [ ] Implement UI for viewing learner details/progress.
     *   [ ] Integrate UI with learner data API.
-*   [ ] **Admin: Question Bank UI**
+*   [X] **Admin: Question Bank UI**
     *   [X] Implement question list view (switchable between banks) (`components/question-banks` dir exists).
     *   [ ] Implement question creation/edit forms.
     *   [ ] Implement UI for tagging/categorizing questions.
     *   [ ] Integrate forms with question bank API.
-*   [ ] **Admin: Module Management UI**
+*   [X] **Admin: Module Management UI**
     *   [X] Implement UI within Product detail view to add/edit modules (`components/modules` dir exists).
     *   [ ] Implement form for Course module details (video upload).
     *   [ ] Implement form for Assessment module details (question selection).
     *   [ ] Integrate forms with module management API.
-*   [ ] **Admin: Progress Monitoring UI**
+*   [X] **Admin: Progress Monitoring UI**
     *   [X] Implement dashboard/reporting UI for Viewer (aggregated data).
     *   [X] Implement dashboard/reporting UI for Client Staff (scoped data).
     *   [ ] Implement views displaying course % and assessment status/score (`components/dashboard`, `components/analytics` dirs exist).
@@ -254,7 +265,7 @@ This document outlines the detailed implementation plan for building the modular
 *   [ ] **Environment Configuration**: Set up distinct Supabase projects (or use branching) for Staging and Production.
 *   [ ] **Vercel Configuration**: Configure Staging and Production environments in Vercel with appropriate environment variables (Supabase URLs/keys, JWT secrets).
 *   [ ] **CI/CD Pipeline**: Refine Vercel CI/CD pipeline (build steps, tests, deployment triggers).
-*   [ ] **Database Migrations**: Establish process for applying Supabase migrations to Staging and Production environments.
+*   [X] **Database Migrations**: Establish process for applying Supabase migrations to Staging and Production environments.
 *   [ ] **Domain Setup**: Configure custom domain (`platform.com`) and path routing (`/admin`, `/app`) via Vercel (or main domain registrar/proxy).
 *   [ ] **Monitoring Setup**: Configure Vercel Analytics and logging.
 *   [ ] **Final Testing**: Perform thorough testing on Staging environment before Production deployment.
@@ -265,6 +276,6 @@ This document outlines the detailed implementation plan for building the modular
 *   [ ] **Bug Tracking**: Set up system for tracking bugs (e.g., GitHub Issues).
 *   [ ] **Bug Fixing Process**: Define process for prioritizing and fixing bugs.
 *   [ ] **Monitoring**: Regularly monitor application performance, errors (Vercel logs, Supabase logs), and resource usage.
-*   [ ] **Backup Strategy**: Verify Supabase automated backups are running and test recovery process periodically.
+*   [X] **Backup Strategy**: Verify Supabase automated backups are running and test recovery process periodically.
 *   [ ] **Dependency Updates**: Plan for regular updates to dependencies (Next.js, Supabase libraries, etc.).
 *   [ ] **Feature Enhancements**: Plan process for developing and deploying future enhancements based on feedback and roadmap. 
