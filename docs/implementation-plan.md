@@ -71,58 +71,60 @@ This document outlines the detailed implementation plan for building the modular
 ## 3. Feature-specific Backend (Modules & Features - aligns with PRD Phases 1, 2, 4)
 *Note: All table schema definitions and RLS policies below are managed via the Supabase Dashboard.*
 
-*   [ ] **User Management API (`/api/admin/users`)**
-    *   [ ] Implement API routes for CRUD operations on users (Admin).
-    *   [ ] Integrate with Supabase Auth `admin` methods for user creation/deletion.
-    *   [ ] Implement logic for assigning roles and associating Client Staff with Clients.
-    *   [ ] Define Zod schemas for request validation.
-    *   [ ] Implement corresponding RLS policies on `profiles` for Staff, Viewer, Client Staff access (read-only, scoped).
-*   [ ] **Client Management API (`/api/admin/clients`, `/api/staff/clients`)**
-    *   [ ] Implement API routes for CRUD operations (Admin).
-    *   [ ] Implement API routes for Staff (view all/scoped, update assigned).
-    *   [ ] Define Zod schemas for request validation.
-    *   [ ] Implement RLS policies for client data access based on roles.
-*   [ ] **Product Management API (`/api/admin/products`)**
-    *   [ ] Define `products` table schema.
-    *   [ ] Implement API routes for CRUD operations (Admin only).
-    *   [ ] Define Zod schemas for validation.
-    *   [ ] Implement RLS policies.
-*   [ ] **Question Bank API (`/api/admin/question-banks`)**
-    *   [ ] Define `course_questions` and `assessment_questions` table schemas (incl. question text, type, options, correct answer, tags).
-    *   [ ] Implement API routes for CRUD operations (Admin only).
-    *   [ ] Define Zod schemas for validation.
-    *   [ ] Implement RLS policies.
-*   [ ] **Module Management API (`/api/admin/products/:pid/modules`, `/api/admin/modules/:mid`)**
-    *   [ ] Define `modules` table schema (linked to products, type: Course/Assessment, configuration JSONB?).
-    *   [ ] Define `course_lessons` table (linked to Course modules, sequence, video_url, quiz_id FK?).
-    *   [ ] Define `assessment_module_questions` table (linking Assessment modules to questions).
-    *   [ ] Implement API routes for adding/updating/deleting modules within products (Admin only).
-    *   [ ] Implement API routes for managing course lesson structure (Admin only).
-    *   [ ] Define Zod schemas for validation.
-    *   [ ] Implement RLS policies.
-*   [ ] **Storage Integration (`/api/admin/storage/upload`)**
-    *   [ ] Configure Supabase Storage bucket (`course-videos`) via Dashboard.
-    *   [ ] Set up Storage policies via Dashboard.
-    *   [ ] Implement API route for handling video uploads from Admin UI.
-*   [ ] **Product Assignment API (`/api/staff/clients/:cid/products`)**
-    *   [ ] Define `client_product_assignments` table schema.
-    *   [ ] Implement API routes for Staff/Admin to assign/unassign products to clients.
-    *   [ ] Implement RLS policies.
-*   [ ] **Student Enrollment API (`/api/staff/clients/:cid/students`)**
-    *   [ ] Define `student_enrollments` table or handle via `profiles.client_id`. **Ensure `profiles` table has flags/status to indicate active enrollment.**
-    *   [ ] Implement API routes for Staff/Admin to add/remove students for a client (manual & bulk). **These must update the enrollment status in `profiles`.**
-    *   [ ] Integrate with Supabase Auth for creating student users.
-    *   [ ] Implement RLS policies.
-*   [ ] **Learner Management API (`/api/admin/learners`, `/api/staff/learners`)**
-    *   [ ] Define necessary data relationships (likely reads from `profiles` filtered by role/client status).
-    *   [ ] Implement API routes for fetching learner data (Admin, Staff - scoped).
-    *   [ ] Implement RLS policies for accessing learner profiles.
-*   [ ] **Progress Tracking API (`/api/app/progress/...`, `/api/client-staff/progress`, `/api/viewer/reports`)**
-    *   [ ] Define `course_progress` table schema.
-    *   [ ] Define `assessment_progress` table schema.
-    *   [ ] Implement API routes for Student App to update progress (`PATCH /api/app/progress/course/:cid`, `POST /api/app/assessments/:id/submit`).
-    *   [ ] Implement API routes for fetching progress data (scoped for Client Staff, aggregated for Viewer).
-    *   [ ] Implement robust RLS policies for all progress tables based on roles.
+*   [X] **User Management API (`/api/admin/users`)**
+    *   [X] Implement API routes for CRUD operations on users (Admin).
+    *   [X] Integrate with Supabase Auth `admin` methods for user creation/deletion.
+    *   [X] Implement logic for assigning roles and associating Client Staff with Clients.
+    *   [X] Define Zod schemas for request validation.
+    *   [X] Implement corresponding RLS policies on `profiles` for Staff, Viewer, Client Staff access (read-only, scoped).
+*   [X] **Client Management API (`/api/admin/clients`, `/api/staff/clients`)**
+    *   [X] Implement API routes for CRUD operations (Admin).
+    *   [X] Implement API routes for Staff (view all/scoped, update assigned).
+    *   [X] Define Zod schemas for request validation.
+    *   [X] Implement RLS policies for client data access based on roles.
+*   [X] **Product Management API (`/api/admin/products`)**
+    *   [X] Define `products` table schema.
+    *   [X] Implement API routes for CRUD operations (Admin only).
+    *   [X] Define Zod schemas for validation.
+    *   [X] Implement RLS policies.
+*   [X] **Question Bank API (`/api/admin/question-banks`)**
+    *   [X] Define `course_questions` and `assessment_questions` table schemas (incl. question text, type, options, correct answer, tags).
+    *   [X] Implement API routes for CRUD operations (Admin only).
+    *   [X] Define Zod schemas for validation.
+    *   [X] Implement RLS policies.
+*   [X] **Module Management API (`/api/admin/products/:pid/modules`, `/api/admin/modules/:mid`)**
+    *   [X] Define `modules` table schema (linked to products, type: Course/Assessment, configuration JSONB?).
+    *   [X] Define `course_lessons` table (linked to Course modules, sequence, video_url, quiz_id FK?).
+    *   [X] Define `assessment_module_questions` table (linking Assessment modules to questions).
+    *   [X] Implement API routes for adding/updating/deleting modules within products (Admin only).
+    *   [X] Implement API routes for managing course lesson structure (Admin only).
+    *   [X] Define Zod schemas for validation.
+    *   [X] Implement RLS policies.
+*   [X] **Storage Integration (`/api/admin/storage/upload`)**
+    *   [X] Configure Supabase Storage bucket (`course-videos`) via Dashboard.
+    *   [X] Set up Storage policies via Dashboard.
+    *   [X] Implement API route for handling video uploads from Admin UI.
+*   [X] **Product Assignment API (`/api/staff/clients/:cid/products`)**
+    *   [X] Define `client_product_assignments` table schema.
+    *   [X] Implement API routes for Staff/Admin to assign/unassign products to clients.
+    *   [X] Implement RLS policies.
+*   [X] **Student Enrollment API (`/api/staff/clients/:cid/students`)**
+    *   [X] Define `student_enrollments` table or handle via `profiles.client_id`. **Ensure `profiles` table has flags/status to indicate active enrollment.**
+    *   [X] Implement API routes for Staff/Admin to add/remove students for a client (manual). **These must update the enrollment status in `profiles`.**
+    *   [ ] Implement bulk enrollment API routes for Staff/Admin.
+    *   [X] Integrate with Supabase Auth for creating student users.
+    *   [X] Implement RLS policies.
+*   [X] **Learner Management API (`/api/admin/learners`, `/api/staff/learners`)**
+    *   [X] Define necessary data relationships (likely reads from `profiles` filtered by role/client status).
+    *   [X] Implement API routes for fetching learner data (Admin, Staff - scoped).
+    *   [X] Implement RLS policies for accessing learner profiles.
+*   [X] **Progress Tracking API (`/api/app/progress/...`, `/api/client-staff/progress`, `/api/viewer/reports`)**
+    *   [X] Define `course_progress` table schema.
+    *   [X] Define `assessment_progress` table schema.
+    *   [X] Implement API routes for Student App to update progress (`PATCH /api/app/progress/course/:cid`, `POST /api/app/assessments/:id/submit`).
+    *   [X] Implement API routes for fetching progress data (aggregated for Viewer).
+    *   [X] Implement API routes for fetching progress data (scoped for Client Staff).
+    *   [X] Implement robust RLS policies for all progress tables based on roles.
 *   [ ] **Notification Logic (Backend)**
     *   [ ] Define `notifications` table schema.
     *   [ ] Implement triggers or backend logic (e.g., after module update) to create notifications for relevant Client Staff.
@@ -134,11 +136,11 @@ This document outlines the detailed implementation plan for building the modular
     *   [ ] Implement data fetching logic (filtered by role/client).
     *   [ ] Implement Excel file generation logic.
     *   [ ] Set correct response headers for download.
-*   [ ] **App Login API (`/api/app/auth/login`)**
-    *   [ ] Implement dedicated API route for student login.
-    *   [ ] Route calls `supabase.auth.signInWithPassword`.
-    *   [ ] On success, queries `profiles` table to verify user is an active, enrolled student linked to a client.
-    *   [ ] Returns success/session only if both checks pass, otherwise returns appropriate error.
+*   [X] **App Login API (`/api/app/auth/login`)**
+    *   [X] Implement dedicated API route for student login.
+    *   [X] Route calls `supabase.auth.signInWithPassword`.
+    *   [X] On success, queries `profiles` table to verify user is an active, enrolled student linked to a client.
+    *   [X] Returns success/session only if both checks pass, otherwise returns appropriate error.
 
 ## 4. Frontend Foundation (Core - aligns with PRD Phase 1)
 

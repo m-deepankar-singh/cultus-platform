@@ -34,13 +34,24 @@ interface StudentData {
   // Add other student fields as needed
 }
 
+// Interface for the combined user, profile, and role data
+interface UserSessionRoleResponse {
+  user: User | null;
+  profile: ProfileData | null;
+  role: string | null;
+  error: Error | null;
+}
+
 /**
  * Fetches the current user session from the server-side Supabase client.
+ * @deprecated Prefer getUserSessionAndRole for combined user, profile, and role data.
  * @returns {Promise<SessionResponse>} An object containing the session and user, or null if no session exists.
  */
 export async function getUserSession(): Promise<SessionResponse> {
   try {
     const supabase = await createClient();
+    // Note: getSession() might return session based on potentially expired cookie.
+    // Prefer getUser() in server-side contexts for security.
     const { data, error } = await supabase.auth.getSession();
 
     if (error) {
@@ -64,7 +75,7 @@ export async function getProfileData(userId: string): Promise<ProfileData | null
   if (!userId) return null;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClient(); // Uses server client
     const { data, error } = await supabase
       .from('profiles')
       .select('*') // Select all columns, adjust as needed
@@ -95,7 +106,7 @@ export async function getStudentData(userId: string): Promise<StudentData | null
   if (!userId) return null;
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClient(); // Uses server client
     const { data, error } = await supabase
       .from('students')
       .select('*') // Select all columns, adjust as needed
@@ -115,4 +126,45 @@ export async function getStudentData(userId: string): Promise<StudentData | null
       console.error(`Unexpected error fetching student data for user ${userId}:`, err);
       return null;
   }
-} 
+}
+
+/**
+ * Fetches the current user session and associated profile data (including role)
+ * securely from server-side context using `getUser()`.
+ * 
+ * @returns {Promise<UserSessionRoleResponse>} An object containing user, profile, role, or an error.
+ */
+export async function getUserSessionAndRole(): Promise<UserSessionRoleResponse> {
+  try {
+    const supabase = await createClient(); // Use server client
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError) {
+      // Don't log generic auth errors unless debugging, middleware handles session presence
+      // console.error('Auth error fetching user:', userError.message);
+      return { user: null, profile: null, role: null, error: userError };
+    }
+
+    if (!user) {
+      // No active session found
+      return { user: null, profile: null, role: null, error: new Error('No active user session.') };
+    }
+
+    // User is authenticated, now fetch their profile
+    const profile = await getProfileData(user.id);
+
+    if (!profile) {
+      console.error(`Profile not found for authenticated user ${user.id}`);
+      // Decide how to handle this case: maybe user exists but profile wasn't created?
+      // Returning user but null role/profile might be appropriate depending on app logic.
+      return { user: user, profile: null, role: null, error: new Error('User profile not found.') };
+    }
+
+    // Success: return user, profile, and extracted role
+    return { user, profile, role: profile.role, error: null };
+
+  } catch (err: any) {
+    console.error('Unexpected error in getUserSessionAndRole:', err);
+    return { user: null, profile: null, role: null, error: err instanceof Error ? err : new Error('An unexpected error occurred') };
+  }
+}

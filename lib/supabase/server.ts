@@ -1,44 +1,34 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 // Define a function that creates a Supabase client for server-side operations
-export const createClient = async () => {
-  // Get the cookie store from the headers
-  const cookieStore = await cookies();
+// This function MUST use the getAll/setAll pattern as per the rule.
+export async function createClient() {
+  const cookieStore = await cookies(); // Get the cookie store from next/headers
 
-  // Create a server-side Supabase client instance with cookie handling
+  // Create a server-side Supabase client instance with the CORRECT cookie handling
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // Define the get method for retrieving cookies
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        // Use getAll as required by the rule
+        getAll() {
+          return cookieStore.getAll();
         },
-        // Define the set method for setting cookies
-        set(name: string, value: string, options: CookieOptions) {
+        // Use setAll as required by the rule
+        setAll(cookiesToSet) {
           try {
-            // Attempt to set the cookie using the cookie store
-            cookieStore.set({ name, value, ...options });
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing user sessions.
-            // console.error("Error setting cookie from Server Component:", error);
-          }
-        },
-        // Define the remove method for deleting cookies
-        remove(name: string, options: CookieOptions) {
-          try {
-            // Attempt to delete the cookie by setting an empty value and options
-            cookieStore.set({ name, value: '', ...options });
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing user sessions.
-            // console.error("Error removing cookie from Server Component:", error);
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
         },
       },
     }
   );
-}; 
+}
