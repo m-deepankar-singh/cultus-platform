@@ -19,6 +19,9 @@ export async function DELETE(
   { params }: { params: { moduleId: string; questionId: string } }
 ) {
   try {
+    // Await params to ensure moduleId and questionId are available
+    const { moduleId: rawModuleId, questionId: rawQuestionId } = await params;
+    
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -36,7 +39,7 @@ export async function DELETE(
     }
 
     // Validate route parameters
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -45,7 +48,7 @@ export async function DELETE(
     }
     const moduleId = moduleIdValidation.data.moduleId;
 
-    const questionIdValidation = QuestionIdSchema.safeParse({ questionId: params.questionId });
+    const questionIdValidation = QuestionIdSchema.safeParse({ questionId: rawQuestionId });
     if (!questionIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Question ID format', details: questionIdValidation.error.format() }, 

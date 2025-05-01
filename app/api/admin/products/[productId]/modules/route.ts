@@ -16,6 +16,7 @@ export async function GET(
   try {
     // Create Supabase server client
     const supabase = await createClient();
+    const paramsObj = await params;
 
     // Authenticate user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -50,7 +51,7 @@ export async function GET(
     }
 
     // Validate productId parameter
-    const productIdValidation = ProductIdSchema.safeParse({ productId: params.productId });
+    const productIdValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
     if (!productIdValidation.success) {
       return NextResponse.json(
         { 
@@ -66,7 +67,7 @@ export async function GET(
     const { data: modules, error: modulesError } = await supabase
       .from("modules")
       .select("*")
-      .eq("product_id", params.productId)
+      .eq("product_id", paramsObj.productId)
       .order("created_at", { ascending: true });
 
     // Handle database error
@@ -102,6 +103,7 @@ export async function POST(
   try {
     // Create Supabase server client
     const supabase = await createClient();
+    const paramsObj = await params;
 
     // Authenticate user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -136,7 +138,7 @@ export async function POST(
     }
 
     // Validate productId parameter
-    const productIdValidation = ProductIdSchema.safeParse({ productId: params.productId });
+    const productIdValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
     if (!productIdValidation.success) {
       return NextResponse.json(
         { 
@@ -152,7 +154,7 @@ export async function POST(
     const body = await request.json();
     
     // Inject productId from route parameter
-    const moduleData = { ...body, product_id: params.productId };
+    const moduleData = { ...body, product_id: paramsObj.productId };
     
     // Validate module data with Zod schema
     const moduleValidation = ModuleSchema.safeParse(moduleData);

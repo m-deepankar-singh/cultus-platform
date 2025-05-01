@@ -11,6 +11,7 @@ export const LessonProgressUpdateSchema = z.object({
 // Schema for updating MODULE progress (Student PATCH body for course module)
 export const ModuleProgressUpdateSchema = z.object({
   status: z.enum(['NotStarted', 'InProgress', 'Completed']).optional(),
+  progress_percentage: z.number().min(0).max(100).optional(),
   score: z.number().min(0).max(100).nullable().optional(),
 });
 

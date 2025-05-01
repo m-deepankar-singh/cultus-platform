@@ -38,33 +38,46 @@ export async function GET(
     const { userId } = validationResult.data;
 
     // 3. Fetch User Profile
-    const { data: userProfile, error: fetchError } = await supabase
+    const supabaseAdmin = createAdminClient();
+    
+    // First try to find in profiles table
+    const { data: userProfile, error: fetchError } = await supabaseAdmin
       .from('profiles')
       .select('*, client:clients(id, name)') // Select all profile fields and client info
       .eq('id', userId)
       .single();
 
+    // If found in profiles, return it
+    if (!fetchError && userProfile) {
+      return NextResponse.json(userProfile);
+    }
+    
+    // If not found in profiles, check students table
+    const { data: studentProfile, error: studentFetchError } = await supabaseAdmin
+      .from('students')
+      .select('*, client:clients(id, name)') // Adjust join based on your schema
+      .eq('id', userId)
+      .single();
+
     // 4. Handle Response & Errors
-    if (fetchError) {
-      // Check if the error is because the user was not found
-      if (fetchError.code === 'PGRST116') { // PostgREST code for "Row not found"
+    if (fetchError && studentFetchError) {
+      // Both lookups failed, check if not found errors
+      if (fetchError.code === 'PGRST116' && studentFetchError.code === 'PGRST116') {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
       // Otherwise, it's likely a server error
       console.error('Error fetching profile:', fetchError);
+      console.error('Error fetching student:', studentFetchError);
       return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
     }
     
-    // Profile found is implied if no error and fetchError.code wasn't PGRST116
-    // Although Supabase might return null data without error in some cases, 
-    // .single() should error if no row found.
-    if (!userProfile) { 
-        // This case might be redundant due to .single() error handling, but included for safety.
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // If student profile found, return it
+    if (studentProfile) {
+      return NextResponse.json(studentProfile);
     }
-
-    // 5. Return Profile Data
-    return NextResponse.json(userProfile);
+    
+    // This case might be redundant due to error handling above, but included for safety.
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   } catch (error) {
     console.error(`Unexpected error in GET /api/admin/users/[userId]:`, error);
@@ -125,10 +138,36 @@ export async function PUT(
       return NextResponse.json({ error: 'No update data provided' }, { status: 400 });
     }
 
-    // 4. Update Profile (using Server Client - assumes RLS allows Admins to update profiles)
-    // If you need to update auth user details (e.g., email), you'd use the Admin client.
-    const { data: updatedProfile, error: updateError } = await supabase
+    // 4. Update Profile or Student
+    const supabaseAdmin = createAdminClient();
+    
+    // First check if user exists in profiles table
+    const { data: userExists, error: userCheckError } = await supabaseAdmin
       .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    // Then check if user exists in students table
+    const { data: studentExists, error: studentCheckError } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    // Determine which table to update
+    let tableName = null;
+    if (userExists) {
+      tableName = 'profiles';
+    } else if (studentExists) {
+      tableName = 'students';
+    } else {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    
+    // Update the appropriate table
+    const { data: updatedData, error: updateError } = await supabaseAdmin
+      .from(tableName)
       .update(updateData)
       .eq('id', userId)
       .select('*, client:clients(id, name)') // Return updated data with client info
@@ -146,14 +185,14 @@ export async function PUT(
     }
 
     // Check if profile data was returned (should be if update succeeded and .single() was used)
-    if (!updatedProfile) {
+    if (!updatedData) {
         // This might indicate the update happened but the select failed, or RLS prevented seeing the result.
         console.error('Profile update seemed to succeed but no data was returned.');
         return NextResponse.json({ error: 'Failed to retrieve updated user profile' }, { status: 500 });
     }
 
     // 6. Return Updated Profile
-    return NextResponse.json(updatedProfile);
+    return NextResponse.json(updatedData);
 
   } catch (error) {
     console.error(`Unexpected error in PUT /api/admin/users/[userId]:`, error);
@@ -203,21 +242,50 @@ export async function DELETE(
     // 3. Create Admin Client
     const supabaseAdmin = createAdminClient();
 
-    // 4. Delete Profile First (Optional but Recommended for data cleanup)
-    // This might fail if there are foreign key constraints, depending on schema design.
-    // If the profile must be deleted first, handle the error more strictly.
-    const { error: deleteProfileError } = await supabaseAdmin
+    // Check if user exists in profiles table
+    const { data: userExists, error: userCheckError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    // Check if user exists in students table
+    const { data: studentExists, error: studentCheckError } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    // If neither exists, return 404
+    if (!userExists && !studentExists) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // 4. Delete from appropriate table
+    let deleteError = null;
+    
+    if (userExists) {
+      const { error } = await supabaseAdmin
       .from('profiles')
       .delete()
       .eq('id', userId);
 
-    if (deleteProfileError) {
-      // Log the profile deletion error but proceed to delete the auth user,
-      // as the auth user is the primary resource to remove.
-      // Depending on DB constraints (e.g., ON DELETE CASCADE), this might not even be necessary.
-      console.warn(`Failed to delete profile for user ${userId}: ${deleteProfileError.message}. Proceeding with auth user deletion.`);
-      // If profile deletion *must* succeed first, return 500 here.
-      // return NextResponse.json({ error: `Failed to delete user profile: ${deleteProfileError.message}` }, { status: 500 });
+      if (error) {
+        deleteError = error;
+        console.warn(`Failed to delete profile for user ${userId}: ${error.message}`);
+      }
+    }
+    
+    if (studentExists) {
+      const { error } = await supabaseAdmin
+        .from('students')
+        .delete()
+        .eq('id', userId);
+      
+      if (error) {
+        deleteError = error;
+        console.warn(`Failed to delete student for user ${userId}: ${error.message}`);
+      }
     }
 
     // 5. Delete Auth User (Critical Step)

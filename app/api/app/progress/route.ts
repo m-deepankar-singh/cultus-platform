@@ -15,31 +15,50 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, client_id')
+    // Fetch student record from 'students' table
+    const { data: studentRecord, error: studentFetchError } = await supabase
+      .from('students')
+      .select('client_id, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) {
-       return NextResponse.json({ error: 'Forbidden: Profile not found' }, { status: 403 });
+    if (studentFetchError) {
+      console.error('Student Fetch Error:', studentFetchError);
+      if (studentFetchError.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Forbidden: Student record not found' },
+          { status: 403 },
+        );
+      }
+      return NextResponse.json(
+        { error: 'Internal Server Error: Could not fetch student record' },
+        { status: 500 },
+      );
     }
-    if (profile.role !== 'Student') {
-       return NextResponse.json({ error: 'Forbidden: User is not a Student' }, { status: 403 });
+
+    // Check if student is active
+    if (!studentRecord.is_active) {
+        return NextResponse.json(
+            { error: 'Forbidden: Student account is inactive' },
+            { status: 403 },
+        );
     }
-    if (!profile.client_id) {
-      // Students must be linked to a client to have assigned products
+
+    // Check if student is linked to a client
+    if (!studentRecord.client_id) {
+      console.error(`Student ${user.id} has no assigned client_id in students table.`);
       return NextResponse.json({ error: 'Forbidden: Student not linked to a client' }, { status: 403 });
     }
+
     const studentId = user.id;
-    const clientId = profile.client_id;
+    const clientId = studentRecord.client_id; // Use client_id from student record
 
     // 2. Fetch Assigned Products
     const { data: assignedProducts, error: assignmentError } = await supabase
       .from('client_product_assignments')
       .select(`
         product_id,
-        products ( id, title, description, thumbnail_url, slug )
+        products ( id, name, description )
       `)
       .eq('client_id', clientId);
 
@@ -69,7 +88,7 @@ export async function GET(request: Request) {
       })
       .filter(product => product !== null) as // Filter out assignments that didn't yield a product
         // Assert the type of the items remaining in the array
-        { id: string; title: string; description: string | null; thumbnail_url: string | null; slug: string | null }[];
+        { id: string; name: string; description: string | null }[];
 
     const productIds = products.map(p => p.id);
 
@@ -82,9 +101,9 @@ export async function GET(request: Request) {
     // 3. Fetch Modules for these Products
     const { data: modules, error: modulesError } = await supabase
       .from('modules')
-      .select('id, product_id, title, type, order') // Select necessary module fields
+      .select('id, product_id, name, type, sequence') // Select 'name' and 'sequence' instead of 'title' and 'order'
       .in('product_id', productIds)
-      .order('order', { ascending: true });
+      .order('sequence', { ascending: true }); // Order by 'sequence'
 
     if (modulesError) {
       console.error(`GET /progress - Error fetching modules for products ${productIds}:`, modulesError);
@@ -105,7 +124,7 @@ export async function GET(request: Request) {
     // 4. Fetch Student's Module Progress for these Modules
     const { data: moduleProgressData, error: moduleProgressError } = await supabase
       .from('student_module_progress') // Fetch consolidated module progress
-      .select('module_id, status, progress_percentage, completed_at, updated_at')
+      .select('module_id, status, progress_percentage, completed_at, last_updated') // Select 'last_updated' instead of 'updated_at'
       .eq('student_id', studentId)
       .in('module_id', moduleIds); // Filter by modules belonging to assigned products
 
@@ -120,10 +139,10 @@ export async function GET(request: Request) {
     let assessmentAttempts: any[] = []; // Initialize as empty array
     if (assessmentModuleIds.length > 0) {
       const { data: attemptsData, error: attemptsError } = await supabase
-        .from('student_assessment_attempts')
-        .select('assessment_module_id, score, passed, submitted_at') // Fetch relevant attempt data
+        .from('assessment_progress') // Use correct table 'assessment_progress'
+        .select('module_id, score, passed, submitted_at') // Select 'module_id' and other relevant columns
         .eq('student_id', studentId)
-        .in('assessment_module_id', assessmentModuleIds);
+        .in('module_id', assessmentModuleIds); // Filter by 'module_id'
 
       if (attemptsError) {
         console.error(`GET /progress - Error fetching assessment attempts for student ${studentId}:`, attemptsError);
@@ -141,9 +160,9 @@ export async function GET(request: Request) {
     const assessmentAttemptsMap = new Map();
     assessmentAttempts.forEach(attempt => {
       // Only store the latest attempt if multiple exist
-      const existing = assessmentAttemptsMap.get(attempt.assessment_module_id);
+      const existing = assessmentAttemptsMap.get(attempt.module_id); // Use module_id as key
       if (!existing || new Date(attempt.submitted_at) > new Date(existing.submitted_at)) {
-        assessmentAttemptsMap.set(attempt.assessment_module_id, attempt);
+        assessmentAttemptsMap.set(attempt.module_id, attempt); // Use module_id as key
       }
     });
 
@@ -167,9 +186,9 @@ export async function GET(request: Request) {
 
         return {
           id: module.id,
-          title: module.title,
+          name: module.name, // Use 'name' from module data
           type: module.type,
-          order: module.order,
+          sequence: module.sequence, // Use 'sequence' from module data
           status: progress?.status || 'NotStarted',
           progress_percentage: progress?.progress_percentage || 0,
           completed_at: progress?.completed_at || null,
@@ -183,7 +202,7 @@ export async function GET(request: Request) {
       });
 
       return {
-        ...product, // id, title, description, thumbnail_url, slug
+        ...product, // id, name, description (updated)
         modules: modulesWithProgress, // Add the processed modules array
       };
     });

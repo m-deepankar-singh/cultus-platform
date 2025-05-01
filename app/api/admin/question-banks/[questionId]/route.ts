@@ -6,13 +6,14 @@ import {
     QuestionBankType // Import QuestionBankType for DELETE query param validation
 } from '@/lib/schemas/question';
 
-// --- PUT Handler (Update Question - Step 5) ---
-export async function PUT(
+// --- GET Handler (Get Question Details) ---
+export async function GET(
     request: Request,
     { params }: { params: { questionId: string } }
 ) {
     try {
         const supabase = await createClient();
+        const paramsObj = await params;
 
         // 1. Get authenticated user & role
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -29,7 +30,83 @@ export async function PUT(
         }
 
         // 2. Validate Route Parameter
-        const idValidationResult = QuestionIdSchema.safeParse(params);
+        const idValidationResult = QuestionIdSchema.safeParse({ questionId: paramsObj.questionId });
+        if (!idValidationResult.success) {
+            return NextResponse.json(
+                { error: 'Invalid Question ID format', details: idValidationResult.error.flatten() },
+                { status: 400 }
+            );
+        }
+        const { questionId } = idValidationResult.data;
+
+        // 3. Validate Query Parameter (`type`)
+        const { searchParams } = new URL(request.url);
+        const typeResult = QuestionBankType.safeParse(searchParams.get('type'));
+
+        if (!typeResult.success) {
+             return NextResponse.json(
+                { error: 'Missing or invalid query parameter: type', details: typeResult.error.flatten() },
+                { status: 400 }
+            );
+        }
+        const type = typeResult.data;
+
+        // 4. Determine Target Table
+        const tableName = type === 'course' ? 'course_questions' : 'assessment_questions';
+
+        // 5. Fetch Question from the database
+        const { data: question, error: dbError } = await supabase
+            .from(tableName)
+            .select('*')
+            .eq('id', questionId)
+            .single();
+
+        if (dbError) {
+            console.error(`GET /api/admin/question-banks/${questionId}: DB Error fetching from ${tableName}`, dbError);
+            if (dbError.code === 'PGRST116') { // PostgREST code for "Matching row not found"
+                return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+            }
+            return NextResponse.json({ error: 'Database error while fetching question.', details: dbError.message }, { status: 500 });
+        }
+
+        if (!question) {
+            return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+        }
+
+        // 6. Return question data
+        return NextResponse.json(question, { status: 200 });
+
+    } catch (error) {
+        console.error(`GET /api/admin/question-banks/[questionId]: Unexpected Error`, error);
+        return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
+    }
+}
+
+// --- PUT Handler (Update Question - Step 5) ---
+export async function PUT(
+    request: Request,
+    { params }: { params: { questionId: string } }
+) {
+    try {
+        const supabase = await createClient();
+        const paramsObj = await params;
+
+        // 1. Get authenticated user & role
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+        if (profileError || !profile || profile.role !== 'Admin') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // 2. Validate Route Parameter
+        const idValidationResult = QuestionIdSchema.safeParse({ questionId: paramsObj.questionId });
         if (!idValidationResult.success) {
             return NextResponse.json(
                 { error: 'Invalid Question ID format', details: idValidationResult.error.flatten() },
@@ -101,6 +178,7 @@ export async function DELETE(
 ) {
      try {
         const supabase = await createClient();
+        const paramsObj = await params;
 
         // 1. Get authenticated user & role (same as PUT)
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -117,7 +195,7 @@ export async function DELETE(
         }
 
         // 2. Validate Route Parameter
-        const idValidationResult = QuestionIdSchema.safeParse(params);
+        const idValidationResult = QuestionIdSchema.safeParse({ questionId: paramsObj.questionId });
         if (!idValidationResult.success) {
             return NextResponse.json(
                 { error: 'Invalid Question ID format', details: idValidationResult.error.flatten() },

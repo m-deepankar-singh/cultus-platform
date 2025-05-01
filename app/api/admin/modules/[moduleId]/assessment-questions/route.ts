@@ -13,6 +13,9 @@ export async function GET(
   { params }: { params: { moduleId: string } }
 ) {
   try {
+    // Await params to ensure moduleId is available
+    const { moduleId: rawModuleId } = await params;
+    
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -29,7 +32,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
     }
 
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -94,6 +97,9 @@ export async function POST(
   { params }: { params: { moduleId: string } }
 ) {
   try {
+    // Await params to ensure moduleId is available
+    const { moduleId: rawModuleId } = await params;
+    
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -110,7 +116,7 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
     }
 
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -174,7 +180,7 @@ export async function POST(
     // Check if the link already exists
     const { data: existingLink, error: linkCheckError } = await supabase
       .from('assessment_module_questions')
-      .select('id')
+      .select('module_id, question_id')
       .eq('module_id', moduleId)
       .eq('question_id', question_id)
       .maybeSingle();
@@ -187,7 +193,7 @@ export async function POST(
     if (existingLink) {
       // Link already exists - we can either return a 409 Conflict or a 200 OK with existing data
       return NextResponse.json(
-        { message: 'Question is already linked to this module', id: existingLink.id },
+        { message: 'Question is already linked to this module', module_id: existingLink.module_id, question_id: existingLink.question_id },
         { status: 200 }
       );
     }

@@ -27,7 +27,7 @@ export async function GET(request: Request, { params }: { params: { clientId: st
     // --- User is authenticated and is an Admin, proceed ---
 
     // 2. Validate route parameter
-    const validationResult = ClientIdSchema.safeParse(params);
+    const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
     if (!validationResult.success) {
         console.error('Validation Error (clientId):', validationResult.error.errors);
         return NextResponse.json({ error: 'Invalid Client ID format', details: validationResult.error.flatten() }, { status: 400 });
@@ -90,7 +90,7 @@ export async function PUT(request: Request, { params }: { params: { clientId: st
         // --- User is authenticated and is an Admin, proceed ---
 
         // 2. Validate route parameter
-        const paramValidation = ClientIdSchema.safeParse(params);
+        const paramValidation = ClientIdSchema.safeParse({ clientId: params.clientId });
         if (!paramValidation.success) {
             console.error('Validation Error (clientId):', paramValidation.error.errors);
             return NextResponse.json({ error: 'Invalid Client ID format', details: paramValidation.error.flatten() }, { status: 400 });
@@ -175,12 +175,12 @@ export async function DELETE(request: Request, { params }: { params: { clientId:
         // --- User is authenticated and is an Admin, proceed ---
 
         // 2. Validate route parameter
-        const paramValidation = ClientIdSchema.safeParse(params);
-        if (!paramValidation.success) {
-            console.error('Validation Error (clientId):', paramValidation.error.errors);
-            return NextResponse.json({ error: 'Invalid Client ID format', details: paramValidation.error.flatten() }, { status: 400 });
+        const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
+        if (!validationResult.success) {
+            console.error('Validation Error (clientId):', validationResult.error.errors);
+            return NextResponse.json({ error: 'Invalid Client ID format', details: validationResult.error.flatten() }, { status: 400 });
         }
-        const { clientId } = paramValidation.data;
+        const { clientId } = validationResult.data;
 
         // 3. Perform deletion
         // Note: Dependencies (users, assignments etc.) should ideally be handled

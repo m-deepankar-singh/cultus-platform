@@ -7,8 +7,9 @@ const BaseQuestionSchema = z.object({
   question_text: z.string().min(1, { message: 'Question text is required' }),
   question_type: z.enum(['MCQ', 'MSQ']), // Multiple Choice Question, Multi-Select Question
   options: z.array(z.object({ id: z.string(), text: z.string() })).min(2, { message: 'At least two options required' }),
-  tags: z.array(z.string()).optional().default([]),
-  // Add other relevant fields like explanation, difficulty, etc.
+  topic: z.string().optional(),
+  difficulty: z.string().optional(),
+  // Remove tags field as it doesn't exist in the database
 });
 
 // --- Core Schemas (without refinements) ---
@@ -19,7 +20,9 @@ const MCQCoreSchema = BaseQuestionSchema.extend({
 
 const MSQCoreSchema = BaseQuestionSchema.extend({
   question_type: z.literal('MSQ'),
-  correct_answers: z.array(z.string()).min(1, { message: 'At least one correct answer ID is required for MSQ' }), // IDs of correct options
+  correct_answer: z.object({
+    answers: z.array(z.string()).min(1, { message: 'At least one correct answer ID is required for MSQ' })
+  }),
 });
 
 // --- Schemas with Refinements ---
@@ -31,9 +34,9 @@ export const MCQSchema = MCQCoreSchema.refine(data => data.options.some(opt => o
 });
 
 // Schema for MSQ with refinement
-export const MSQSchema = MSQCoreSchema.refine(data => data.correct_answers.every(ans => data.options.some(opt => opt.id === ans)), {
+export const MSQSchema = MSQCoreSchema.refine(data => data.correct_answer.answers.every(ans => data.options.some(opt => opt.id === ans)), {
   message: 'All correct answer IDs must match option IDs',
-  path: ['correct_answers'],
+  path: ['correct_answer', 'answers'],
 });
 
 // Union schema for basic validation (using CORE schemas for discriminatedUnion)
@@ -67,7 +70,9 @@ const UpdateMCQApiSchema = BaseQuestionSchema.partial().extend({
 });
 const UpdateMSQApiSchema = BaseQuestionSchema.partial().extend({
     question_type: z.literal('MSQ'),
-    correct_answers: z.array(z.string()).min(1).optional(), // Keep min(1) if present, but allow undefined
+    correct_answer: z.object({
+      answers: z.array(z.string()).min(1)
+    }).optional(),
     bank_type: QuestionBankType,
 });
 export const UpdateQuestionApiSchema = z.discriminatedUnion('question_type', [
@@ -83,7 +88,7 @@ export const QuestionIdSchema = z.object({
 
 export const QuestionBankQuerySchema = z.object({
     type: QuestionBankType,
-    // Add other query params like search, tags etc. as optional strings
+    // Add other query params like search, tag etc. as optional strings
     search: z.string().optional(),
     tag: z.string().optional(),
 }); 

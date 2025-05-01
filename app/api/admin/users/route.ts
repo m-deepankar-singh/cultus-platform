@@ -24,24 +24,27 @@ export async function GET(request: Request) {
       .eq('id', user.id)
       .single();
 
+    // Improved error handling - if no profile or error fetching profile, return 403 Forbidden
     if (profileError || !profile) {
         console.error('Error fetching user profile or profile not found:', profileError);
-        // If the user is authenticated but has no profile, it might be an issue.
-        return NextResponse.json({ error: 'Could not verify user role' }, { status: 500 });
+        return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Authorize based on role
     if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Role is Admin, proceed to fetch the list of users
+    // Use admin client to bypass RLS completely for admin operations
+    const supabaseAdmin = createAdminClient();
+    
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get('search');
     const roleFilter = searchParams.get('role');
     const clientIdFilter = searchParams.get('clientId');
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('profiles')
       .select('*, client:clients(id, name)'); // Fetch profile and related client name
 
@@ -50,14 +53,14 @@ export async function GET(request: Request) {
     }
 
     if (roleFilter) {
-      query = query.eq('role', roleFilter);
+      query = query.ilike('role', roleFilter);
     }
 
     if (clientIdFilter) {
       query = query.eq('client_id', clientIdFilter);
     }
 
-    query = query.order('created_at', { ascending: false });
+    query = query.order('updated_at', { ascending: false });
 
     const { data: users, error: dbError } = await query;
 
@@ -90,12 +93,13 @@ export async function POST(request: Request) {
       .eq('id', requestingUser.id)
       .single();
 
+    // Improved error handling for profile fetch
     if (profileError || !profile) {
-      return NextResponse.json({ error: 'Could not verify user role' }, { status: 500 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // 2. Parse & Validate Request Body
@@ -141,7 +145,6 @@ export async function POST(request: Request) {
       .from('profiles')
       .insert({
         id: userId,
-        email: email, // Storing email redundantly, consider if necessary
         role: role,
         client_id: client_id,
         full_name: full_name,

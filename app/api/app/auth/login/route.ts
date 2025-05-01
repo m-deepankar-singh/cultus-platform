@@ -54,41 +54,41 @@ export async function POST(request: Request) {
     // Get user ID for verification
     const userId = authData.user.id;
 
-    // Fetch user profile to verify role, client_id, and active status
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, client_id, is_active')
+    // Fetch student record to verify client_id and active status
+    const { data: studentRecord, error: studentFetchError } = await supabase
+      .from('students') // Query the students table
+      .select('client_id, is_active') // Select relevant fields from students
       .eq('id', userId)
       .single();
 
-    // Handle profile fetch errors
-    if (profileError) {
-      console.error('Profile fetch error after login:', profileError);
-      
+    // Handle student record fetch errors
+    if (studentFetchError) {
+      console.error('Student record fetch error after login:', studentFetchError);
+
       // Sign out the potentially logged-in user
       await supabase.auth.signOut();
-      
+
       return NextResponse.json(
-        { 
-          error: 'Error verifying user status' 
-        }, 
+        {
+          error: 'Error verifying user status'
+        },
         { status: 500 }
       );
     }
 
-    // Verify the user is an active student with a client_id
-    const isVerifiedStudent = 
-      profile && 
-      profile.role === 'Student' && 
-      profile.client_id && 
-      profile.is_active === true;
+    // Verify the user is an active student with a client_id in the students table
+    const isVerifiedStudent =
+      studentRecord &&
+      studentRecord.client_id &&
+      studentRecord.is_active === true;
 
     // Handle verification result
     if (isVerifiedStudent) {
-      // Login successful and verified
+      // Login successful and verified - return token for testing
       return NextResponse.json(
         { 
-          message: 'Login successful' 
+          message: 'Login successful',
+          accessToken: authData.session?.access_token // Include the access token
         }, 
         { status: 200 }
       );

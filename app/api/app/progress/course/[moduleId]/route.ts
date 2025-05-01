@@ -15,14 +15,14 @@ export async function PATCH(
 ) {
   try {
     // 1. Validate Route Parameter (moduleId)
-    const moduleIdValidation = UuidSchema.safeParse(params.moduleId);
+    const { moduleId } = await params;
+    const moduleIdValidation = UuidSchema.safeParse(moduleId);
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request: Invalid Module ID format', details: moduleIdValidation.error.flatten().formErrors },
         { status: 400 },
       );
     }
-    const moduleId = moduleIdValidation.data; // Use validated moduleId
 
     // 2. Parse and Validate Request Body
     let body;
@@ -59,43 +59,45 @@ export async function PATCH(
       );
     }
 
-    // 2. Authorization: Get user profile and check role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, client_id') 
+    // 2. Authorization: Get student record and check status
+    const { data: studentRecord, error: studentFetchError } = await supabase
+      .from('students') // Query the students table
+      .select('client_id, is_active') // Select relevant fields
       .eq('id', user.id)
       .single();
 
-    if (profileError) {
-      console.error('Profile Fetch Error:', profileError);
-      if (profileError.code === 'PGRST116') { 
+    if (studentFetchError) {
+      console.error('Student Fetch Error:', studentFetchError);
+      if (studentFetchError.code === 'PGRST116') { // No student record found for this user ID
         return NextResponse.json(
-          { error: 'Forbidden: User profile not found' },
+          { error: 'Forbidden: Student record not found' }, // More specific error
           { status: 403 },
         );
       }
       return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch profile' },
+        { error: 'Internal Server Error: Could not fetch student record' },
         { status: 500 },
       );
     }
 
-    if (profile.role !== 'Student') {
-      return NextResponse.json(
-        { error: 'Forbidden: User does not have Student role' },
-        { status: 403 },
-      );
+    // Check if student account is active
+    if (!studentRecord.is_active) {
+        return NextResponse.json(
+            { error: 'Forbidden: Student account is inactive' },
+            { status: 403 },
+        );
     }
 
-    if (!profile.client_id) { 
-      console.error(`Student ${user.id} has no assigned client_id.`);
+    // Ensure the student is associated with a client
+    if (!studentRecord.client_id) { 
+      console.error(`Student ${user.id} has no assigned client_id in students table.`);
       return NextResponse.json(
         { error: 'Forbidden: Student not associated with a client' },
         { status: 403 },
       );
     }
     const studentId = user.id;
-    const clientId = profile.client_id;
+    const clientId = studentRecord.client_id; // Use client_id from the student record
 
     // 4. Verify Enrollment
     // 4a. Get product_id from module
@@ -140,19 +142,19 @@ export async function PATCH(
     const progressRecord: {
       student_id: string;
       module_id: string;
-      status?: 'NotStarted' | 'InProgress' | 'Completed'; // Match local schema/DB
-      score?: number | null; // Match local schema/DB
+      status?: 'NotStarted' | 'InProgress' | 'Completed';
+      score?: number | null;
+      progress_percentage?: number | null;
       completed_at: string | null;
-      updated_at: string;
+      last_updated: string;
     } = {
       student_id: studentId,
       module_id: moduleId,
-      // Use fields from the validated local schema data
       ...(updateData.status !== undefined && { status: updateData.status }),
-      ...(updateData.score !== undefined && { score: updateData.score }), // Use score now
-      // Use the correct 'Completed' status for the check
+      ...(updateData.score !== undefined && { score: updateData.score }),
+      ...(updateData.progress_percentage !== undefined && { progress_percentage: updateData.progress_percentage }),
       completed_at: updateData.status === 'Completed' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(), // Always update this timestamp
+      last_updated: new Date().toISOString(),
     };
 
     const { data: upsertedProgress, error: upsertError } = await supabase
@@ -198,14 +200,14 @@ export async function GET(
 ) {
   try {
     // 1. Validate Route Parameter (moduleId)
-    const moduleIdValidation = UuidSchema.safeParse(params.moduleId);
+    const { moduleId } = await params;
+    const moduleIdValidation = UuidSchema.safeParse(moduleId);
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request: Invalid Module ID format', details: moduleIdValidation.error.flatten().formErrors },
         { status: 400 },
       );
     }
-    const moduleId = moduleIdValidation.data;
 
     // 2. Authentication & Authorization (Similar to PATCH)
     const supabase = await createClient();

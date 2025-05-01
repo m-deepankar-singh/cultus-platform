@@ -9,6 +9,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
+    const paramsObj = await params;
 
     // 1. Authentication & Authorization
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -34,7 +35,7 @@ export async function GET(
     // --- User is authenticated and is an Admin, proceed ---
 
     // 2. Validate Route Parameter
-    const validationResult = ProductIdSchema.safeParse(params);
+    const validationResult = ProductIdSchema.safeParse({ productId: paramsObj.productId });
 
     if (!validationResult.success) {
         console.error('Validation error (productId):', validationResult.error.flatten());
@@ -81,6 +82,7 @@ export async function PUT(
 ) {
   try {
     const supabase = await createClient();
+    const paramsObj = await params;
 
     // 1. Authentication & Authorization
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -106,7 +108,7 @@ export async function PUT(
     // --- User is authenticated and is an Admin, proceed ---
 
     // 2. Validate Route Parameter
-    const paramValidation = ProductIdSchema.safeParse(params);
+    const paramValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
     if (!paramValidation.success) {
       console.error('Validation error (productId):', paramValidation.error.flatten());
       return NextResponse.json({ error: 'Invalid Product ID format', details: paramValidation.error.flatten() }, { status: 400 });
@@ -170,6 +172,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient();
+    const paramsObj = await params;
 
     // 1. Authentication & Authorization
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -195,7 +198,7 @@ export async function DELETE(
     // --- User is authenticated and is an Admin, proceed ---
 
     // 2. Validate Route Parameter
-    const paramValidation = ProductIdSchema.safeParse(params);
+    const paramValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
     if (!paramValidation.success) {
       console.error('Validation error (productId):', paramValidation.error.flatten());
       return NextResponse.json({ error: 'Invalid Product ID format', details: paramValidation.error.flatten() }, { status: 400 });

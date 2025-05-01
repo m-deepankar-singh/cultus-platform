@@ -14,6 +14,8 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
+    const paramsObj = await params;
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
@@ -29,7 +31,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
     }
 
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -41,7 +43,7 @@ export async function GET(
     const { data: module, error: moduleError } = await supabase
       .from('modules')
       .select('*, product:products(id, name)') // Fetch product details too
-      .eq('id', params.moduleId)
+      .eq('id', paramsObj.moduleId)
       .single();
 
     if (moduleError) {
@@ -61,7 +63,7 @@ export async function GET(
       const { data: lessons, error } = await supabase
         .from('course_lessons')
         .select('*, quiz:course_questions(id, question_text)')
-        .eq('module_id', params.moduleId)
+        .eq('module_id', paramsObj.moduleId)
         .order('sequence', { ascending: true });
       relatedData.lessons = lessons;
       relatedError = error;
@@ -69,7 +71,7 @@ export async function GET(
       const { data: assessmentQuestions, error } = await supabase
         .from('assessment_module_questions')
         .select('question:assessment_questions(*)') // Select all columns from joined questions
-        .eq('module_id', params.moduleId);
+        .eq('module_id', paramsObj.moduleId);
       relatedData.assessmentQuestions = assessmentQuestions?.map(aq => aq.question) ?? []; // Extract question objects
       relatedError = error;
     }
@@ -102,6 +104,8 @@ export async function PUT(
 ) {
   try {
     const supabase = await createClient();
+    const paramsObj = await params;
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
@@ -117,7 +121,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
     }
 
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -146,7 +150,7 @@ export async function PUT(
     const { data: updatedModule, error: updateError } = await supabase
       .from('modules')
       .update(updateData)
-      .eq('id', params.moduleId)
+      .eq('id', paramsObj.moduleId)
       .select()
       .single();
 
@@ -179,6 +183,8 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient();
+    const paramsObj = await params;
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
@@ -194,7 +200,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
     }
 
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -206,7 +212,7 @@ export async function DELETE(
     const { error: deleteError, count } = await supabase
       .from('modules')
       .delete({ count: 'exact' }) // Request count to check if a row was actually deleted
-      .eq('id', params.moduleId);
+      .eq('id', paramsObj.moduleId);
 
     if (deleteError) {
       console.error('Error deleting module:', deleteError);
