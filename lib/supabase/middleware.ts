@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export function createClient(request: NextRequest) {
-  // Create an unmodified response
+  // Create an initial response object to be potentially modified
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -14,43 +14,24 @@ export function createClient(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
-          // If the cookie is updated, update the cookies for the request and response
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          });
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          // Apply cookies to the request object first (name and value only)
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          
+          // Create the response *after* modifying the request cookies
+          // Pass the modified request object to NextResponse.next()
           response = NextResponse.next({
             request: {
-              headers: request.headers,
+              headers: request.headers, // Maintain original headers
             },
           });
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-        },
-        remove(name: string, options: CookieOptions) {
-          // If the cookie is removed, update the cookies for the request and response
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
+
+          // Apply cookies to the response object created from the *modified* request
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
           });
         },
       },

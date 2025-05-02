@@ -13,5 +13,15 @@ export const UpdateProductSchema = ProductSchema.partial();
 
 // Schema for validating a product ID (UUID) from route parameters
 export const ProductIdSchema = z.object({
-  productId: z.string().uuid({ message: 'Invalid Product ID format' })
-}); 
+  productId: z.string().uuid({
+    message: 'Product ID must be a valid UUID',
+  }),
+});
+
+export const ProductAssignmentSchema = z.object({
+  product_id: z.string().uuid({
+    message: 'Product ID must be a valid UUID',
+  }),
+});
+
+export type ProductFormData = z.infer<typeof ProductSchema>; 

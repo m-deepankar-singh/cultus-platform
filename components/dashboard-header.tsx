@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Bell, BookOpen, Moon, Search, Sun, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,13 @@ import { useTheme } from "next-themes"
 
 export function DashboardHeader() {
   const [showNotifications, setShowNotifications] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+
+  // useEffect only runs on the client, so we only show the theme toggle after mounting
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 dark:border-primary/20 dark:bg-background/95 dark:backdrop-blur-md">
@@ -36,7 +42,11 @@ export function DashboardHeader() {
           aria-label="Toggle theme"
           className="dark:hover:text-primary"
         >
-          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          {mounted ? (
+            theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />
+          ) : (
+            <div className="h-5 w-5" /> // Renders an empty div during SSR
+          )}
         </Button>
 
         <Button

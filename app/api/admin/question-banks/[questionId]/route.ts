@@ -6,242 +6,227 @@ import {
     QuestionBankType // Import QuestionBankType for DELETE query param validation
 } from '@/lib/schemas/question';
 
+interface RouteParams {
+    params: {
+        questionId: string;
+    };
+}
+
 // --- GET Handler (Get Question Details) ---
-export async function GET(
-    request: Request,
-    { params }: { params: { questionId: string } }
-) {
+export async function GET(request: Request, { params }: RouteParams) {
     try {
         const supabase = await createClient();
-        const paramsObj = await params;
 
-        // 1. Get authenticated user & role
+        // 1. Validate the question ID
+        const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
+        if (!validationResult.success) {
+            return NextResponse.json(
+                { error: 'Invalid question ID', details: validationResult.error.flatten() },
+                { status: 400 }
+            );
+        }
+
+        // 2. Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        // 3. Fetch user role
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', user.id)
             .single();
-        if (profileError || !profile || profile.role !== 'Admin') {
+
+        if (profileError || !profile) {
+            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
+        }
+
+        const userRole = profile.role;
+
+        // 4. Check if user has appropriate role
+        if (userRole !== 'Admin') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // 2. Validate Route Parameter
-        const idValidationResult = QuestionIdSchema.safeParse({ questionId: paramsObj.questionId });
-        if (!idValidationResult.success) {
-            return NextResponse.json(
-                { error: 'Invalid Question ID format', details: idValidationResult.error.flatten() },
-                { status: 400 }
-            );
-        }
-        const { questionId } = idValidationResult.data;
-
-        // 3. Validate Query Parameter (`type`)
-        const { searchParams } = new URL(request.url);
-        const typeResult = QuestionBankType.safeParse(searchParams.get('type'));
-
-        if (!typeResult.success) {
-             return NextResponse.json(
-                { error: 'Missing or invalid query parameter: type', details: typeResult.error.flatten() },
-                { status: 400 }
-            );
-        }
-        const type = typeResult.data;
-
-        // 4. Determine Target Table
-        const tableName = type === 'course' ? 'course_questions' : 'assessment_questions';
-
-        // 5. Fetch Question from the database
-        const { data: question, error: dbError } = await supabase
-            .from(tableName)
+        // 5. Fetch the question (try assessment_questions first)
+        const { data: question, error: questionError } = await supabase
+            .from('assessment_questions')
             .select('*')
-            .eq('id', questionId)
+            .eq('id', params.questionId)
             .single();
 
-        if (dbError) {
-            console.error(`GET /api/admin/question-banks/${questionId}: DB Error fetching from ${tableName}`, dbError);
-            if (dbError.code === 'PGRST116') { // PostgREST code for "Matching row not found"
-                return NextResponse.json({ error: 'Question not found' }, { status: 404 });
-            }
-            return NextResponse.json({ error: 'Database error while fetching question.', details: dbError.message }, { status: 500 });
+        if (questionError && questionError.code !== 'PGRST116') { // Not found error code
+            return NextResponse.json({ error: 'Database error', details: questionError.message }, { status: 500 });
         }
 
         if (!question) {
             return NextResponse.json({ error: 'Question not found' }, { status: 404 });
         }
 
-        // 6. Return question data
         return NextResponse.json(question, { status: 200 });
-
     } catch (error) {
-        console.error(`GET /api/admin/question-banks/[questionId]: Unexpected Error`, error);
+        console.error('GET /api/admin/question-banks/[questionId]: Unexpected Error', error);
         return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
     }
 }
 
 // --- PUT Handler (Update Question - Step 5) ---
-export async function PUT(
-    request: Request,
-    { params }: { params: { questionId: string } }
-) {
+export async function PUT(request: Request, { params }: RouteParams) {
     try {
         const supabase = await createClient();
-        const paramsObj = await params;
 
-        // 1. Get authenticated user & role
+        // 1. Validate the question ID
+        const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
+        if (!validationResult.success) {
+            return NextResponse.json(
+                { error: 'Invalid question ID', details: validationResult.error.flatten() },
+                { status: 400 }
+            );
+        }
+
+        // 2. Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        // 3. Fetch user role
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', user.id)
             .single();
-        if (profileError || !profile || profile.role !== 'Admin') {
+
+        if (profileError || !profile) {
+            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
+        }
+
+        const userRole = profile.role;
+
+        // 4. Check if user has appropriate role
+        if (userRole !== 'Admin') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // 2. Validate Route Parameter
-        const idValidationResult = QuestionIdSchema.safeParse({ questionId: paramsObj.questionId });
-        if (!idValidationResult.success) {
-            return NextResponse.json(
-                { error: 'Invalid Question ID format', details: idValidationResult.error.flatten() },
-                { status: 400 }
-            );
-        }
-        const { questionId } = idValidationResult.data;
-
-        // 3. Parse & Validate Request Body
+        // 5. Validate request body
         const body = await request.json();
-        const validationResult = UpdateQuestionApiSchema.safeParse(body);
-
-        if (!validationResult.success) {
-            console.error(`PUT /api/admin/question-banks/${questionId}: Validation Error`, validationResult.error.flatten());
+        const bodyValidation = UpdateQuestionApiSchema.safeParse(body);
+        if (!bodyValidation.success) {
             return NextResponse.json(
-                { error: 'Invalid request body', details: validationResult.error.flatten() },
+                { error: 'Invalid request body', details: bodyValidation.error.flatten() },
                 { status: 400 }
             );
         }
 
-        // 4. Extract data and determine target table
-        const { bank_type, ...updateData } = validationResult.data;
+        // 6. Extract and prepare data for update
+        const { bank_type, ...questionData } = bodyValidation.data;
 
-        // Ensure there's something to update besides bank_type (which isn't stored)
-        if (Object.keys(updateData).length === 0) {
-             return NextResponse.json(
-                { error: 'Request body must contain fields to update.' },
-                { status: 400 }
-            );
-        }
+        // Always use assessment_questions table
+        const tableName = 'assessment_questions';
 
-        const tableName = bank_type === 'course' ? 'course_questions' : 'assessment_questions';
-
-        // 5. Update Question in the database
-        const { data: updatedQuestion, error: dbError } = await supabase
+        // 7. Check if question exists
+        const { data: existingQuestion, error: checkError } = await supabase
             .from(tableName)
-            .update(updateData)
-            .eq('id', questionId)
+            .select('id')
+            .eq('id', params.questionId)
+            .single();
+
+        if (checkError) {
+            if (checkError.code === 'PGRST116') { // Not found error code
+                return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+            }
+            return NextResponse.json({ error: 'Database error', details: checkError.message }, { status: 500 });
+        }
+
+        // 8. Update the question
+        const { data: updatedQuestion, error: updateError } = await supabase
+            .from(tableName)
+            .update(questionData)
+            .eq('id', params.questionId)
             .select()
             .single();
 
-        if (dbError) {
-            console.error(`PUT /api/admin/question-banks/${questionId}: DB Error updating ${tableName}`, dbError);
-            // Handle potential errors like not found (e.g., if dbError.code indicates no rows updated)
-             if (dbError.code === 'PGRST116') { // PostgREST code for "Matching row not found"
-                return NextResponse.json({ error: 'Question not found' }, { status: 404 });
-            }
-            return NextResponse.json({ error: 'Database error while updating question.', details: dbError.message }, { status: 500 });
+        if (updateError) {
+            return NextResponse.json({ error: 'Database error while updating question', details: updateError.message }, { status: 500 });
         }
 
-         // This check is redundant if using .single() which errors on no rows, but good practice if not using .single()
-        if (!updatedQuestion) {
-             return NextResponse.json({ error: 'Question not found' }, { status: 404 });
-        }
-
-        // 6. Return updated question data
         return NextResponse.json(updatedQuestion, { status: 200 });
-
     } catch (error) {
-        console.error(`PUT /api/admin/question-banks/[questionId]: Unexpected Error`, error);
+        console.error('PUT /api/admin/question-banks/[questionId]: Unexpected Error', error);
         return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
     }
 }
 
 // --- DELETE Handler (Delete Question - Step 6) ---
-export async function DELETE(
-    request: Request, // request is needed to get query params
-    { params }: { params: { questionId: string } }
-) {
+export async function DELETE(request: Request, { params }: RouteParams) {
      try {
         const supabase = await createClient();
-        const paramsObj = await params;
 
-        // 1. Get authenticated user & role (same as PUT)
+        // 1. Validate the question ID
+        const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
+        if (!validationResult.success) {
+            return NextResponse.json(
+                { error: 'Invalid question ID', details: validationResult.error.flatten() },
+                { status: 400 }
+            );
+        }
+
+        // 2. Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
          if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        // 3. Fetch user role
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', user.id)
             .single();
-        if (profileError || !profile || profile.role !== 'Admin') {
+
+        if (profileError || !profile) {
+            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
+        }
+
+        const userRole = profile.role;
+
+        // 4. Check if user has appropriate role
+        if (userRole !== 'Admin') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // 2. Validate Route Parameter
-        const idValidationResult = QuestionIdSchema.safeParse({ questionId: paramsObj.questionId });
-        if (!idValidationResult.success) {
-            return NextResponse.json(
-                { error: 'Invalid Question ID format', details: idValidationResult.error.flatten() },
-                { status: 400 }
-            );
-        }
-        const { questionId } = idValidationResult.data;
+        // 5. Always use assessment_questions table
+        const tableName = 'assessment_questions';
 
-        // 3. Validate Query Parameter (`type`)
-        const { searchParams } = new URL(request.url);
-        const typeResult = QuestionBankType.safeParse(searchParams.get('type'));
-
-        if (!typeResult.success) {
-             return NextResponse.json(
-                { error: 'Missing or invalid query parameter: type', details: typeResult.error.flatten() },
-                { status: 400 }
-            );
-        }
-        const type = typeResult.data;
-
-        // 4. Determine Target Table
-        const tableName = type === 'course' ? 'course_questions' : 'assessment_questions';
-
-        // 5. Perform Deletion
-        // TODO: Consider adding dependency checks here before deletion if needed
-        // e.g., check if questionId exists in `module_quiz_questions` or `assessment_module_questions`
-        const { error: dbError, count } = await supabase
+        // 6. Check if question exists
+        const { data: existingQuestion, error: checkError } = await supabase
             .from(tableName)
-            .delete({ count: 'exact' }) // Get the count of deleted rows
-            .eq('id', questionId);
+            .select('id')
+            .eq('id', params.questionId)
+            .single();
 
-        if (dbError) {
-             console.error(`DELETE /api/admin/question-banks/${questionId}: DB Error deleting from ${tableName}`, dbError);
-            return NextResponse.json({ error: 'Database error while deleting question.', details: dbError.message }, { status: 500 });
+        if (checkError) {
+            if (checkError.code === 'PGRST116') { // Not found error code
+                return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+            }
+            return NextResponse.json({ error: 'Database error', details: checkError.message }, { status: 500 });
         }
 
-        // Check if a row was actually deleted
-        if (count === 0) {
-            return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+        // 7. Delete the question
+        const { error: deleteError } = await supabase
+            .from(tableName)
+            .delete()
+            .eq('id', params.questionId);
+
+        if (deleteError) {
+            return NextResponse.json({ error: 'Database error while deleting question', details: deleteError.message }, { status: 500 });
         }
 
-        // 6. Return success (No Content)
-        return new NextResponse(null, { status: 204 });
-
+        return NextResponse.json({ success: true, message: 'Question deleted successfully' }, { status: 200 });
     } catch (error) {
-        console.error(`DELETE /api/admin/question-banks/[questionId]: Unexpected Error`, error);
+        console.error('DELETE /api/admin/question-banks/[questionId]: Unexpected Error', error);
         return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
     }
 } 

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserSessionAndRole } from '@/lib/supabase/utils';
@@ -12,8 +11,11 @@ import { ProductIdSchema } from '@/lib/schemas/product';
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { clientId: string; productId: string } }
+  context: { params: { clientId: string; productId: string } }
 ) {
+  // Properly await the params object
+  const params = await context.params;
+  
   // Authenticate and authorize the user
   const { profile, role, error: authError } = await getUserSessionAndRole();
 
@@ -27,20 +29,21 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden: Access denied for this role' }, { status: 403 });
   }
 
-  // Validate route parameters
+  // Validate clientId from route params
   const clientIdValidation = ClientIdSchema.safeParse({ clientId: params.clientId });
-  const productIdValidation = ProductIdSchema.safeParse({ productId: params.productId });
+  if (!clientIdValidation.success) {
+    return NextResponse.json({
+      error: 'Invalid Client ID format',
+      details: clientIdValidation.error.flatten() 
+    }, { status: 400 });
+  }
 
-  // Check both validations
-  if (!clientIdValidation.success || !productIdValidation.success) {
-    const errors = {
-      ...(clientIdValidation.success ? {} : { clientId: clientIdValidation.error.flatten() }),
-      ...(productIdValidation.success ? {} : { productId: productIdValidation.error.flatten() }),
-    };
-    
+  // Validate productId from route params
+  const productIdValidation = ProductIdSchema.safeParse({ productId: params.productId });
+  if (!productIdValidation.success) {
     return NextResponse.json({ 
-      error: 'Invalid route parameters', 
-      details: errors 
+      error: 'Invalid Product ID format',
+      details: productIdValidation.error.flatten() 
     }, { status: 400 });
   }
 
@@ -63,28 +66,21 @@ export async function DELETE(
     // Create Supabase client
     const supabase = await createClient();
     
-    // Perform the deletion
-    const { error, count } = await supabase
+    // Delete the assignment
+    const { error } = await supabase
       .from('client_product_assignments')
-      .delete({ count: 'exact' }) // Request count to check if row existed
-      .eq('client_id', validatedClientId)
-      .eq('product_id', validatedProductId);
+      .delete()
+      .match({
+        client_id: validatedClientId,
+        product_id: validatedProductId
+      });
 
     if (error) {
       console.error('Error unassigning product from client:', error);
       return NextResponse.json({ error: 'Database error unassigning product' }, { status: 500 });
     }
 
-    // Check if any rows were deleted
-    if (count === 0) {
-      // Optional: decide if you want to return 404 or just success when the assignment doesn't exist
-      return NextResponse.json({ 
-        message: 'Product was not assigned to this client' 
-      }, { status: 404 }); // Not Found
-    }
-
-    // Success - return 204 No Content for successful deletion
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ success: true }, { status: 200 });
     
   } catch (error) {
     console.error('Unexpected error in DELETE /api/staff/clients/[clientId]/products/[productId]:', error);

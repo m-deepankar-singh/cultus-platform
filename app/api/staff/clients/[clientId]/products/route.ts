@@ -9,7 +9,7 @@ import type { Product, ClientProductAssignment } from '@/lib/types/supabase';
 
 // Define the expected structure of the assignment data including the joined product
 type AssignmentWithProduct = {
-  assigned_at: string;
+  created_at: string;
   product: Product | null;
 };
 
@@ -18,12 +18,11 @@ type AssignmentWithProduct = {
  * Accessible by Admins and Staff (for their assigned client).
  */
 export async function GET(
-  request: Request, // Keep request parameter even if unused for potential future use
-  { params }: { params: { clientId: string } }
+  request: Request,
+  context: { params: { clientId: string } }
 ) {
-  // Fix: Remove supabase client creation here, as getUserSessionAndRole handles it
-  // const supabase = createClient(); 
-  // Fix: Call without arguments
+  // Properly await the params object
+  const params = await context.params;
   const { profile, role, error: authError } = await getUserSessionAndRole();
 
   if (authError || !profile || !role) {
@@ -65,9 +64,9 @@ export async function GET(
     // Explicitly type the expected return data from Supabase
     const { data: assignments, error: dbError } = await supabase
       .from('client_product_assignments')
-      .select('assigned_at, product:products(*)') // Select assignment details and all product info
+      .select('created_at, product:products(*)')
       .eq('client_id', validatedClientId)
-      .returns<AssignmentWithProduct[]>(); // Specify the expected return type
+      .returns<AssignmentWithProduct[]>();
 
     if (dbError) {
       console.error('Error fetching client product assignments:', dbError);
@@ -77,7 +76,7 @@ export async function GET(
     // Extract just the product details from the assignments with proper typing
     const assignedProducts = assignments
         ?.map((a: AssignmentWithProduct) => a.product)
-        .filter((p: Product | null): p is Product => p !== null) // Type guard to filter out nulls
+        .filter((p: Product | null): p is Product => p !== null)
         ?? [];
 
     return NextResponse.json(assignedProducts);
@@ -94,8 +93,11 @@ export async function GET(
  */
 export async function POST(
   request: Request,
-  { params }: { params: { clientId: string } }
+  context: { params: { clientId: string } }
 ) {
+  // Properly await the params object
+  const params = await context.params;
+  
   // Authenticate and authorize the user
   const { profile, role, error: authError } = await getUserSessionAndRole();
 
@@ -170,7 +172,7 @@ export async function POST(
       .insert({
         client_id: validatedClientId,
         product_id: product_id,
-        // The database likely has a default for assigned_at (now())
+        // The database will automatically set created_at with the default value
       })
       .select()
       .single();

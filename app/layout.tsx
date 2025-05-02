@@ -4,12 +4,13 @@ import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SidebarProvider } from "@/components/sidebar-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { QueryProvider } from "@/components/providers/query-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Admin Dashboard - Upskilling Platform",
-  description: "Admin dashboard for managing an upskilling platform",
+  title: "Upskilling Platform",
+  description: "Platform for upskilling learners",
     generator: 'v0.dev'
 }
 
@@ -22,10 +23,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <QueryProvider>
           <SidebarProvider>
             {children}
             <Toaster />
           </SidebarProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

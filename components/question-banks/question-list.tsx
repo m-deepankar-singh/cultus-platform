@@ -1,0 +1,230 @@
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Edit, Search, Trash2 } from 'lucide-react';
+import { QuestionForm } from './question-form';
+import { Badge } from '@/components/ui/badge';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+// Define the Question type based on your API response
+interface Question {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  question_text: string;
+  options: { id: string; text: string }[];
+  correct_answer: string | { answers: string[] };
+  created_by: string | null;
+  difficulty: string | null;
+  topic: string | null;
+  question_type: 'MCQ' | 'MSQ';
+}
+
+interface QuestionListProps {
+  questions: Question[];
+  type: 'assessment' | 'course';
+}
+
+export default function QuestionList({ questions, type }: QuestionListProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState<string | null>(null);
+
+  // Filter questions based on search term
+  const filteredQuestions = questions.filter(question => 
+    question.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    question.topic?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    question.difficulty?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Format the date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  };
+
+  // Get correct answer display text
+  const getCorrectAnswerText = (question: Question) => {
+    if (question.question_type === 'MCQ') {
+      const correctOptionId = question.correct_answer as string;
+      const correctOption = question.options.find(opt => opt.id === correctOptionId);
+      return correctOption ? correctOption.text : 'Unknown';
+    } else {
+      const answers = (question.correct_answer as { answers: string[] }).answers;
+      const correctOptions = question.options.filter(opt => answers.includes(opt.id));
+      return correctOptions.map(opt => opt.text).join(', ');
+    }
+  };
+
+  // Handle edit
+  const handleEdit = (question: Question) => {
+    setEditingQuestion(question);
+    setIsFormOpen(true);
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = (id: string) => {
+    setQuestionToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  // Handle actual deletion
+  const handleDelete = async () => {
+    if (!questionToDelete) return;
+    
+    try {
+      // Call API to delete question
+      const res = await fetch(`/api/admin/question-banks/${questionToDelete}`, {
+        method: 'DELETE',
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to delete question');
+      }
+      
+      // Could refresh questions here or use optimistic updates
+      // For now, we'll just close the dialog
+      setDeleteDialogOpen(false);
+      setQuestionToDelete(null);
+      
+      // In a real implementation, you would either redirect or refresh the questions
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      setDeleteDialogOpen(false);
+      setQuestionToDelete(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>
+          {type === 'assessment' ? 'Assessment' : 'Course'} Questions
+        </CardTitle>
+        <div className="relative w-64">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search questions..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Question</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Correct Answer</TableHead>
+              <TableHead>Topic</TableHead>
+              <TableHead>Difficulty</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredQuestions.length > 0 ? (
+              filteredQuestions.map((question) => (
+                <TableRow key={question.id}>
+                  <TableCell className="font-medium max-w-xs truncate" title={question.question_text}>
+                    {question.question_text}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{question.question_type}</Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate" title={getCorrectAnswerText(question)}>
+                    {getCorrectAnswerText(question)}
+                  </TableCell>
+                  <TableCell>{question.topic || '-'}</TableCell>
+                  <TableCell>{question.difficulty || '-'}</TableCell>
+                  <TableCell>{formatDate(question.created_at)}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <span className="sr-only">Open menu</span>
+                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
+                            <path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
+                          </svg>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => handleEdit(question)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onSelect={() => handleDeleteConfirm(question.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center h-24">
+                  {searchTerm 
+                    ? 'No questions found matching your search.' 
+                    : 'No questions available. Add a new question to get started.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+
+      {/* Edit Question Form */}
+      {editingQuestion && (
+        <QuestionForm 
+          open={isFormOpen} 
+          onOpenChange={setIsFormOpen} 
+          bankType={type} 
+          questionToEdit={editingQuestion} 
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the question
+              and remove it from any assessments or courses that use it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+} 

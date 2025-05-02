@@ -165,6 +165,94 @@ export async function PUT(
   }
 }
 
+// Handler for partially updating an existing product (PATCH)
+export async function PATCH(
+  request: Request, 
+  { params }: { params: { productId: string } }
+) {
+  try {
+    const supabase = await createClient();
+    const paramsObj = await params;
+
+    // 1. Authentication & Authorization
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
+    }
+
+    if (profile.role !== 'Admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // --- User is authenticated and is an Admin, proceed ---
+
+    // 2. Validate Route Parameter
+    const paramValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
+    if (!paramValidation.success) {
+      console.error('Validation error (productId):', paramValidation.error.flatten());
+      return NextResponse.json({ error: 'Invalid Product ID format', details: paramValidation.error.flatten() }, { status: 400 });
+    }
+    const { productId } = paramValidation.data;
+
+    // 3. Parse & Validate Request Body
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      console.error('Invalid JSON body:', e);
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    // Use the same UpdateProductSchema since it's already set up to handle partial updates
+    const bodyValidation = UpdateProductSchema.safeParse(body);
+    if (!bodyValidation.success) {
+      console.error('Validation error (body):', bodyValidation.error.flatten());
+      return NextResponse.json({ error: 'Invalid input', details: bodyValidation.error.flatten() }, { status: 400 });
+    }
+    const updateData = bodyValidation.data;
+
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No update data provided' }, { status: 400 });
+    }
+
+    // 4. Update Product in Database (same as PUT but semantically for partial updates)
+    const { data: updatedProduct, error: dbError } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', productId)
+      .select() // Select the updated record
+      .single();
+
+    // 5. Handle Response & Errors
+    if (dbError) {
+      console.error(`Database error updating product ${productId}:`, dbError);
+      return NextResponse.json({ error: 'Failed to update product', details: dbError.message }, { status: 500 });
+    }
+
+    if (!updatedProduct) {
+      return NextResponse.json({ error: `Product with ID ${productId} not found or update failed` }, { status: 404 });
+    }
+
+    return NextResponse.json(updatedProduct, { status: 200 });
+
+  } catch (error) {
+    console.error(`Unexpected error in PATCH /api/admin/products/[productId]:`, error);
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+  }
+}
+
 // Handler for deleting a product
 export async function DELETE(
   request: Request, // Keep request parameter for consistency, even if unused

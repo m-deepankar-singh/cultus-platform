@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema, LessonIdSchema, UpdateCourseLessonSchema } from '@/lib/schemas/module';
+import { z } from 'zod';
+
+const LessonUpdateSchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  description: z.string().optional().nullable(),
+  video_url: z.string().url().optional().nullable(),
+  sequence: z.number().int().positive().optional(),
+  has_quiz: z.boolean().optional(),
+  quiz_questions: z.array(z.any()).optional(),
+  quiz_data: z.any().optional()
+});
 
 /**
  * GET /api/admin/modules/[moduleId]/lessons/[lessonId]
@@ -13,6 +24,10 @@ export async function GET(
   { params }: { params: { moduleId: string; lessonId: string } }
 ) {
   try {
+    // Await params before destructuring to fix Next.js warning
+    const resolvedParams = await Promise.resolve(params);
+    const { moduleId: rawModuleId, lessonId: rawLessonId } = resolvedParams;
+    
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -30,7 +45,7 @@ export async function GET(
     }
 
     // Validate route parameters
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -39,7 +54,7 @@ export async function GET(
     }
     const moduleId = moduleIdValidation.data.moduleId;
 
-    const lessonIdValidation = LessonIdSchema.safeParse({ lessonId: params.lessonId });
+    const lessonIdValidation = LessonIdSchema.safeParse({ lessonId: rawLessonId });
     if (!lessonIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Lesson ID format', details: lessonIdValidation.error.format() }, 
@@ -48,51 +63,32 @@ export async function GET(
     }
     const lessonId = lessonIdValidation.data.lessonId;
 
-    // Verify the module exists and is of type 'Course'
-    const { data: module, error: moduleCheckError } = await supabase
-      .from('modules')
-      .select('id, type')
-      .eq('id', moduleId)
-      .single();
+    // Fetch the specific lesson
+    const { data: lesson, error } = await supabase
+      .from("lessons")
+      .select("*")
+      .eq("id", lessonId)
+      .eq("module_id", moduleId)
+      .single()
 
-    if (moduleCheckError) {
-      if (moduleCheckError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Not Found', message: 'Module not found' }, { status: 404 });
-      } else {
-        console.error('Error checking module type:', moduleCheckError);
-        return NextResponse.json({ error: 'Server Error', message: 'Error verifying module' }, { status: 500 });
+    if (error) {
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ error: "Lesson not found" }, { status: 404 })
       }
-    }
-
-    if (module.type !== 'Course') {
+      console.error("Error fetching lesson:", error)
       return NextResponse.json(
-        { error: 'Bad Request', message: `Lessons are only applicable to 'Course' modules. This module is of type '${module.type}'.` },
-        { status: 400 }
-      );
+        { error: "Failed to fetch lesson" },
+        { status: 500 }
+      )
     }
 
-    // Fetch the specific lesson (ensuring it belongs to the correct module)
-    const { data: lesson, error: lessonError } = await supabase
-      .from('course_lessons')
-      .select('*')
-      .eq('id', lessonId)
-      .eq('module_id', moduleId) // Important: ensure lesson belongs to specified module
-      .single();
-
-    if (lessonError) {
-      if (lessonError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Not Found', message: 'Lesson not found in this module' }, { status: 404 });
-      } else {
-        console.error('Error fetching lesson:', lessonError);
-        return NextResponse.json({ error: 'Server Error', message: 'Error fetching lesson details' }, { status: 500 });
-      }
-    }
-
-    return NextResponse.json(lesson);
-
+    return NextResponse.json(lesson)
   } catch (error) {
-    console.error('Unexpected error in GET lesson details:', error);
-    return NextResponse.json({ error: 'Server Error', message: 'An unexpected error occurred' }, { status: 500 });
+    console.error("Error in GET lesson:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch lesson" },
+      { status: 500 }
+    )
   }
 }
 
@@ -107,6 +103,10 @@ export async function PUT(
   { params }: { params: { moduleId: string; lessonId: string } }
 ) {
   try {
+    // Await params before destructuring to fix Next.js warning
+    const resolvedParams = await Promise.resolve(params);
+    const { moduleId: rawModuleId, lessonId: rawLessonId } = resolvedParams;
+    
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -124,7 +124,7 @@ export async function PUT(
     }
 
     // Validate route parameters
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -133,7 +133,7 @@ export async function PUT(
     }
     const moduleId = moduleIdValidation.data.moduleId;
 
-    const lessonIdValidation = LessonIdSchema.safeParse({ lessonId: params.lessonId });
+    const lessonIdValidation = LessonIdSchema.safeParse({ lessonId: rawLessonId });
     if (!lessonIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Lesson ID format', details: lessonIdValidation.error.format() }, 
@@ -142,60 +142,59 @@ export async function PUT(
     }
     const lessonId = lessonIdValidation.data.lessonId;
 
-    // Parse and validate request body
-    const body = await request.json();
-    const updateValidation = UpdateCourseLessonSchema.safeParse(body);
-
-    if (!updateValidation.success) {
-      return NextResponse.json(
-        { error: 'Bad Request', message: 'Invalid update data', details: updateValidation.error.format() },
-        { status: 400 }
-      );
-    }
-
-    const updateData = updateValidation.data;
-
-    // Check if there's actually anything to update
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: 'Bad Request', message: 'No update fields provided' }, { status: 400 });
-    }
-
-    // Verify the lesson exists and belongs to the specified module
+    // First, check if lesson exists
     const { data: existingLesson, error: checkError } = await supabase
-      .from('course_lessons')
-      .select('id')
-      .eq('id', lessonId)
-      .eq('module_id', moduleId)
-      .single();
+      .from("lessons")
+      .select("id")
+      .eq("id", lessonId)
+      .eq("module_id", moduleId)
+      .single()
 
     if (checkError) {
-      if (checkError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Not Found', message: 'Lesson not found in this module' }, { status: 404 });
-      } else {
-        console.error('Error checking lesson existence:', checkError);
-        return NextResponse.json({ error: 'Server Error', message: 'Error verifying lesson' }, { status: 500 });
+      if (checkError.code === "PGRST116") {
+        return NextResponse.json({ error: "Lesson not found" }, { status: 404 })
       }
+      console.error("Error checking lesson:", checkError)
+      return NextResponse.json(
+        { error: "Failed to verify lesson" },
+        { status: 500 }
+      )
+    }
+
+    // Validate update data
+    const body = await request.json()
+    const result = LessonUpdateSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Invalid lesson data", details: result.error.format() },
+        { status: 400 }
+      )
     }
 
     // Update the lesson
     const { data: updatedLesson, error: updateError } = await supabase
-      .from('course_lessons')
-      .update(updateData)
-      .eq('id', lessonId)
-      .eq('module_id', moduleId) // Ensure we only update if the lesson belongs to this module
+      .from("lessons")
+      .update(result.data)
+      .eq("id", lessonId)
+      .eq("module_id", moduleId)
       .select()
-      .single();
+      .single()
 
     if (updateError) {
-      console.error('Error updating lesson:', updateError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error updating lesson' }, { status: 500 });
+      console.error("Error updating lesson:", updateError)
+      return NextResponse.json(
+        { error: "Failed to update lesson" },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json(updatedLesson);
-
+    return NextResponse.json(updatedLesson)
   } catch (error) {
-    console.error('Unexpected error in PUT lesson:', error);
-    return NextResponse.json({ error: 'Server Error', message: 'An unexpected error occurred' }, { status: 500 });
+    console.error("Error in PUT lesson:", error)
+    return NextResponse.json(
+      { error: "Failed to update lesson" },
+      { status: 500 }
+    )
   }
 }
 
@@ -210,6 +209,10 @@ export async function DELETE(
   { params }: { params: { moduleId: string; lessonId: string } }
 ) {
   try {
+    // Await params before destructuring to fix Next.js warning
+    const resolvedParams = await Promise.resolve(params);
+    const { moduleId: rawModuleId, lessonId: rawLessonId } = resolvedParams;
+    
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -227,7 +230,7 @@ export async function DELETE(
     }
 
     // Validate route parameters
-    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: params.moduleId });
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
@@ -236,7 +239,7 @@ export async function DELETE(
     }
     const moduleId = moduleIdValidation.data.moduleId;
 
-    const lessonIdValidation = LessonIdSchema.safeParse({ lessonId: params.lessonId });
+    const lessonIdValidation = LessonIdSchema.safeParse({ lessonId: rawLessonId });
     if (!lessonIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid Lesson ID format', details: lessonIdValidation.error.format() }, 
@@ -245,28 +248,74 @@ export async function DELETE(
     }
     const lessonId = lessonIdValidation.data.lessonId;
 
-    // Delete the lesson (ensuring it belongs to the correct module)
-    const { error: deleteError, count } = await supabase
-      .from('course_lessons')
-      .delete({ count: 'exact' }) // Request count to check if a row was actually deleted
-      .eq('id', lessonId)
-      .eq('module_id', moduleId); // Ensure we only delete if the lesson belongs to this module
+    // First, check if lesson exists
+    const { data: existingLesson, error: checkError } = await supabase
+      .from("lessons")
+      .select("id, sequence")
+      .eq("id", lessonId)
+      .eq("module_id", moduleId)
+      .single()
+
+    if (checkError) {
+      if (checkError.code === "PGRST116") {
+        return NextResponse.json({ error: "Lesson not found" }, { status: 404 })
+      }
+      console.error("Error checking lesson:", checkError)
+      return NextResponse.json(
+        { error: "Failed to verify lesson" },
+        { status: 500 }
+      )
+    }
+
+    // Delete the lesson
+    const { error: deleteError } = await supabase
+      .from("lessons")
+      .delete()
+      .eq("id", lessonId)
+      .eq("module_id", moduleId)
 
     if (deleteError) {
-      console.error('Error deleting lesson:', deleteError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error deleting lesson' }, { status: 500 });
+      console.error("Error deleting lesson:", deleteError)
+      return NextResponse.json(
+        { error: "Failed to delete lesson" },
+        { status: 500 }
+      )
     }
 
-    // Check if any row was actually deleted
-    if (count === 0) {
-      return NextResponse.json({ error: 'Not Found', message: 'Lesson not found in this module' }, { status: 404 });
+    // Reorder remaining lessons to close the gap
+    const { data: remainingLessons, error: fetchError } = await supabase
+      .from("lessons")
+      .select("id, sequence")
+      .eq("module_id", moduleId)
+      .order("sequence", { ascending: true })
+
+    if (fetchError) {
+      console.error("Error fetching remaining lessons:", fetchError)
+      // We don't need to fail the request for this - deletion was successful
+    } else if (remainingLessons && remainingLessons.length > 0) {
+      // Update sequences to ensure there are no gaps
+      const updatePromises = remainingLessons.map(async (lesson, index) => {
+        if (lesson.sequence !== index + 1) {
+          const { error } = await supabase
+            .from("lessons")
+            .update({ sequence: index + 1 })
+            .eq("id", lesson.id)
+
+          if (error) {
+            console.error(`Error updating sequence for lesson ${lesson.id}:`, error)
+          }
+        }
+      })
+
+      await Promise.all(updatePromises)
     }
 
-    // No content response for successful deletion
-    return new NextResponse(null, { status: 204 });
-
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Unexpected error in DELETE lesson:', error);
-    return NextResponse.json({ error: 'Server Error', message: 'An unexpected error occurred' }, { status: 500 });
+    console.error("Error in DELETE lesson:", error)
+    return NextResponse.json(
+      { error: "Failed to delete lesson" },
+      { status: 500 }
+    )
   }
 }

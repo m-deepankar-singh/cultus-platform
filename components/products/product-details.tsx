@@ -1,20 +1,26 @@
 "use client"
 
 import { useState } from "react"
-import { BookOpen, Building2, FileText, Layers, PlusCircle, Settings } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Building2, Layers, Settings } from "lucide-react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ModulesList } from "@/components/products/modules-list"
 import { ClientsList } from "@/components/products/clients-list"
 import { ProductSettings } from "@/components/products/product-settings"
+import { ModuleManager } from "@/components/modules/module-manager"
 
-interface ProductDetailsProps {
+interface Product {
   id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
 }
 
-export function ProductDetails({ id }: ProductDetailsProps) {
+interface ProductDetailsProps {
+  product: Product
+}
+
+export function ProductDetails({ product }: ProductDetailsProps) {
   const [activeTab, setActiveTab] = useState("modules")
 
   return (
@@ -38,53 +44,29 @@ export function ProductDetails({ id }: ProductDetailsProps) {
         </Tabs>
       </CardHeader>
       <CardContent className="p-0">
-        <TabsContent value="modules" className="m-0">
-          <div className="flex items-center justify-between border-b p-4">
-            <div>
-              <CardTitle>Modules</CardTitle>
-              <CardDescription>Manage the modules in this product</CardDescription>
+        <Tabs defaultValue="modules">
+          <TabsContent value="modules" className="m-0">
+            <div className="p-6">
+              <ModuleManager productId={product.id} />
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Module
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  <span>Content Module</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <FileText className="mr-2 h-4 w-4" />
-                  <span>Quiz Module</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <ModulesList productId={id} />
-        </TabsContent>
-        <TabsContent value="clients" className="m-0">
-          <div className="flex items-center justify-between border-b p-4">
-            <div>
-              <CardTitle>Clients</CardTitle>
-              <CardDescription>Manage client access to this product</CardDescription>
+          </TabsContent>
+          <TabsContent value="clients" className="m-0">
+            <div className="flex items-center justify-between border-b p-4">
+              <div>
+                <h2 className="text-xl font-bold">Clients</h2>
+                <p className="text-muted-foreground">Manage client access to this product</p>
+              </div>
             </div>
-            <Button>
-              <Building2 className="mr-2 h-4 w-4" />
-              Assign to Client
-            </Button>
-          </div>
-          <ClientsList productId={id} />
-        </TabsContent>
-        <TabsContent value="settings" className="m-0">
-          <div className="border-b p-4">
-            <CardTitle>Settings</CardTitle>
-            <CardDescription>Configure product settings</CardDescription>
-          </div>
-          <ProductSettings productId={id} />
-        </TabsContent>
+            <ClientsList productId={product.id} />
+          </TabsContent>
+          <TabsContent value="settings" className="m-0">
+            <div className="border-b p-4">
+              <h2 className="text-xl font-bold">Settings</h2>
+              <p className="text-muted-foreground">Configure product settings</p>
+            </div>
+            <ProductSettings productId={product.id} />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   )

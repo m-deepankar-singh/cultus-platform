@@ -19,7 +19,9 @@ export async function GET(
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
-    const validationResult = ClientIdSchema.safeParse(params);
+    // Await params before validation
+    const awaitedParams = await params;
+    const validationResult = ClientIdSchema.safeParse({ clientId: awaitedParams.clientId });
     if (!validationResult.success) {
       return NextResponse.json(
         { error: 'Invalid Client ID format', details: validationResult.error.flatten() },
@@ -38,11 +40,9 @@ export async function GET(
 
     const supabase = await createClient(); 
     const { data: students, error: dbError } = await supabase
-      .from('profiles')
+      .from('students')
       .select('id, full_name, email, created_at, is_active, last_login_at') 
       .eq('client_id', validatedClientId)
-      .eq('role', USER_ROLES.find(r => r === 'Student')) 
-      .eq('is_active', true) 
       .order('full_name', { ascending: true });
 
     if (dbError) {
@@ -72,7 +72,9 @@ export async function POST(
     }
 
     // 2. Validate clientId route parameter
-    const clientIdValidation = ClientIdSchema.safeParse(params);
+    // Await params before validation
+    const awaitedParams = await params;
+    const clientIdValidation = ClientIdSchema.safeParse({ clientId: awaitedParams.clientId });
     if (!clientIdValidation.success) {
       return NextResponse.json(
         { error: 'Invalid Client ID format', details: clientIdValidation.error.flatten() },
@@ -281,7 +283,9 @@ export async function DELETE(
     }
 
     // Validate clientId
-    const clientIdValidation = ClientIdSchema.safeParse(params);
+    // Await params before validation
+    const awaitedParams = await params;
+    const clientIdValidation = ClientIdSchema.safeParse({ clientId: awaitedParams.clientId });
     if (!clientIdValidation.success) {
       return NextResponse.json(
         { error: 'Invalid Client ID format', details: clientIdValidation.error.flatten() },
@@ -317,20 +321,20 @@ if (!studentIdValidation.success) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // 4. Perform Unenrollment (Update Profile)
+    // 4. Perform Unenrollment (Update Student Table)
     const supabaseAdmin = createAdminClient();
-    const { data: updatedProfile, error: updateError, count } = await supabaseAdmin
-      .from('profiles')
+    const { data: updatedStudent, error: updateError, count } = await supabaseAdmin
+      .from('students') // Changed from profiles to students
       .update({
-        is_active: false,  // Mark as inactive
-        client_id: null,   // Remove client association
+        is_active: false, // Mark as inactive in the students table
+        // client_id: null, // Removing client_id might not be necessary, just deactivate
         updated_at: new Date().toISOString(),
       })
-      .eq('id', validatedStudentId)          // Target the specific student
-      .eq('client_id', validatedClientId)    // Ensure they currently belong to this client
-      .eq('role', USER_ROLES.find(r => r === 'Student')) // Ensure it's a student profile
-      .select('id')                          // Select minimal data to confirm update
-      .maybeSingle();                        // Handle case where student/client combo not found
+      .eq('id', validatedStudentId) // Target the specific student
+      .eq('client_id', validatedClientId) // Ensure they belong to this client
+      // .eq('role', USER_ROLES.find(r => r === 'Student')) // Role check not needed for students table
+      .select('id') // Select minimal data to confirm update
+      .maybeSingle(); // Handle case where student/client combo not found
 
     if (updateError) {
       console.error(`DELETE /students: Database error unenrolling student ${validatedStudentId}:`, updateError);
@@ -338,7 +342,7 @@ if (!studentIdValidation.success) {
     }
 
     // Check if any row was actually updated
-    if (!updatedProfile || count === 0) {
+    if (!updatedStudent || count === 0) {
       console.warn(`DELETE /students: Student ${validatedStudentId} not found or not active for client ${validatedClientId}`);
       return NextResponse.json({ error: 'Student not found for this client or already unenrolled' }, { status: 404 });
     }
@@ -348,6 +352,127 @@ if (!studentIdValidation.success) {
 
   } catch (error: any) {
     console.error('DELETE /students Unexpected Error:', error);
+    return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/staff/clients/[clientId]/students?studentId=...
+ * Activate or deactivate a student for a client by toggling their profile's is_active status.
+ * Requires studentId as a query parameter and is_active in the request body.
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: { clientId: string } }
+) {
+  try {
+    // Extract the studentId from query parameters
+    const { searchParams } = new URL(request.url);
+    const studentId = searchParams.get('studentId');
+
+    // 1. Validate parameters
+    if (!studentId) {
+      return NextResponse.json({ error: 'Missing required query parameter: studentId' }, { status: 400 });
+    }
+
+    // Validate clientId
+    // Await params before validation
+    const awaitedParams = await params;
+    const clientIdValidation = ClientIdSchema.safeParse({ clientId: awaitedParams.clientId });
+    if (!clientIdValidation.success) {
+      return NextResponse.json(
+        { error: 'Invalid Client ID format', details: clientIdValidation.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const validatedClientId = clientIdValidation.data.clientId;
+
+    // Validate studentId format (UUID)
+    const studentIdValidation = z.string().uuid({ message: 'Invalid Student ID format' }).safeParse(studentId);
+    if (!studentIdValidation.success) {
+      return NextResponse.json(
+        { error: 'Invalid Student ID format', details: studentIdValidation.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const validatedStudentId = studentIdValidation.data;
+
+    // Parse request body
+    const body = await request.json();
+    const bodySchema = z.object({
+      is_active: z.boolean({ required_error: 'is_active is required' })
+    });
+    
+    const bodyValidation = bodySchema.safeParse(body);
+    if (!bodyValidation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: bodyValidation.error.flatten() },
+        { status: 400 }
+      );
+    }
+    
+    const { is_active } = bodyValidation.data;
+
+    // 2. Authentication & Authorization
+    const { user, profile, role, error: authError } = await getUserSessionAndRole();
+
+    if (authError || !user || !profile || !role) {
+      console.error('PATCH /students Auth Error:', authError);
+      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
+    }
+
+    // 3. Authorization Check: Admin or Staff associated with the client
+    const isAdmin = role === USER_ROLES.find(r => r === 'Admin');
+    const isStaffForClient = role === USER_ROLES.find(r => r === 'Staff') && profile.client_id === validatedClientId;
+
+    if (!isAdmin && !isStaffForClient) {
+      console.warn(`PATCH /students AuthZ Failed: User ${profile.id} (${role}) attempted to update student ${validatedStudentId} for client ${validatedClientId}`);
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // 4. Check if student exists and belongs to this client
+    const supabaseAdmin = createAdminClient();
+    const { data: existingStudent, error: fetchError } = await supabaseAdmin
+      .from('students') // Changed from profiles to students
+      .select('id, is_active')
+      .eq('id', validatedStudentId)
+      .eq('client_id', validatedClientId)
+      // .eq('role', USER_ROLES.find(r => r === 'Student')) // Role check not needed for students table
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error(`PATCH /students: Database error checking student ${validatedStudentId}:`, fetchError);
+      return NextResponse.json({ error: 'Failed to check student status', details: fetchError.message }, { status: 500 });
+    }
+
+    if (!existingStudent) {
+      console.warn(`PATCH /students: Student ${validatedStudentId} not found for client ${validatedClientId}`);
+      return NextResponse.json({ error: 'Student not found for this client' }, { status: 404 });
+    }
+
+    // 5. Update student status
+    const { data: updatedStudent, error: updateError } = await supabaseAdmin
+      .from('students') // Changed from profiles to students
+      .update({
+        is_active: is_active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', validatedStudentId)
+      .eq('client_id', validatedClientId)
+      // .eq('role', USER_ROLES.find(r => r === 'Student')) // Role check not needed for students table
+      .select('id, full_name, email, is_active') // Ensure these fields exist in students table
+      .single();
+
+    if (updateError) {
+      console.error(`PATCH /students: Database error updating student ${validatedStudentId}:`, updateError);
+      return NextResponse.json({ error: 'Failed to update student status', details: updateError.message }, { status: 500 });
+    }
+
+    // 6. Return updated student
+    return NextResponse.json(updatedStudent);
+
+  } catch (error: any) {
+    console.error('PATCH /students Unexpected Error:', error);
     return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
   }
 }

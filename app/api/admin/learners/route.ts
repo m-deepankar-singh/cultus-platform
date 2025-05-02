@@ -55,12 +55,9 @@ export async function GET(request: Request) {
 
     // 3. Build Supabase Query
     let query = supabase
-      .from('profiles')
-      .select('id, created_at, updated_at, user_id, role, client_id, is_active, email, full_name, client:clients(id, name)'); // Select profile and basic client info
-
-    // Filter by role always
-    query = query.eq('role', 'Student' as UserRole);
-
+      .from('students')
+      .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, client:clients(id, name)');
+      
     // Apply search filter (case-insensitive on full_name and email)
     if (search) {
       query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);

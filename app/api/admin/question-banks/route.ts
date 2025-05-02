@@ -53,16 +53,13 @@ export async function GET(request: Request) {
 
         const { type, search, tag } = validationResult.data;
 
-        // Determine Target Table
-        const tableName = type === 'course' ? 'course_questions' : 'assessment_questions';
+        // Always use assessment_questions table since course_questions doesn't exist
+        const tableName = 'assessment_questions';
 
         // Build Supabase Query
-        let query = supabase.from(tableName).select('*'); // Now supabase is the client object
+        let query = supabase.from(tableName).select('*');
 
         if (search) {
-            // Use textSearch for potentially better performance if tsvector is set up,
-            // otherwise fallback to ilike.
-            // query = query.textSearch('fts', search); // Example if using full-text search
             query = query.ilike('question_text', `%${search}%`);
         }
 
@@ -123,9 +120,9 @@ export async function POST(request: Request) {
             );
         }
 
-        // 3. Extract data and determine target table
+        // 3. Extract data - always use assessment_questions table
         const { bank_type, ...questionData } = validationResult.data;
-        const tableName = bank_type === 'course' ? 'course_questions' : 'assessment_questions';
+        const tableName = 'assessment_questions';
 
         // 4. Insert Question into the database
         const { data: newQuestion, error: dbError } = await supabase

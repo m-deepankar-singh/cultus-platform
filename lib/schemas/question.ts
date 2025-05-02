@@ -87,7 +87,7 @@ export const QuestionIdSchema = z.object({
 });
 
 export const QuestionBankQuerySchema = z.object({
-    type: QuestionBankType,
+    type: QuestionBankType.optional(),
     // Add other query params like search, tag etc. as optional strings
     search: z.string().optional(),
     tag: z.string().optional(),

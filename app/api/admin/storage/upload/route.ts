@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   // 3. Upload to Supabase Storage
-  const bucketName = 'course-videos'; // As per plan - ensure this bucket exists!
+  const bucketName = 'course-bucket'; // Changed from 'course-videos' to match the actual Supabase bucket
   let uploadDataPath: string | undefined;
   try {
     const supabase = await createClient();

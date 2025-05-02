@@ -1,11 +1,28 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { ModuleIdSchema, AssessmentQuestionLinkSchema } from '@/lib/schemas/module';
+import { ModuleIdSchema } from '@/lib/schemas/module';
+import { z } from 'zod';
+
+const AssessmentQuestionsSchema = z.object({
+  questions: z.array(
+    z.object({
+      id: z.string().uuid(),
+      sequence: z.number().int().min(1),
+      question_text: z.string().optional(),
+      question_type: z.enum(['MCQ', 'MSQ']).optional(),
+      options: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
+      correct_answer: z.union([
+        z.string(),
+        z.object({ answers: z.array(z.string()) })
+      ]).optional()
+    })
+  )
+});
 
 /**
  * GET /api/admin/modules/[moduleId]/assessment-questions
  * 
- * Retrieves all questions linked to a specific 'Assessment' module.
+ * Retrieves all questions associated with a specific assessment module.
  * Requires admin authentication.
  */
 export async function GET(
@@ -13,210 +30,304 @@ export async function GET(
   { params }: { params: { moduleId: string } }
 ) {
   try {
-    // Await params to ensure moduleId is available
-    const { moduleId: rawModuleId } = await params;
+    // Await params before destructuring to fix Next.js warning
+    const resolvedParams = await Promise.resolve(params);
+    const { moduleId: rawModuleId } = resolvedParams;
     
     const supabase = await createClient();
+
+    // Authenticate the user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check user role
     const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     if (profileError || !profile) {
       console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Failed to verify user permissions' }, { status: 403 });
     }
 
+    if (profile.role !== 'Admin' && profile.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // Validate the module ID format
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
-        { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
+        { error: 'Invalid Module ID format', details: moduleIdValidation.error.format() },
         { status: 400 }
       );
     }
     const moduleId = moduleIdValidation.data.moduleId;
 
-    // Verify the module exists and is of type 'Assessment'
-    const { data: module, error: moduleCheckError } = await supabase
+    // Check if the module exists and is an assessment
+    const { data: module, error: moduleError } = await supabase
       .from('modules')
       .select('id, type')
       .eq('id', moduleId)
       .single();
 
-    if (moduleCheckError) {
-      if (moduleCheckError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Not Found', message: 'Module not found' }, { status: 404 });
-      } else {
-        console.error('Error checking module type:', moduleCheckError);
-        return NextResponse.json({ error: 'Server Error', message: 'Error verifying module' }, { status: 500 });
-      }
+    if (moduleError) {
+      console.error('Error fetching module:', moduleError);
+      return NextResponse.json(
+        { error: 'Failed to fetch module', details: moduleError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!module) {
+      return NextResponse.json({ error: 'Module not found' }, { status: 404 });
     }
 
     if (module.type !== 'Assessment') {
       return NextResponse.json(
-        { error: 'Bad Request', message: `Assessment questions are only applicable to 'Assessment' modules. This module is of type '${module.type}'.` },
+        { error: 'This endpoint is only for Assessment modules' },
         { status: 400 }
       );
     }
 
-    // Fetch linked questions
-    const { data: linkedQuestions, error: questionsError } = await supabase
+    // Fetch assessment questions
+    const { data: questions, error: questionsError } = await supabase
       .from('assessment_module_questions')
-      .select('question:assessment_questions(*)')
-      .eq('module_id', moduleId);
+      .select(`
+        module_id,
+        question_id,
+        sequence,
+        assessment_questions (
+          id,
+          question_text,
+          question_type,
+          options,
+          correct_answer,
+          topic,
+          difficulty
+        )
+      `)
+      .eq('module_id', moduleId)
+      .order('sequence', { ascending: true });
 
     if (questionsError) {
-      console.error('Error fetching linked questions:', questionsError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching linked questions' }, { status: 500 });
+      console.error('Error fetching assessment questions:', questionsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch assessment questions', details: questionsError.message },
+        { status: 500 }
+      );
     }
 
-    // Extract just the question objects from the joined results
-    const questions = linkedQuestions?.map(item => item.question) || [];
-    
-    return NextResponse.json(questions);
+    // Transform the data structure to flatten it
+    const formattedQuestions = (questions || []).map(q => ({
+      id: q.question_id,
+      sequence: q.sequence,
+      ...(q.assessment_questions || {}),
+    }));
 
+    return NextResponse.json(formattedQuestions);
   } catch (error) {
-    console.error('Unexpected error in GET assessment questions:', error);
-    return NextResponse.json({ error: 'Server Error', message: 'An unexpected error occurred' }, { status: 500 });
+    console.error('Error in GET assessment questions:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch assessment questions', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 }
 
 /**
- * POST /api/admin/modules/[moduleId]/assessment-questions
+ * PUT /api/admin/modules/[moduleId]/assessment-questions
  * 
- * Links an assessment question to a specific 'Assessment' module.
+ * Updates the assessment questions for a module.
+ * Allows reordering, adding, and removing questions.
  * Requires admin authentication.
  */
-export async function POST(
+export async function PUT(
   request: Request,
   { params }: { params: { moduleId: string } }
 ) {
   try {
-    // Await params to ensure moduleId is available
-    const { moduleId: rawModuleId } = await params;
+    // Await params before destructuring to fix Next.js warning
+    const resolvedParams = await Promise.resolve(params);
+    const { moduleId: rawModuleId } = resolvedParams;
     
     const supabase = await createClient();
+
+    // Authenticate the user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check user role
     const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     if (profileError || !profile) {
       console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Failed to verify user permissions' }, { status: 403 });
     }
 
+    if (profile.role !== 'Admin' && profile.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // Validate the module ID format
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
     if (!moduleIdValidation.success) {
       return NextResponse.json(
-        { error: 'Bad Request', message: 'Invalid Module ID format', details: moduleIdValidation.error.format() }, 
+        { error: 'Invalid Module ID format', details: moduleIdValidation.error.format() },
         { status: 400 }
       );
     }
     const moduleId = moduleIdValidation.data.moduleId;
 
-    // Verify the module exists and is of type 'Assessment'
-    const { data: module, error: moduleCheckError } = await supabase
+    // Check if the module exists and is an assessment
+    const { data: module, error: moduleError } = await supabase
       .from('modules')
       .select('id, type')
       .eq('id', moduleId)
       .single();
 
-    if (moduleCheckError) {
-      if (moduleCheckError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Not Found', message: 'Module not found' }, { status: 404 });
-      } else {
-        console.error('Error checking module type:', moduleCheckError);
-        return NextResponse.json({ error: 'Server Error', message: 'Error verifying module' }, { status: 500 });
-      }
+    if (moduleError) {
+      console.error('Error fetching module:', moduleError);
+      return NextResponse.json(
+        { error: 'Failed to fetch module', details: moduleError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!module) {
+      return NextResponse.json({ error: 'Module not found' }, { status: 404 });
     }
 
     if (module.type !== 'Assessment') {
       return NextResponse.json(
-        { error: 'Bad Request', message: `Questions can only be linked to 'Assessment' modules. This module is type '${module.type}'.` },
+        { error: 'This endpoint is only for Assessment modules' },
         { status: 400 }
       );
     }
 
     // Parse and validate request body
     const body = await request.json();
-    const linkValidation = AssessmentQuestionLinkSchema.safeParse(body);
-
-    if (!linkValidation.success) {
+    console.log('Received request body:', body);
+    
+    const validationResult = AssessmentQuestionsSchema.safeParse(body);
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Bad Request', message: 'Invalid question link data', details: linkValidation.error.format() },
+        { error: 'Invalid request body', details: validationResult.error.format() },
         { status: 400 }
       );
     }
 
-    const { question_id } = linkValidation.data;
+    const { questions } = validationResult.data;
 
-    // Verify the question exists
-    const { data: question, error: questionCheckError } = await supabase
-      .from('assessment_questions')
-      .select('id')
-      .eq('id', question_id)
-      .single();
+    // Skip RPC and use direct approach
+    const useDirectApproach = true;
+    let updateSuccess = false;
 
-    if (questionCheckError) {
-      if (questionCheckError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Not Found', message: 'Assessment question not found' }, { status: 404 });
+    if (!useDirectApproach) {
+      // Start a transaction to update the assessment questions
+      const { error: transactionError } = await supabase.rpc('update_assessment_questions', {
+        p_module_id: moduleId,
+        p_questions: questions
+      });
+
+      if (!transactionError) {
+        updateSuccess = true;
       } else {
-        console.error('Error checking question existence:', questionCheckError);
-        return NextResponse.json({ error: 'Server Error', message: 'Error verifying question' }, { status: 500 });
+        console.error('Error updating assessment questions using RPC:', transactionError);
       }
     }
 
-    // Check if the link already exists
-    const { data: existingLink, error: linkCheckError } = await supabase
-      .from('assessment_module_questions')
-      .select('module_id, question_id')
-      .eq('module_id', moduleId)
-      .eq('question_id', question_id)
-      .maybeSingle();
-
-    if (linkCheckError) {
-      console.error('Error checking existing link:', linkCheckError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error checking existing question link' }, { status: 500 });
+    // If RPC failed or we're using direct approach
+    if (!updateSuccess) {
+      console.log('Using direct insert/delete approach');
+      
+      // First, delete all existing associations
+      const { error: deleteError } = await supabase
+        .from('assessment_module_questions')
+        .delete()
+        .eq('module_id', moduleId);
+      
+      if (deleteError) {
+        console.error('Error deleting existing questions:', deleteError);
+        return NextResponse.json(
+          { error: 'Failed to update assessment questions', details: deleteError.message },
+          { status: 500 }
+        );
+      }
+      
+      // Then, insert the new associations
+      const associations = questions.map(q => ({
+        module_id: moduleId,
+        question_id: q.id,
+        sequence: q.sequence
+      }));
+      
+      console.log('Inserting associations:', associations);
+      
+      const { error: insertError } = await supabase
+        .from('assessment_module_questions')
+        .insert(associations);
+      
+      if (insertError) {
+        console.error('Error inserting new questions:', insertError);
+        return NextResponse.json(
+          { error: 'Failed to update assessment questions', details: insertError.message },
+          { status: 500 }
+        );
+      }
     }
 
-    if (existingLink) {
-      // Link already exists - we can either return a 409 Conflict or a 200 OK with existing data
+    // Fetch the updated questions to return
+    const { data: updatedQuestions, error: fetchError } = await supabase
+      .from('assessment_module_questions')
+      .select(`
+        module_id,
+        question_id,
+        sequence,
+        assessment_questions (
+          id,
+          question_text,
+          question_type,
+          options,
+          correct_answer,
+          topic,
+          difficulty
+        )
+      `)
+      .eq('module_id', moduleId)
+      .order('sequence', { ascending: true });
+
+    if (fetchError) {
+      console.error('Error fetching updated questions:', fetchError);
       return NextResponse.json(
-        { message: 'Question is already linked to this module', module_id: existingLink.module_id, question_id: existingLink.question_id },
-        { status: 200 }
+        { error: 'Questions updated but failed to fetch the result', details: fetchError.message },
+        { status: 207 } // Multi-Status response
       );
     }
 
-    // Create the link
-    const { data: newLink, error: insertError } = await supabase
-      .from('assessment_module_questions')
-      .insert({
-        module_id: moduleId,
-        question_id: question_id
-      })
-      .select()
-      .single();
+    // Transform the data structure to flatten it
+    const formattedQuestions = (updatedQuestions || []).map(q => ({
+      id: q.question_id,
+      sequence: q.sequence,
+      ...(q.assessment_questions || {}),
+    }));
 
-    if (insertError) {
-      console.error('Error linking question to module:', insertError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error linking question to module' }, { status: 500 });
-    }
-
-    return NextResponse.json(newLink, { status: 201 }); // 201 Created
-
+    return NextResponse.json(formattedQuestions);
   } catch (error) {
-    console.error('Unexpected error in POST assessment question link:', error);
-    return NextResponse.json({ error: 'Server Error', message: 'An unexpected error occurred' }, { status: 500 });
+    console.error('Error in PUT assessment questions:', error);
+    return NextResponse.json(
+      { error: 'Failed to update assessment questions', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 }
