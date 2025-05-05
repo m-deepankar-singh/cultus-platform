@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { Loader2 } from "lucide-react"
+import { Loader2, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Separator } from "@/components/ui/separator"
+import { useCurrentUser } from "@/hooks/use-current-user"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 // Define the base form schema for all module types
 const baseModuleSchema = z.object({
@@ -52,6 +54,10 @@ export function StandaloneModuleForm({ type }: StandaloneModuleFormProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { role, isLoading: isLoadingUser } = useCurrentUser()
+  
+  // Check if user is admin
+  const isAdmin = role === 'Admin'
   
   // Select the appropriate form schema based on module type
   const formSchema = type === "Course" ? courseModuleSchema : assessmentModuleSchema
@@ -64,23 +70,49 @@ export function StandaloneModuleForm({ type }: StandaloneModuleFormProps) {
       : { name: "", description: "", time_limit_minutes: 60, pass_threshold: 70 },
   })
   
+  // If not admin, redirect back to modules page
+  useEffect(() => {
+    if (!isLoadingUser && !isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied",
+        description: "Only administrators can create modules.",
+      })
+      router.push('/modules')
+    }
+  }, [isLoadingUser, isAdmin, router, toast])
+  
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    // Double-check for admin role before submission
+    if (!isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Permission Denied",
+        description: "Only administrators can create modules.",
+      })
+      return
+    }
+    
     setIsSubmitting(true)
     
     try {
       // Build the module configuration object based on type
       const configuration = type === "Course" 
-        ? { video_url: (data as z.infer<typeof courseModuleSchema>).video_url || null }
+        ? { 
+            video_url: (data as z.infer<typeof courseModuleSchema>).video_url || null,
+            description: data.description || null
+          }
         : { 
             time_limit_minutes: (data as z.infer<typeof assessmentModuleSchema>).time_limit_minutes || 60,
-            pass_threshold: (data as z.infer<typeof assessmentModuleSchema>).pass_threshold || 70
+            pass_threshold: (data as z.infer<typeof assessmentModuleSchema>).pass_threshold || 70,
+            description: data.description || null
           }
       
       // Prepare the module data for API
       const moduleData = {
         name: data.name,
         type,
-        description: data.description || null,
+        description: data.description || null, // We'll send this, but it will be extracted in the API
         configuration,
       }
       
@@ -94,11 +126,30 @@ export function StandaloneModuleForm({ type }: StandaloneModuleFormProps) {
       })
       
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to create module")
+        // Handle empty or invalid JSON responses
+        let errorMessage = "Failed to create module";
+        try {
+          // Try to parse the response as JSON, but handle errors if it's not valid JSON
+          const errorData = await response.json().catch(() => ({ message: `Server error: ${response.status}` }));
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          console.error("Error parsing error response:", parseError);
+        }
+        throw new Error(errorMessage);
       }
       
-      const responseData = await response.json()
+      // Handle potential empty response when fetching the successful response data
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.error("Error parsing success response:", parseError);
+        throw new Error("Received invalid response after creating module");
+      }
+      
+      if (!responseData || !responseData.id) {
+        throw new Error("Module was created but received invalid response data");
+      }
       
       toast({
         title: "Module created successfully",
@@ -118,6 +169,37 @@ export function StandaloneModuleForm({ type }: StandaloneModuleFormProps) {
     } finally {
       setIsSubmitting(false)
     }
+  }
+  
+  // Show loading state while checking user role
+  if (isLoadingUser) {
+    return (
+      <Card className="max-w-3xl mx-auto">
+        <CardContent className="flex justify-center items-center p-8">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p>Loading...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+  
+  // If not admin, show access denied
+  if (!isAdmin) {
+    return (
+      <Card className="max-w-3xl mx-auto">
+        <CardContent className="p-8">
+          <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Access Denied</AlertTitle>
+            <AlertDescription>
+              Only administrators can create modules. You will be redirected to the modules page.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    )
   }
   
   return (
@@ -256,17 +338,18 @@ export function StandaloneModuleForm({ type }: StandaloneModuleFormProps) {
           </CardContent>
           
           <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push("/modules")}
-              disabled={isSubmitting}
-            >
+            <Button variant="outline" type="button" onClick={() => router.back()}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Module
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                `Create ${type}`
+              )}
             </Button>
           </CardFooter>
         </form>

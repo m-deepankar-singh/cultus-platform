@@ -10,12 +10,6 @@ export function ClientsHeader() {
         <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
         <p className="text-muted-foreground">Manage client organizations and their access to products.</p>
       </div>
-      <div className="flex items-center gap-2">
-        <Button>
-          <Building2 className="mr-2 h-4 w-4" />
-          Add Client
-        </Button>
-      </div>
     </div>
   )
 }

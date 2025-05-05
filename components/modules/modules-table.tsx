@@ -20,7 +20,8 @@ import {
   Trash,
   ExternalLink,
   FileText,
-  BookOpen
+  BookOpen,
+  Eye
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -58,7 +59,12 @@ interface Module {
   }[] | null
 }
 
-export function ModulesTable({ modules }: { modules: Module[] }) {
+interface ModulesTableProps {
+  modules: Module[]
+  isAdmin: boolean
+}
+
+export function ModulesTable({ modules, isAdmin }: ModulesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
@@ -138,20 +144,25 @@ export function ModulesTable({ modules }: { modules: Module[] }) {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem asChild>
                 <Link href={`/modules/${module.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
                   View Details
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/modules/${module.id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
-                <Trash className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/modules/${module.id}/edit`}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive">
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )

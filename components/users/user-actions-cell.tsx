@@ -14,6 +14,7 @@ import { MoreHorizontal } from "lucide-react"
 import { EditUserDialog } from './edit-user-dialog'
 import { toggleUserStatus } from '@/app/actions/userActions'
 import { toast } from '@/components/ui/use-toast'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 
 // Types (should ideally be shared)
 interface Client { id: string; name: string; }
@@ -43,6 +44,7 @@ interface UserActionsCellProps {
 
 export function UserActionsCell({ user, clients }: UserActionsCellProps) {
     const [isLoading, setIsLoading] = React.useState(false);
+    const { currentUser } = useCurrentUser();
     
     // Check if user is active based on banned_until or metadata
     const isUserActive = 
@@ -51,7 +53,23 @@ export function UserActionsCell({ user, clients }: UserActionsCellProps) {
         user.user_metadata?.status === 'active' ||
         user.app_metadata?.status === 'active';
 
+    // Check if current user is a Staff member
+    const isStaffUser = currentUser?.profile?.role === 'Staff';
+    
+    // Staff users should not be able to edit or deactivate users
+    const canEditUsers = !isStaffUser;
+    const canDeactivateUsers = !isStaffUser;
+
     const handleToggleStatus = async () => {
+        if (!canDeactivateUsers) {
+            toast({
+                variant: 'destructive',
+                title: 'Permission Denied',
+                description: 'Staff users cannot deactivate accounts'
+            });
+            return;
+        }
+        
         try {
             setIsLoading(true);
             const result = await toggleUserStatus(user.id, !isUserActive);
@@ -89,19 +107,27 @@ export function UserActionsCell({ user, clients }: UserActionsCellProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <EditUserDialog user={user} clients={clients}>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        Edit Profile
+                {canEditUsers ? (
+                    <EditUserDialog user={user} clients={clients}>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            Edit Profile
+                        </DropdownMenuItem>
+                    </EditUserDialog>
+                ) : (
+                    <DropdownMenuItem disabled className="text-muted-foreground cursor-not-allowed">
+                        View Only Mode
                     </DropdownMenuItem>
-                </EditUserDialog>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                    onClick={handleToggleStatus} 
-                    className={isUserActive ? "text-destructive" : "text-green-600"}
-                    disabled={isLoading}
-                >
-                    {isUserActive ? 'Deactivate User' : 'Activate User'}
-                </DropdownMenuItem>
+                )}
+                {canEditUsers && <DropdownMenuSeparator />}
+                {canDeactivateUsers && (
+                    <DropdownMenuItem 
+                        onClick={handleToggleStatus} 
+                        className={isUserActive ? "text-destructive" : "text-green-600"}
+                        disabled={isLoading}
+                    >
+                        {isUserActive ? 'Deactivate User' : 'Activate User'}
+                    </DropdownMenuItem>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
     );

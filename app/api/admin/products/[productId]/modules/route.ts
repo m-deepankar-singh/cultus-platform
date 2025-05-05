@@ -7,7 +7,7 @@ import { ModuleSchema } from "@/lib/schemas/module";
  * GET /api/admin/products/[productId]/modules
  * 
  * Retrieves all modules associated with a specific product.
- * Requires admin authentication.
+ * Accessible by both Admin and Staff roles.
  */
 export async function GET(
   request: Request,
@@ -42,10 +42,10 @@ export async function GET(
       );
     }
 
-    // Verify user is an Admin
-    if (profile.role !== "Admin") {
+    // Verify user is an Admin or Staff
+    if (profile.role !== "Admin" && profile.role !== "Staff") {
       return NextResponse.json(
-        { error: "Forbidden", message: "Admin role required" },
+        { error: "Forbidden", message: "Admin or Staff role required" },
         { status: 403 }
       );
     }

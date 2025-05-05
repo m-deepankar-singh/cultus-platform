@@ -19,15 +19,21 @@ export default async function UsersPage() {
 		console.error("Error fetching clients for User page:", clientsError);
 		// Handle error appropriately, maybe show a message
 	}
+	
+	// Add debug logging for client data
+	console.log("Clients fetched for Users page:", clients?.length || 0, "clients found");
+	
+	// Make sure clients is always an array, even if data is null
+	const safeClients = clients || [];
 
 	return (
 		<div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
 			{/* Pass fetched clients to the header */}
-			<UsersHeader clients={clients || []} />
+			<UsersHeader clients={safeClients} />
 			{/* Add Suspense for data fetching in UsersTable */}
 			<Suspense fallback={<UsersTableSkeleton />}>
 				{/* Pass clients down to the table */}
-				<UsersTable clients={clients || []}/>
+				<UsersTable clients={safeClients}/>
 			</Suspense>
 		</div>
 	);

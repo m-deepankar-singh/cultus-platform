@@ -103,7 +103,16 @@ export function AssignProductModal({
       })
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`)
+        // Try to get more detailed error information
+        const errorData = await response.json().catch(() => ({}))
+        
+        if (response.status === 403) {
+          // Handle specific permission errors
+          const errorMessage = errorData.error || "You don't have permission to assign products to this client."
+          throw new Error(errorMessage)
+        } else {
+          throw new Error(`Error: ${response.status}${errorData.error ? ` - ${errorData.error}` : ''}`)
+        }
       }
 
       const selectedProduct = products.find(p => p.id === selectedProductId)
@@ -125,7 +134,9 @@ export function AssignProductModal({
       console.error("Failed to assign product:", error)
       toast({
         title: "Error",
-        description: "Failed to assign product. Please try again.",
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to assign product. Please try again.",
         variant: "destructive",
       })
     } finally {

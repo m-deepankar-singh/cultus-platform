@@ -15,7 +15,7 @@ type AssignmentWithProduct = {
 
 /**
  * GET handler to list products assigned to a specific client.
- * Accessible by Admins and Staff (for their assigned client).
+ * Accessible by Admins and Staff (for any client).
  */
 export async function GET(
   request: Request,
@@ -44,22 +44,25 @@ export async function GET(
 
   const validatedClientId = validationResult.data.clientId;
 
-  // Staff can only access their assigned client's products
-  if (role === 'Staff') {
-    if (!profile.client_id) {
-        console.warn(`Staff user ${profile.id} has no assigned client_id.`);
-        return NextResponse.json({ error: 'Forbidden: Staff user not assigned to any client' }, { status: 403 });
-    }
-    if (profile.client_id !== validatedClientId) {
-        console.warn(`Staff user ${profile.id} attempted to access client ${validatedClientId} but is assigned to ${profile.client_id}.`);
-        return NextResponse.json({ error: 'Forbidden: Access denied to this client' }, { status: 403 });
-    }
-  }
+  // Note: We're removing the client_id restriction for Staff users
+  // Staff can now view products for any client
 
-  // Admin or authorized Staff can proceed
+  // Admin or Staff can proceed
   try {
     // Create supabase client for this request
     const supabase = await createClient();
+
+    // Verify client exists first (good practice)
+    const { data: clientExists, error: clientCheckError } = await supabase
+      .from('clients')
+      .select('id, name')
+      .eq('id', validatedClientId)
+      .single();
+    
+    if (clientCheckError || !clientExists) {
+      console.error('Client not found or error checking client:', clientCheckError);
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
 
     // Explicitly type the expected return data from Supabase
     const { data: assignments, error: dbError } = await supabase
@@ -89,7 +92,7 @@ export async function GET(
 
 /**
  * POST handler to assign a product to a client.
- * Accessible by Admins and Staff (for their assigned client).
+ * Accessible by Admins and Staff (for any client).
  */
 export async function POST(
   request: Request,
@@ -123,17 +126,8 @@ export async function POST(
 
   const validatedClientId = validationResult.data.clientId;
 
-  // Staff can only access their assigned client
-  if (role === 'Staff') {
-    if (!profile.client_id) {
-      console.warn(`Staff user ${profile.id} has no assigned client_id.`);
-      return NextResponse.json({ error: 'Forbidden: Staff user not assigned to any client' }, { status: 403 });
-    }
-    if (profile.client_id !== validatedClientId) {
-      console.warn(`Staff user ${profile.id} attempted to access client ${validatedClientId} but is assigned to ${profile.client_id}.`);
-      return NextResponse.json({ error: 'Forbidden: Access denied to this client' }, { status: 403 });
-    }
-  }
+  // Note: We're removing the client_id restriction for Staff users
+  // Staff can now assign products to any client
 
   try {
     // Parse request body
@@ -164,6 +158,18 @@ export async function POST(
     if (productCheckError || !productExists) {
       console.error('Product not found or error checking product:', productCheckError);
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+    
+    // Verify client exists first (good practice)
+    const { data: clientExists, error: clientCheckError } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', validatedClientId)
+      .single();
+    
+    if (clientCheckError || !clientExists) {
+      console.error('Client not found or error checking client:', clientCheckError);
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
     
     // Insert assignment

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Trash } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { TrashIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,90 +16,108 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Loader2 } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface DeleteModuleButtonProps {
-  id: string
-  name: string
+  moduleId: string
 }
 
-export function DeleteModuleButton({ id, name }: DeleteModuleButtonProps) {
+export function DeleteModuleButton({ moduleId }: DeleteModuleButtonProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmation, setConfirmation] = useState("")
   const [open, setOpen] = useState(false)
-  
+
   const handleDelete = async () => {
+    if (confirmation !== "delete") {
+      toast({
+        variant: "destructive",
+        title: "Confirmation required",
+        description: 'Please type "delete" to confirm.',
+      })
+      return
+    }
+
     setIsDeleting(true)
-    
+
     try {
-      const response = await fetch(`/api/admin/modules/${id}`, {
+      const response = await fetch(`/api/admin/modules/${moduleId}`, {
         method: "DELETE",
       })
-      
+
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to delete module")
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to delete module")
       }
-      
+
       toast({
         title: "Module deleted",
-        description: `${name} has been deleted successfully.`,
+        description: "The module has been permanently deleted.",
       })
-      
+
+      // Close dialog and redirect to modules list
+      setOpen(false)
       router.push("/modules")
-      router.refresh()
     } catch (error) {
       console.error("Error deleting module:", error)
       toast({
         variant: "destructive",
         title: "Error deleting module",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description: error instanceof Error ? error.message : "An error occurred while deleting the module.",
       })
+    } finally {
       setIsDeleting(false)
-      setOpen(false)
+      setConfirmation("")
     }
   }
-  
+
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button variant="destructive" size="sm">
-          <Trash className="mr-2 h-4 w-4" />
-          Delete
+          <TrashIcon className="h-4 w-4 mr-2" />
+          Delete Module
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete the module "{name}". This action cannot be undone.
-            {id.startsWith("00000000") && (
-              <p className="mt-2 text-yellow-600 font-medium">
-                Warning: Deleting this system module may affect core functionality.
-              </p>
-            )}
+            This action cannot be undone. This will permanently delete the module and all its
+            content including lessons, videos, quizzes, and assessment questions.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="py-4">
+          <Label htmlFor="confirmation" className="text-sm font-medium">
+            Please type <span className="font-bold">delete</span> to confirm
+          </Label>
+          <Input
+            id="confirmation"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            className="mt-2"
+            placeholder="delete"
+          />
+        </div>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel
+            onClick={() => {
+              setConfirmation("")
+            }}
+          >
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault()
               handleDelete()
             }}
-            disabled={isDeleting}
+            disabled={isDeleting || confirmation !== "delete"}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
-              </>
-            ) : (
-              "Delete"
-            )}
+            {isDeleting ? "Deleting..." : "Delete Module"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

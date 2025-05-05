@@ -9,6 +9,10 @@
     box-sizing: border-box;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 /* Apply base styles to body for full page background and font */
 body {
     background-color: #121212; /* Match module background */

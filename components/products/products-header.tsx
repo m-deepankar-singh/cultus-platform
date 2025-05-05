@@ -11,26 +11,6 @@ export function ProductsHeader() {
         <h1 className="text-2xl font-bold tracking-tight">Products</h1>
         <p className="text-muted-foreground">Manage courses and assessments for your clients.</p>
       </div>
-      <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <Package className="mr-2 h-4 w-4" />
-              Create Product
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <BookOpen className="mr-2 h-4 w-4" />
-              <span>New Course</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <FileText className="mr-2 h-4 w-4" />
-              <span>New Assessment</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
     </div>
   )
 }

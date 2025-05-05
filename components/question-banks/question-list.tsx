@@ -28,14 +28,14 @@ interface Question {
   difficulty: string | null;
   topic: string | null;
   question_type: 'MCQ' | 'MSQ';
+  bankType: 'assessment' | 'course';
 }
 
 interface QuestionListProps {
   questions: Question[];
-  type: 'assessment' | 'course';
 }
 
-export default function QuestionList({ questions, type }: QuestionListProps) {
+export default function QuestionList({ questions }: QuestionListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -114,11 +114,9 @@ export default function QuestionList({ questions, type }: QuestionListProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>
-          {type === 'assessment' ? 'Assessment' : 'Course'} Questions
-        </CardTitle>
-        <div className="relative w-64">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <CardTitle>Questions</CardTitle>
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search questions..."
@@ -133,6 +131,7 @@ export default function QuestionList({ questions, type }: QuestionListProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Question</TableHead>
+              <TableHead>Bank Type</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Correct Answer</TableHead>
               <TableHead>Topic</TableHead>
@@ -147,6 +146,11 @@ export default function QuestionList({ questions, type }: QuestionListProps) {
                 <TableRow key={question.id}>
                   <TableCell className="font-medium max-w-xs truncate" title={question.question_text}>
                     {question.question_text}
+                  </TableCell>
+                  <TableCell>
+                    {question.bankType 
+                      ? question.bankType.charAt(0).toUpperCase() + question.bankType.slice(1)
+                      : '-'} 
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{question.question_type}</Badge>
@@ -186,7 +190,7 @@ export default function QuestionList({ questions, type }: QuestionListProps) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center h-24">
+                <TableCell colSpan={8} className="text-center h-24">
                   {searchTerm 
                     ? 'No questions found matching your search.' 
                     : 'No questions available. Add a new question to get started.'}
@@ -202,7 +206,7 @@ export default function QuestionList({ questions, type }: QuestionListProps) {
         <QuestionForm 
           open={isFormOpen} 
           onOpenChange={setIsFormOpen} 
-          bankType={type} 
+          bankType={editingQuestion.bankType} 
           questionToEdit={editingQuestion} 
         />
       )}

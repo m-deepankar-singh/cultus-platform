@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building2, MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
+import { Building2, MoreHorizontal, Search, SlidersHorizontal, Package } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -22,12 +22,25 @@ import { ClientForm } from "@/components/clients/client-form"
 import { Client, getClients, toggleClientStatus } from "@/app/actions/clientActions"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+// Interface for products
+interface Product {
+  id: string
+  name: string
+  description: string | null
+}
+
+// Extended client interface to include products
+interface ClientWithProducts extends Client {
+  products?: Product[]
+}
 
 export function ClientsTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
-  const [clients, setClients] = useState<Client[]>([])
+  const [clients, setClients] = useState<ClientWithProducts[]>([])
   const [loading, setLoading] = useState(true)
   const [editClient, setEditClient] = useState<Client | null>(null)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -38,7 +51,24 @@ export function ClientsTable() {
     try {
       setLoading(true)
       const clientsData = await getClients()
-      setClients(clientsData)
+      
+      // Create enhanced client objects with product data
+      const enhancedClients = await Promise.all(
+        clientsData.map(async (client) => {
+          try {
+            const response = await fetch(`/api/staff/clients/${client.id}/products`)
+            if (response.ok) {
+              const products = await response.json()
+              return { ...client, products }
+            }
+          } catch (error) {
+            console.error(`Failed to fetch products for client ${client.id}:`, error)
+          }
+          return { ...client, products: [] }
+        })
+      )
+      
+      setClients(enhancedClients)
     } catch (error) {
       console.error("Failed to fetch clients:", error)
       toast({
@@ -153,6 +183,7 @@ export function ClientsTable() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Contact Email</TableHead>
+              <TableHead>Assigned Products</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -161,13 +192,13 @@ export function ClientsTable() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   Loading clients...
                 </TableCell>
               </TableRow>
             ) : filteredClients.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No clients found.
                 </TableCell>
               </TableRow>
@@ -183,6 +214,46 @@ export function ClientsTable() {
                     </div>
                   </TableCell>
                   <TableCell>{client.contact_email || "—"}</TableCell>
+                  <TableCell>
+                    {client.products && client.products.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        <TooltipProvider>
+                          {client.products.slice(0, 3).map((product) => (
+                            <Tooltip key={product.id}>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                  <Package className="h-3 w-3" />
+                                  {product.name.length > 18 ? `${product.name.substring(0, 15)}...` : product.name}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{product.name}</p>
+                                {product.description && <p className="text-xs text-muted-foreground">{product.description}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                          {client.products.length > 3 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline">
+                                  +{client.products.length - 3} more
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="max-w-xs space-y-1">
+                                  {client.products.slice(3).map((product) => (
+                                    <p key={product.id} className="text-sm">{product.name}</p>
+                                  ))}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </TooltipProvider>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">No products assigned</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant={client.is_active ? "info" : "secondary"}
@@ -209,6 +280,13 @@ export function ClientsTable() {
                         <DropdownMenuItem onClick={() => handleEditClient(client)}>
                           Edit client
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href={`/clients/${client.id}`}>
+                            Manage assigned products
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => handleToggleStatus(client.id, client.is_active)}
                           className={client.is_active ? "text-red-600" : "text-green-600"}

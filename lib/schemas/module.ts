@@ -10,7 +10,7 @@ export type ModuleType = z.infer<typeof ModuleTypeEnum>;
  * Base schema for module properties.
  */
 export const ModuleSchema = z.object({
-  product_id: z.string().uuid({ message: 'Invalid Product ID' }),
+  product_id: z.string().uuid({ message: 'Invalid Product ID' }).nullable(),
   name: z.string().min(1, { message: 'Module name is required' }),
   type: ModuleTypeEnum,
   configuration: z.record(z.unknown()).optional().default({}), 
@@ -23,9 +23,9 @@ export const ModuleSchema = z.object({
 
 /**
  * Schema for updating an existing module.
- * Allows partial updates and omits product_id (cannot be changed).
+ * Allows partial updates.
  */
-export const UpdateModuleSchema = ModuleSchema.omit({ product_id: true }).partial();
+export const UpdateModuleSchema = ModuleSchema.partial();
 
 /**
  * Schema for validating a module ID (UUID) from route parameters or data.

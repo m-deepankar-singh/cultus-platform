@@ -18,6 +18,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { ProductForm } from "@/components/products/product-form"
+import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Product {
   id: string
@@ -36,6 +49,10 @@ export function ProductsTable({ products }: ProductsTableProps) {
   const [showFilters, setShowFilters] = useState(false)
   const [showProductForm, setShowProductForm] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined)
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -50,6 +67,41 @@ export function ProductsTable({ products }: ProductsTableProps) {
   const handleEditProduct = (product: Product) => {
     setSelectedProduct(product)
     setShowProductForm(true)
+  }
+
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/admin/products/${productToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Product deleted",
+          description: `Successfully deleted "${productToDelete.name}"`,
+        })
+        router.refresh()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete product')
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An error occurred while deleting the product."
+      })
+    } finally {
+      setIsDeleting(false)
+      setProductToDelete(null)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -149,7 +201,12 @@ export function ProductsTable({ products }: ProductsTableProps) {
                           Edit product
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">Delete product</DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={() => handleDeleteClick(product)}
+                        >
+                          Delete product
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -165,6 +222,28 @@ export function ProductsTable({ products }: ProductsTableProps) {
         onOpenChange={setShowProductForm}
         product={selectedProduct}
       />
+
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the product "{productToDelete?.name}". 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

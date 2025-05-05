@@ -12,6 +12,16 @@ export const dynamic = 'force-dynamic'
 export default async function ModulesPage() {
   const supabase = await createClient()
   
+  // Get current user and role
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user?.id || '')
+    .single()
+  
+  const isAdmin = userProfile?.role === 'Admin'
+  
   // Fetch all modules
   const { data: modules, error } = await supabase
     .from("modules")
@@ -45,11 +55,13 @@ export default async function ModulesPage() {
         <div>
           <h1 className="text-4xl font-bold mb-2">Modules Management</h1>
           <p className="text-muted-foreground">
-            Create and manage all modules from this centralized location
+            {isAdmin 
+              ? "Create and manage all modules from this centralized location" 
+              : "View all modules from this centralized location"}
           </p>
         </div>
         
-        <ModuleCreateButton />
+        {isAdmin && <ModuleCreateButton />}
       </div>
       
       <Tabs defaultValue="all" className="w-full">
@@ -65,7 +77,7 @@ export default async function ModulesPage() {
               <CardTitle>All Modules ({modules?.length || 0})</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModulesTable modules={modules || []} />
+              <ModulesTable modules={modules || []} isAdmin={isAdmin} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -76,7 +88,7 @@ export default async function ModulesPage() {
               <CardTitle>Course Modules ({courseModules.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModulesTable modules={courseModules} />
+              <ModulesTable modules={courseModules} isAdmin={isAdmin} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -87,7 +99,7 @@ export default async function ModulesPage() {
               <CardTitle>Assessment Modules ({assessmentModules.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModulesTable modules={assessmentModules} />
+              <ModulesTable modules={assessmentModules} isAdmin={isAdmin} />
             </CardContent>
           </Card>
         </TabsContent>

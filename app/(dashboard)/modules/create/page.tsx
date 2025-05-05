@@ -27,12 +27,13 @@ export default async function CreateModulePage({
     .eq("id", user.id)
     .single()
   
-  if (profileError || !profile || profile.role !== "admin") {
+  if (profileError || !profile || profile.role?.toLowerCase() !== "admin") {
     redirect("/dashboard")
   }
   
   // Validate and extract module type from query params
-  const moduleType = searchParams.type?.toLowerCase() === "assessment" 
+  const resolvedParams = await Promise.resolve(searchParams);
+  const moduleType = resolvedParams.type?.toLowerCase() === "assessment" 
     ? "Assessment" 
     : "Course"
   

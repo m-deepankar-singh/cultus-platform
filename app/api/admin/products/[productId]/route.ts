@@ -28,11 +28,11 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'Admin') {
+    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // --- User is authenticated and is an Admin, proceed ---
+    // --- User is authenticated and is an Admin or Staff, proceed ---
 
     // 2. Validate Route Parameter
     const validationResult = ProductIdSchema.safeParse({ productId: paramsObj.productId });
@@ -101,11 +101,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'Admin') {
+    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // --- User is authenticated and is an Admin, proceed ---
+    // --- User is authenticated and is an Admin or Staff, proceed ---
 
     // 2. Validate Route Parameter
     const paramValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
@@ -191,11 +191,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'Admin') {
+    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // --- User is authenticated and is an Admin, proceed ---
+    // --- User is authenticated and is an Admin or Staff, proceed ---
 
     // 2. Validate Route Parameter
     const paramValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
@@ -279,11 +279,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'Admin') {
+    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // --- User is authenticated and is an Admin, proceed ---
+    // --- User is authenticated and is an Admin or Staff, proceed ---
 
     // 2. Validate Route Parameter
     const paramValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });

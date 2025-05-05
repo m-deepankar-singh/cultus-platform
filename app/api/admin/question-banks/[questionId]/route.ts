@@ -77,14 +77,18 @@ export async function PUT(request: Request, { params }: RouteParams) {
     try {
         const supabase = await createClient();
 
-        // 1. Validate the question ID
-        const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
+        // 1. Get params asynchronously
+        const { questionId } = await params;
+        
+        // 2. Validate the question ID
+        const validationResult = QuestionIdSchema.safeParse({ questionId });
         if (!validationResult.success) {
             return NextResponse.json(
                 { error: 'Invalid question ID', details: validationResult.error.flatten() },
                 { status: 400 }
             );
         }
+        // We already have the validated questionId
 
         // 2. Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -130,7 +134,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         const { data: existingQuestion, error: checkError } = await supabase
             .from(tableName)
             .select('id')
-            .eq('id', params.questionId)
+            .eq('id', questionId) // Use extracted variable
             .single();
 
         if (checkError) {
@@ -144,7 +148,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         const { data: updatedQuestion, error: updateError } = await supabase
             .from(tableName)
             .update(questionData)
-            .eq('id', params.questionId)
+            .eq('id', questionId) // Use extracted variable
             .select()
             .single();
 
@@ -164,14 +168,18 @@ export async function DELETE(request: Request, { params }: RouteParams) {
      try {
         const supabase = await createClient();
 
-        // 1. Validate the question ID
-        const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
+        // 1. Get params asynchronously
+        const { questionId } = await params;
+        
+        // 2. Validate the question ID
+        const validationResult = QuestionIdSchema.safeParse({ questionId });
         if (!validationResult.success) {
             return NextResponse.json(
                 { error: 'Invalid question ID', details: validationResult.error.flatten() },
                 { status: 400 }
             );
         }
+        // We already have the validated questionId
 
         // 2. Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -204,7 +212,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         const { data: existingQuestion, error: checkError } = await supabase
             .from(tableName)
             .select('id')
-            .eq('id', params.questionId)
+            .eq('id', questionId) // Use extracted variable
             .single();
 
         if (checkError) {
@@ -218,7 +226,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         const { error: deleteError } = await supabase
             .from(tableName)
             .delete()
-            .eq('id', params.questionId);
+            .eq('id', questionId); // Use extracted variable
 
         if (deleteError) {
             return NextResponse.json({ error: 'Database error while deleting question', details: deleteError.message }, { status: 500 });

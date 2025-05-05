@@ -176,16 +176,23 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
         body: JSON.stringify({ lessons: updatedLessons }),
       })
       
-      const data = await response.json().catch(err => {
-        console.error("Error parsing response:", err)
-        return { error: "Failed to parse server response" }
-      })
+      // Check if response has content before trying to parse it as JSON
+      const contentType = response.headers.get("content-type")
+      let data = null
+      
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await response.json()
+        } catch (parseError) {
+          console.error("Error parsing JSON response:", parseError)
+          throw new Error(`Failed to parse server response: ${response.status} ${response.statusText}`)
+        }
+      }
       
       if (!response.ok) {
-        console.error("Server error response:", data)
-        const errorMessage = data.details
-          ? `${data.error}: ${typeof data.details === 'string' ? data.details : JSON.stringify(data.details)}`
-          : data.error || "Failed to update lesson order"
+        const errorMessage = data?.error || data?.message || 
+          (data?.details ? `${data.error}: ${typeof data.details === 'string' ? data.details : JSON.stringify(data.details)}` : 
+          `Failed to update lesson order: ${response.status} ${response.statusText}`)
         throw new Error(errorMessage)
       }
       
@@ -198,6 +205,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
       
       setSaveSuccess(true)
       router.refresh()
+      
     } catch (error) {
       console.error("Error updating lesson order:", error)
       toast({
@@ -205,6 +213,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
         title: "Error saving order",
         description: error instanceof Error ? error.message : "Failed to save lesson order. Please try again.",
       })
+      setSaveSuccess(false)
     } finally {
       setIsSaving(false)
     }
@@ -375,12 +384,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Lessons</h2>
-          <p className="text-muted-foreground">Manage lessons for this course module</p>
-        </div>
-        
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto"> 
           {lessons.length > 0 && !saveSuccess && (
             <Button 
               variant="outline" 
@@ -446,8 +450,8 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
           ))}
         </div>
       ) : lessons.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center p-10">
+        <Card className="border-none shadow-none">
+          <CardContent className="p-0">
             <p className="text-muted-foreground mb-4 text-center">
               No lessons have been added to this module yet.
             </p>

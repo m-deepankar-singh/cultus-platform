@@ -1,78 +1,50 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
 import { ClientSchema } from '@/lib/schemas/client'; // Import the Zod schema
+import { getUserSessionAndRole } from '@/lib/supabase/utils';
 
+/**
+ * GET /api/admin/clients
+ * 
+ * Retrieves a list of all clients
+ * Accessible only by users with 'Admin' or 'Staff' roles
+ */
 export async function GET(request: Request) {
   try {
+    // 1. Authentication & Authorization
+    const { user, profile, role, error: authError } = await getUserSessionAndRole();
+
+    if (authError || !user || !profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only allow Admins and Staff to access client list
+    if (!role || !["Admin", "Staff"].includes(role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // 2. Get Supabase client
     const supabase = await createClient();
 
-    // 1. Get the user session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // 3. Fetch all clients
+    const { data: clients, error: clientsError } = await supabase
+      .from('clients')
+      .select('id, name')
+      .order('name', { ascending: true });
 
-    if (authError || !user) {
-      console.error('Auth Error:', authError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (clientsError) {
+      console.error('Error fetching clients:', clientsError);
+      return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
     }
 
-    // 2. Get the user's role from the profiles table (assuming role is stored there)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role') // Select only the role column
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-        console.error('Profile Fetch Error:', profileError);
-        // If RLS prevents access, it might appear as a profile error or profile being null
-        return NextResponse.json({ error: 'Forbidden or Profile Not Found' }, { status: 403 });
-    }
-
-    if (!profile) {
-        console.error('Profile not found for user:', user.id);
-        return NextResponse.json({ error: 'Forbidden: User profile not found.' }, { status: 403 });
-    }
-
-    const role = profile.role;
-
-    // 3. Check if the role is Admin
-    if (role !== 'Admin') {
-      console.warn(`User ${user.id} with role ${role} attempted to access admin route.`);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // --- User is authenticated and is an Admin, proceed --- 
-
-    const { searchParams } = new URL(request.url);
-    const searchQuery = searchParams.get('search');
-    const isActiveFilter = searchParams.get('isActive');
-
-    let query = supabase.from('clients').select('*'); // Adjust columns as needed, e.g., 'id, name, contact_email, is_active'
-
-    if (searchQuery) {
-      query = query.ilike('name', `%${searchQuery}%`);
-    }
-
-    if (isActiveFilter !== null) {
-      const isActive = isActiveFilter.toLowerCase() === 'true';
-      query = query.eq('is_active', isActive);
-    }
-
-    query = query.order('name', { ascending: true });
-
-    const { data: clients, error: dbError } = await query;
-
-    if (dbError) {
-      console.error('Supabase DB Error:', dbError);
-      return NextResponse.json({ error: 'Failed to fetch clients', details: dbError.message }, { status: 500 });
-    }
-
-    return NextResponse.json(clients || [], { status: 200 });
-
+    // 4. Return client list
+    return NextResponse.json(clients || []);
+    
   } catch (error) {
-    console.error('GET /api/admin/clients Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Unexpected error in GET /api/admin/clients:', error);
+    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
-} 
+}
 
 export async function POST(request: Request) {
   try {

@@ -59,6 +59,7 @@ export function AssessmentQuestionManager({
   const [searchQuery, setSearchQuery] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null)
 
   // Fetch selected questions on mount
   useEffect(() => {
@@ -236,31 +237,43 @@ export function AssessmentQuestionManager({
   }
 
   const saveQuestions = async () => {
-    // Validation: Ensure at least one question is selected
-    if (selectedQuestions.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "An assessment module must have at least one question.",
-      })
-      return // Stop the save process
-    }
-    
     setIsSaving(true)
+    setError(null)
+    
     try {
-      // Prepare the data with updated sequence numbers
-      const updatedQuestions = selectedQuestions.map((q, index) => ({
-        id: q.id,
-        sequence: index + 1,
-        question_text: q.question_text,
-        question_type: q.question_type,
-        options: q.options,
-        correct_answer: q.correct_answer
+      // Validate data before saving
+      if (questions.length === 0) {
+        setError("No questions to save")
+        setIsSaving(false)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "There are no questions to save",
+        })
+        return // Stop the save process
+      }
+      
+      // Check minimum number required
+      if (questions.length < 5) {
+        setError("Assessment should have at least 5 questions")
+        setIsSaving(false)
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Assessment should have at least 5 questions",
+        })
+        return // Stop the save process
+      }
+      
+      // Update sequence numbers
+      const updatedQuestions = questions.map((question, index) => ({
+        ...question,
+        sequence: index + 1
       }))
       
       console.log('Sending questions to save:', updatedQuestions)
       
-      // Make API call to update questions
+      // Make API call to update all questions
       const response = await fetch(`/api/admin/modules/${moduleId}/assessment-questions`, {
         method: "PUT",
         headers: {
@@ -269,24 +282,40 @@ export function AssessmentQuestionManager({
         body: JSON.stringify({ questions: updatedQuestions }),
       })
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('API error response:', errorData)
-        throw new Error(errorData.error || `Failed to save questions: ${response.status}`)
+      // Check if response has content before trying to parse it as JSON
+      const contentType = response.headers.get("content-type")
+      let data = null
+      
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await response.json()
+        } catch (parseError) {
+          console.error("Error parsing JSON response:", parseError)
+          throw new Error(`Failed to parse server response: ${response.status} ${response.statusText}`)
+        }
       }
       
-      // Update local state with server response
-      const data = await response.json()
+      if (!response.ok) {
+        const errorMessage = data?.error || data?.message || `Failed to save questions: ${response.status} ${response.statusText}`
+        throw new Error(errorMessage)
+      }
+      
       console.log('Received saved questions response:', data)
       
-      setQuestions(data)
+      // Update state with saved data if returned
+      if (data && Array.isArray(data)) {
+        setQuestions(data)
+      }
       
+      // Show success notification
       toast({
         title: "Success",
-        description: "Assessment questions have been updated",
+        description: "Assessment questions have been saved",
       })
+      
     } catch (error) {
-      console.error("Error saving assessment questions:", error)
+      console.error("Error saving questions:", error)
+      setError(error instanceof Error ? error.message : "Unknown error occurred")
       toast({
         variant: "destructive",
         title: "Error saving questions",
@@ -300,13 +329,8 @@ export function AssessmentQuestionManager({
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Assessment Questions</h2>
-          <p className="text-muted-foreground">Manage questions for this assessment module</p>
-        </div>
-        
         {!readOnly && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <Button 
               variant="outline" 
               onClick={saveQuestions}

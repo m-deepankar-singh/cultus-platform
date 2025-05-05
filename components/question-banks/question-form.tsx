@@ -91,7 +91,7 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
           options: questionToEdit.options,
           correct_answer: questionToEdit.correct_answer as string,
           topic: questionToEdit.topic || '',
-          difficulty: questionToEdit.difficulty || '',
+          difficulty: questionToEdit.difficulty || 'none',
           bank_type: bankType,
         };
       } else {
@@ -101,7 +101,7 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
           options: questionToEdit.options,
           correct_answers: (questionToEdit.correct_answer as { answers: string[] }).answers,
           topic: questionToEdit.topic || '',
-          difficulty: questionToEdit.difficulty || '',
+          difficulty: questionToEdit.difficulty || 'none',
           bank_type: bankType,
         };
       }
@@ -116,7 +116,7 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
       ],
       ...(questionType === 'MCQ' ? { correct_answer: '' } : { correct_answers: [] }),
       topic: '',
-      difficulty: '',
+      difficulty: 'none',
       bank_type: bankType,
     };
   };
@@ -184,8 +184,9 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
         question_type: data.question_type,
         options: data.options,
         bank_type: data.bank_type,
-        topic: data.topic || null,
-        difficulty: data.difficulty || null,
+        // Convert empty strings or 'none' to null
+        topic: (!data.topic || data.topic === '') ? null : data.topic,
+        difficulty: (!data.difficulty || data.difficulty === '' || data.difficulty === 'none') ? null : data.difficulty,
         // Transform correct_answers to the expected format for MSQ
         ...(data.question_type === 'MCQ' 
           ? { correct_answer: data.correct_answer } 
@@ -440,7 +441,7 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Not specified</SelectItem>
+                      <SelectItem value="none">Not specified</SelectItem>
                       <SelectItem value="Easy">Easy</SelectItem>
                       <SelectItem value="Medium">Medium</SelectItem>
                       <SelectItem value="Hard">Hard</SelectItem>

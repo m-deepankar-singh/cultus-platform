@@ -89,7 +89,7 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
               Edit Module
             </Link>
           </Button>
-          <DeleteModuleButton id={moduleId} name={module.name} />
+          <DeleteModuleButton moduleId={moduleId} />
         </div>
       </div>
 
@@ -147,7 +147,6 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
           <TabsTrigger value="details">Module Details</TabsTrigger>
           {module.type === "Course" && <TabsTrigger value="lessons">Lessons</TabsTrigger>}
           {module.type === "Assessment" && <TabsTrigger value="questions">Questions</TabsTrigger>}
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         
         <TabsContent value="details">
@@ -174,18 +173,6 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
                       </a>
                     </div>
                   )}
-                  
-                  <div className="bg-muted rounded-md p-6 text-center">
-                    <h3 className="font-semibold mb-2">Lesson Management</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Add, edit, and reorder lessons using the Lessons tab above
-                    </p>
-                    <Button asChild variant="outline">
-                      <Link href="#" className="cursor-not-allowed opacity-70">
-                        <span>Lesson Editor Coming Soon</span>
-                      </Link>
-                    </Button>
-                  </div>
                 </div>
               )}
               
@@ -202,14 +189,6 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
                   <div className="flex justify-between items-center border-b pb-2">
                     <h3 className="font-semibold">Pass Threshold</h3>
                     <span>{module.configuration?.pass_threshold || 70}%</span>
-                  </div>
-                  
-                  <div className="bg-muted rounded-md p-6 text-center">
-                    <h3 className="font-semibold mb-2">Question Management</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Add and manage assessment questions using the Questions tab above
-                    </p>
-                    <QuestionsTabButton />
                   </div>
                 </div>
               )}
@@ -241,25 +220,6 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
             </CardHeader>
             <CardContent>
               <AssessmentQuestionManager moduleId={moduleId} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Module Settings</CardTitle>
-              <CardDescription>
-                Configure advanced settings for this module
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted rounded-md p-8 text-center">
-                <h3 className="text-xl font-semibold mb-4">Advanced Settings Coming Soon</h3>
-                <p className="max-w-lg mx-auto mb-6">
-                  Advanced configuration options for this module will be available here.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

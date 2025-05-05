@@ -4,7 +4,7 @@ This file tracks identified issues, bugs, and future tasks for the Upskilling Pl
 
 ## Bugs / Issues
 
-- [ ] **Client Dropdown Empty in User Creation**
+- [x] **Client Dropdown Empty in User Creation**
     - **Feature:** User Management (Admin Panel)
     - **Problem:** When creating a new user and selecting the "Client Staff" role in the `AddUserDialog`, the subsequent "Client" dropdown appears but is empty. It does not populate with the list of clients.
     - **Context:** The client list *is* being fetched correctly in the `UsersPage` server component and passed down through props (`UsersHeader` -> `AddUserDialog` -> `UserForm`). The `(clients || []).map` guard prevents runtime errors but doesn't resolve the missing data.
@@ -15,6 +15,19 @@ This file tracks identified issues, bugs, and future tasks for the Upskilling Pl
         - `components/users/users-header.tsx`
         - `components/users/add-user-dialog.tsx`
         - `components/users/user-form.tsx`
+    - **Resolution:** Added client-side fetching of clients in the `AddUserDialog` component to ensure the dropdown has the most up-to-date data. Created a new `/api/admin/clients` endpoint to facilitate this. Also added filtering for null/empty client IDs in the dropdown rendering.
+
+- [x] **Learner Updates Not Persisting in Database**
+    - **Feature:** Learner Management (Admin Panel)
+    - **Problem:** Updates to learner information via the admin PATCH endpoint sometimes don't persist in the database despite the API returning success responses with updated data.
+    - **Context:** The API endpoint is correctly receiving requests, validating input, and executing update operations with the service client to bypass RLS policies. Detailed logging shows the update being executed and returning success, but changes don't always appear in the database or UI.
+    - **Expected:** All validated updates should be persisted in the database and reflected in subsequent fetches.
+    - **Root Cause:** Email updates in Supabase Auth by default require verification via links sent to both old and new email addresses before the change is finalized, causing a mismatch between API response data and actual database state.
+    - **Relevant Files:**
+        - `app/api/admin/learners/[studentId]/route.ts` (PATCH method)
+        - `components/learners/edit-learner-dialog.tsx`
+        - `lib/supabase/server.ts` (service client creation)
+    - **Resolution:** Instead of implementing complex synchronization between the students table and auth.users tables, email updates have been disabled in the UI and API to prevent inconsistencies. The edit form now shows email as disabled with an explanatory message, and the API returns an error if email changes are attempted.
 
 ## Future Tasks
 

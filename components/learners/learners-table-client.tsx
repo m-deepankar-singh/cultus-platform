@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,10 +19,28 @@ import { Badge } from "@/components/ui/badge"
 import { Learner } from "./learners-table"
 import { format } from "date-fns"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { EditLearnerDialog } from "./edit-learner-dialog"
 
 interface LearnersTableClientProps {
   initialLearners: Learner[]
   uniqueClients: string[]
+}
+
+interface Client {
+  id: string
+  name: string
 }
 
 export function LearnersTableClient({ initialLearners, uniqueClients }: LearnersTableClientProps) {
@@ -30,8 +48,74 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
   const [clientFilter, setClientFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [learners, setLearners] = useState(initialLearners)
+  
+  // State for all clients - used for edit dialog
+  const [allClients, setAllClients] = useState<Client[]>([])
+  const [loadingClients, setLoadingClients] = useState(true)
+  
+  // State for edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [currentLearner, setCurrentLearner] = useState<Learner | null>(null)
+  
+  // State for delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [learnerToDelete, setLearnerToDelete] = useState<Learner | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  
+  const router = useRouter()
+  const { toast } = useToast()
 
-  const filteredLearners = initialLearners.filter((learner) => {
+  // Fetch all clients for the edit dialog
+  useEffect(() => {
+    const fetchAllClients = async () => {
+      try {
+        const response = await fetch("/api/admin/clients")
+        if (!response.ok) {
+          throw new Error("Failed to fetch clients")
+        }
+        const data = await response.json()
+        setAllClients(data)
+      } catch (error) {
+        console.error("Error fetching clients:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load all clients for the edit dialog."
+        })
+      } finally {
+        setLoadingClients(false)
+      }
+    }
+
+    fetchAllClients()
+  }, [toast])
+
+  // Effect to refresh data when the learnerAdded event is triggered
+  useEffect(() => {
+    // Set initial data
+    setLearners(initialLearners)
+    
+    // Set up event listener for learnerAdded event
+    const handleLearnerAdded = () => {
+      // Refresh the page to get updated data
+      router.refresh()
+      
+      toast({
+        title: "Learner added",
+        description: "The learners list has been refreshed."
+      })
+    }
+    
+    document.addEventListener('learnerAdded', handleLearnerAdded)
+    
+    // Clean up event listener
+    return () => {
+      document.removeEventListener('learnerAdded', handleLearnerAdded)
+    }
+  }, [initialLearners, router, toast])
+
+  const filteredLearners = learners.filter((learner) => {
     const matchesSearch =
       learner.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (learner.email && learner.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -44,6 +128,68 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
 
     return matchesSearch && matchesClient && matchesStatus
   })
+  
+  // Handle edit learner
+  const handleEditLearner = (learner: Learner) => {
+    setCurrentLearner(learner)
+    setEditDialogOpen(true)
+  }
+  
+  // Handle learner updated
+  const handleLearnerUpdated = () => {
+    router.refresh()
+    toast({
+      title: "Learner updated",
+      description: "The learner has been updated successfully."
+    })
+  }
+  
+  // Handle delete learner
+  const handleDeleteLearner = (learner: Learner) => {
+    setLearnerToDelete(learner)
+    setDeleteDialogOpen(true)
+  }
+  
+  // Confirm delete learner
+  const confirmDeleteLearner = async () => {
+    if (!learnerToDelete) return
+    
+    setIsDeleting(true)
+    
+    try {
+      const response = await fetch(`/api/admin/learners/${learnerToDelete.id}`, {
+        method: "DELETE",
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete learner")
+      }
+      
+      toast({
+        title: "Learner deleted",
+        description: `${learnerToDelete.full_name} has been deleted successfully.`,
+      })
+      
+      // Remove from local state to avoid refresh
+      setLearners(prevLearners => 
+        prevLearners.filter(learner => learner.id !== learnerToDelete.id)
+      )
+      
+      // Also refresh to get updated data from server
+      router.refresh()
+    } catch (error) {
+      toast({
+        title: "Failed to delete learner",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      setLearnerToDelete(null)
+    }
+  }
 
   return (
     <>
@@ -164,7 +310,16 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
                           <DropdownMenuItem asChild>
                             <Link href={`/learners/${learner.id}`}>View details</Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>View progress</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleEditLearner(learner)}>
+                            Edit learner
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteLearner(learner)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            Delete learner
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -175,6 +330,44 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
           </TableBody>
         </Table>
       </div>
+      
+      {/* Edit Learner Dialog */}
+      {currentLearner && (
+        <EditLearnerDialog
+          isOpen={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false)
+            setCurrentLearner(null)
+          }}
+          learner={currentLearner}
+          clients={allClients}
+          onLearnerUpdated={handleLearnerUpdated}
+        />
+      )}
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the learner{' '}
+              <span className="font-semibold">{learnerToDelete?.full_name}</span> and their data.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteLearner}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 } 

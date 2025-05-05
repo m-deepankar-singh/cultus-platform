@@ -201,15 +201,18 @@ async function LearnerDetail({ studentId }: { studentId: string }) {
   );
 }
 
-export default function LearnerDetailPage({
+export default async function LearnerDetailPage({
   params,
 }: {
   params: { studentId: string };
 }) {
+  // Parse params before using them, ensuring they're properly awaited
+  const studentId = params.studentId;
+  
   return (
     <div className="p-4 md:p-8">
       <Suspense fallback={<LearnerDetailSkeleton />}>
-        <LearnerDetail studentId={params.studentId} />
+        <LearnerDetail studentId={studentId} />
       </Suspense>
     </div>
   );

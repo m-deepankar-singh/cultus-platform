@@ -109,15 +109,30 @@ export async function LearnersTable() {
 // Placeholder component for loading state
 export function LearnersTableSkeleton() {
   return (
-    <Card>
+    <Card className="animate-in fade-in-50">
       <div className="p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 h-10 bg-gray-200 animate-pulse rounded-md"></div>
-          <div className="h-10 w-24 bg-gray-200 animate-pulse rounded-md"></div>
+          <div className="relative flex-1 h-10 bg-muted animate-pulse rounded-md"></div>
+          <div className="h-10 w-24 bg-muted animate-pulse rounded-md"></div>
         </div>
       </div>
-      <div className="rounded-md border dark:border-border">
-        <div className="h-64 w-full bg-gray-100 animate-pulse"></div>
+      <div className="rounded-md border">
+        <div className="grid grid-cols-7 border-b">
+          {Array(7).fill(0).map((_, i) => (
+            <div key={i} className="p-4 h-10">
+              <div className="h-5 w-20 bg-muted animate-pulse rounded"></div>
+            </div>
+          ))}
+        </div>
+        {Array(5).fill(0).map((_, i) => (
+          <div key={i} className="grid grid-cols-7 border-b">
+            {Array(7).fill(0).map((_, j) => (
+              <div key={j} className="p-4">
+                <div className="h-5 w-full bg-muted animate-pulse rounded"></div>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </Card>
   )

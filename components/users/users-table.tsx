@@ -18,6 +18,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { User } from "@supabase/supabase-js"
 import { UserActionsCell } from "./user-actions-cell"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { InfoIcon } from "lucide-react"
 
 interface Profile {
   id: string
@@ -79,26 +81,53 @@ function isUserActive(user: UserProfile): boolean {
 export async function UsersTable({ clients }: UsersTableProps) {
   const supabaseAdmin = createAdminClient()
   const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
+  const supabase = await createClient()
+
+  // Get the current user to determine their role
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  
+  // Get current user's profile to determine their role
+  const { data: currentUserProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', currentUser?.id ?? '')
+    .single()
+  
+  const isStaffUser = currentUserProfile?.role === 'Staff'
 
   if (usersError) {
     console.error("Error fetching users (Admin):", usersError)
     return <div>Error loading users.</div>
   }
 
+  // Fetch profiles and clients
   const profilePromise = supabaseAdmin.from("profiles").select("id, full_name, role, client_id")
   const clientPromise = supabaseAdmin.from("clients").select("id, name")
+  
+  // Also fetch students to filter them out from the users list
+  const studentsPromise = supabaseAdmin.from("students").select("id")
 
-  const [{ data: profiles, error: profilesError }, { data: clientsData, error: clientsError }] =
-    await Promise.all([profilePromise, clientPromise])
+  const [
+    { data: profiles, error: profilesError }, 
+    { data: clientsData, error: clientsError },
+    { data: students, error: studentsError }
+  ] = await Promise.all([profilePromise, clientPromise, studentsPromise])
 
-  if (profilesError || clientsError) {
-    console.error("Error fetching profiles or clients (Admin):", profilesError || clientsError)
+  if (profilesError || clientsError || studentsError) {
+    console.error("Error fetching profiles, clients, or students:", 
+      profilesError || clientsError || studentsError)
   }
 
   const profileMap = new Map(profiles?.map((p: Profile) => [p.id, p]))
   const clientMap = new Map(clientsData?.map((c: Client) => [c.id, c]))
+  
+  // Create a set of student IDs for faster lookup
+  const studentIds = new Set(students?.map((s: { id: string }) => s.id) || [])
 
-  const combinedUsers: UserProfile[] = usersData.users.map((user: User) => {
+  // Filter out users that exist in the students table
+  const filteredUsers = usersData.users.filter((user: User) => !studentIds.has(user.id))
+
+  const combinedUsers: UserProfile[] = filteredUsers.map((user: User) => {
     const profile = profileMap.get(user.id)
     const clientName = profile?.client_id ? clientMap.get(profile.client_id)?.name : undefined
     return {
@@ -110,6 +139,14 @@ export async function UsersTable({ clients }: UsersTableProps) {
 
   return (
     <Card>
+      {isStaffUser && (
+        <Alert className="mb-4">
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>
+            You are in view-only mode. Staff members can view users but cannot edit or deactivate them.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="rounded-md border">
         <Table>
           <TableHeader>

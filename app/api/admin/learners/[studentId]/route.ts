@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
+import { z } from 'zod';
 
 /**
  * GET /api/admin/learners/[studentId]
  * 
  * Retrieves detailed information for a specific learner (user with 'Student' role),
  * including their profile and a summary of their course progress.
- * Accessible only by users with the 'Admin' role.
+ * Accessible by users with the 'Admin' or 'Staff' role.
  */
 export async function GET(
   request: Request, // Keep request param even if unused for potential future use (e.g., headers)
@@ -28,7 +29,7 @@ export async function GET(
         });
     }
 
-    if (role !== 'Admin') {
+    if (!role || !["Admin", "Staff"].includes(role)) {
       return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
@@ -36,7 +37,8 @@ export async function GET(
     }
 
     // 2. Validate Route Parameter (studentId)
-    const validationResult = UserIdSchema.safeParse({ userId: params.studentId });
+    const { studentId } = await params;
+    const validationResult = UserIdSchema.safeParse({ userId: studentId });
 
     if (!validationResult.success) {
       return new NextResponse(
@@ -47,8 +49,6 @@ export async function GET(
         }
       );
     }
-
-    const { userId: studentId } = validationResult.data;
 
     // Get Supabase client *after* auth check
     const supabase = await createClient();
@@ -116,5 +116,250 @@ export async function GET(
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+}
+
+// Schema for updating a learner
+const UpdateLearnerSchema = z.object({
+  full_name: z.string().min(2).optional(),
+  phone_number: z.string().optional().nullable(),
+  client_id: z.string().uuid().optional(),
+  is_active: z.boolean().optional(),
+});
+
+/**
+ * PATCH /api/admin/learners/[studentId]
+ * 
+ * Updates a learner's information
+ * Note: Email changes are not allowed to avoid sync issues with auth.users
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: { studentId: string } }
+) {
+  try {
+    // 1. Authentication & Authorization
+    const { user, profile, role, error: authError } = await getUserSessionAndRole();
+
+    if (authError || !user || !profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Allow both Admins and Staff to update learners
+    if (!role || !["Admin", "Staff"].includes(role)) {
+      return NextResponse.json({ error: "Forbidden: Only Admins and Staff can update learners" }, { status: 403 });
+    }
+
+    // 2. Validate studentId
+    const { studentId } = await params;
+    const validationResult = UserIdSchema.safeParse({ userId: studentId });
+
+    if (!validationResult.success) {
+      return NextResponse.json({
+        error: "Invalid student ID format",
+        details: validationResult.error.flatten()
+      }, { status: 400 });
+    }
+
+    // 3. Parse and validate request body
+    const body = await request.json();
+    
+    // Check if email is being attempted to be updated
+    if (body.email !== undefined) {
+      return NextResponse.json({ 
+        error: "Changing email is not supported", 
+        details: "Email updates are not allowed to maintain consistency with authentication systems."
+      }, { status: 400 });
+    }
+    
+    const validation = UpdateLearnerSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return NextResponse.json({ 
+        error: "Validation error", 
+        details: validation.error.format() 
+      }, { status: 400 });
+    }
+    
+    const updateData = validation.data;
+    
+    // 4. Get Supabase clients
+    const supabase = await createClient();
+    const serviceClient = await createServiceClient();
+    
+    // 5. Check if the student exists - query the students table directly
+    const { data: existingStudent, error: checkError } = await supabase
+      .from('students')
+      .select('id, email')
+      .eq('id', studentId)
+      .single();
+    
+    if (checkError || !existingStudent) {
+      console.error('Error checking if student exists:', checkError);
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+    
+    // If client_id is being updated, check if it exists
+    if (updateData.client_id) {
+      const { data: clientExists, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('id', updateData.client_id)
+        .single();
+      
+      if (clientError || !clientExists) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    
+    // 7. Update the student
+    console.log(`[PATCH /api/admin/learners/${studentId}] Preparing update. User ID: ${user.id}`);
+    const updatePayload = {
+      ...updateData,
+      updated_at: new Date().toISOString()
+    };
+    console.log(`[PATCH /api/admin/learners/${studentId}] Update Payload:`, JSON.stringify(updatePayload, null, 2));
+
+    // Start transaction for atomic updates
+    const tx = await serviceClient.rpc('begin_transaction'); // Assuming a custom RPC or use supabase transaction method if available
+
+    try {
+      // Update the student record
+      const { data: updateResult, error: updateError, count } = await serviceClient
+        .from('students')
+        .update(updatePayload)
+        .eq('id', studentId);
+      
+      if (updateError) {
+        throw updateError; // Throw to rollback transaction
+      }
+      
+      if (count === 0) {
+        console.log(`[PATCH /api/admin/learners/${studentId}] No rows updated - possible no change or concurrency issue`);
+        throw new Error('No rows updated');
+      }
+      
+      // Commit transaction
+      await serviceClient.rpc('commit_transaction');
+      
+      // Fetch and return updated student
+      const { data: updatedStudent, error: fetchError } = await serviceClient
+        .from('students')
+        .select('*')
+        .eq('id', studentId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching updated student:', fetchError);
+        return NextResponse.json({ error: "Failed to retrieve updated student data" }, { status: 500 });
+      }
+      
+      return NextResponse.json(updatedStudent);
+    } catch (txError) {
+      console.error('Transaction Error:', txError);
+      await serviceClient.rpc('rollback_transaction');
+      return NextResponse.json({
+        error: "Failed to update student",
+        details: txError instanceof Error ? txError.message : 'Unknown error during transaction'
+      }, { status: 500 });
+    }
+  } catch (error) {
+    console.error('Unexpected error in PATCH /api/admin/learners/[studentId]:', error);
+    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/admin/learners/[studentId]
+ * 
+ * Deletes a learner (both auth user and student record)
+ * This can only be done by an Admin
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: { studentId: string } }
+) {
+  try {
+    // 1. Authentication & Authorization
+    const { user, profile, role, error: authError } = await getUserSessionAndRole();
+
+    if (authError || !user || !profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Allow both Admins and Staff to delete learners
+    if (!role || !["Admin", "Staff"].includes(role)) {
+      return NextResponse.json({ error: "Forbidden: Only Admins and Staff can delete learners" }, { status: 403 });
+    }
+
+    // 2. Validate studentId
+    const { studentId } = await params;
+    const validationResult = UserIdSchema.safeParse({ userId: studentId });
+
+    if (!validationResult.success) {
+      return NextResponse.json({
+        error: "Invalid student ID format",
+        details: validationResult.error.flatten()
+      }, { status: 400 });
+    }
+
+    // 3. Get Supabase clients
+    const supabase = await createClient();
+    const serviceClient = await createServiceClient();
+    
+    // 4. Check if the student exists
+    const { data: existingStudent, error: checkError } = await supabase
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .single();
+    
+    if (checkError || !existingStudent) {
+      console.error('Error checking if student exists:', checkError);
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+    
+    // 5. Start a transaction - depends on Supabase's transaction support
+    try {
+      // First delete the student record
+      const { error: deleteStudentError } = await serviceClient
+        .from('students')
+        .delete()
+        .eq('id', studentId);
+      
+      if (deleteStudentError) {
+        throw deleteStudentError;
+      }
+      
+      // Delete all progress data associated with the student
+      // For student_module_progress
+      const { error: deleteProgressError } = await serviceClient
+        .from('student_module_progress')
+        .delete()
+        .eq('student_id', studentId);
+      
+      if (deleteProgressError) {
+        console.warn('Error deleting student module progress:', deleteProgressError);
+        // Consider whether this should be a hard failure
+      }
+      
+      // Delete the auth user
+      const { error: deleteAuthError } = await serviceClient.auth.admin.deleteUser(studentId);
+      
+      if (deleteAuthError) {
+        throw deleteAuthError;
+      }
+      
+      return NextResponse.json({ message: "Student successfully deleted" });
+    } catch (txError) {
+      console.error('Error during student deletion:', txError);
+      return NextResponse.json({
+        error: "Failed to delete student",
+        details: txError instanceof Error ? txError.message : 'Unknown error during deletion'
+      }, { status: 500 });
+    }
+  } catch (error) {
+    console.error('Unexpected error in DELETE /api/admin/learners/[studentId]:', error);
+    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
 }

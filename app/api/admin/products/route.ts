@@ -27,13 +27,13 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
     }
 
-    // Authorize based on role
-    if (profile.role !== 'Admin') {
-        console.warn(`User ${user.id} with role ${profile.role} attempted to access admin route.`);
+    // Authorize based on role - allow Admin and Staff
+    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
+        console.warn(`User ${user.id} with role ${profile.role} attempted to access products route.`);
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // --- User is authenticated and is an Admin, proceed ---
+    // --- User is authenticated and is an Admin or Staff, proceed ---
 
     // 2. Parse Query Parameters
     const { searchParams } = new URL(request.url);
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   try {
     const supabase = await createClient();
 
-    // 1. Authentication & Authorization (Ensure only Admins can create)
+    // 1. Authentication & Authorization (Allow Admin and Staff)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -98,11 +98,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'Admin') {
+    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // --- User is authenticated and is an Admin, proceed ---
+    // --- User is authenticated and is an Admin or Staff, proceed ---
 
     // 2. Parse & Validate Request Body
     let body;

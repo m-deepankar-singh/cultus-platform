@@ -7,8 +7,8 @@ const BaseQuestionSchema = z.object({
   question_text: z.string().min(1, { message: 'Question text is required' }),
   question_type: z.enum(['MCQ', 'MSQ']), // Multiple Choice Question, Multi-Select Question
   options: z.array(z.object({ id: z.string(), text: z.string() })).min(2, { message: 'At least two options required' }),
-  topic: z.string().optional(),
-  difficulty: z.string().optional(),
+  topic: z.string().nullable().optional(),
+  difficulty: z.string().nullable().optional(),
   // Remove tags field as it doesn't exist in the database
 });
 

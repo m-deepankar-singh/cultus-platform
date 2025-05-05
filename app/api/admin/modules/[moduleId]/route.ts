@@ -168,6 +168,109 @@ export async function PUT(
 }
 
 /**
+ * PATCH /api/admin/modules/[moduleId]
+ * 
+ * Updates specific fields of a module by ID.
+ * Requires admin authentication.
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: { moduleId: string } }
+) {
+  try {
+    const supabase = await createClient();
+    const paramsObj = await params;
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single();
+    if (profileError || !profile) {
+      console.error('Error fetching user profile:', profileError);
+      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
+    }
+    if (profile.role !== 'Admin') {
+      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
+    }
+
+    const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
+    if (!moduleIdValidation.success) {
+      return NextResponse.json(
+        { error: 'Bad Request', message: 'Invalid module ID format', details: moduleIdValidation.error.format() }, 
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    
+    const { data: existingModule, error: checkError } = await supabase
+      .from("modules")
+      .select("id")
+      .eq("id", paramsObj.moduleId)
+      .single();
+      
+    if (checkError) {
+      if (checkError.code === "PGRST116") {
+        return NextResponse.json(
+          { error: "Not Found", message: "Module not found" },
+          { status: 404 }
+        );
+      }
+      
+      console.error("Error checking module existence:", checkError);
+      return NextResponse.json(
+        { error: "Server Error", message: "Error checking if module exists" },
+        { status: 500 }
+      );
+    }
+    
+    const moduleValidation = ModuleSchema.partial().safeParse(body);
+    if (!moduleValidation.success) {
+      return NextResponse.json(
+        { 
+          error: "Bad Request", 
+          message: "Invalid module data",
+          details: moduleValidation.error.format() 
+        },
+        { status: 400 }
+      );
+    }
+
+    const validatedModuleData = moduleValidation.data;
+
+    const { data: updatedModule, error: updateError } = await supabase
+      .from("modules")
+      .update({
+        ...validatedModuleData,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", paramsObj.moduleId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error updating module:", updateError);
+      return NextResponse.json(
+        { error: "Server Error", message: "Error updating module" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(updatedModule);
+
+  } catch (error) {
+    console.error("Unexpected error in PATCH module:", error);
+    return NextResponse.json(
+      { error: "Server Error", message: "An unexpected error occurred" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * DELETE /api/admin/modules/[moduleId]
  * 
  * Deletes a specific module by ID.

@@ -20,8 +20,38 @@ interface AddUserDialogProps {
     clients: Client[];
 }
 
-export function AddUserDialog({ clients }: AddUserDialogProps) {
+export function AddUserDialog({ clients: initialClients }: AddUserDialogProps) {
     const [open, setOpen] = React.useState(false);
+    const [clients, setClients] = React.useState<Client[]>(initialClients || []);
+    const [isLoading, setIsLoading] = React.useState(false);
+
+    // Fetch clients when the dialog opens to ensure we have the most up-to-date list
+    React.useEffect(() => {
+        if (open) {
+            const fetchClients = async () => {
+                setIsLoading(true);
+                try {
+                    const response = await fetch('/api/admin/clients');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch clients');
+                    }
+                    const data = await response.json();
+                    console.log('Clients fetched in AddUserDialog:', data);
+                    setClients(data || []);
+                } catch (error) {
+                    console.error('Error fetching clients:', error);
+                    // Fallback to the initial clients if the fetch fails
+                    if (initialClients?.length) {
+                        setClients(initialClients);
+                    }
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            fetchClients();
+        }
+    }, [open, initialClients]);
 
     // Optional: Callback to close dialog after successful form submission
     const handleFormSubmit = () => {

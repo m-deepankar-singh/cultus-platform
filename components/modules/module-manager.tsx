@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/components/ui/use-toast"
 import { ModulesList } from "../products/modules-list"
 import { AssignModuleModal } from "../products/assign-module-modal"
+import { useCurrentUser } from "@/hooks/use-current-user"
 
 interface Module {
   id: string
@@ -26,10 +27,13 @@ interface ModuleManagerProps {
 export function ModuleManager({ productId }: ModuleManagerProps) {
   const router = useRouter()
   const { toast } = useToast()
+  const { user, role } = useCurrentUser()
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
+  
+  const isAdmin = role === 'Admin'
 
   useEffect(() => {
     fetchModules()
@@ -62,15 +66,20 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
   }
 
   const handleUnassignModule = async (moduleId: string) => {
+    if (!isAdmin) return
+    
     try {
+      const UNASSIGNED_MODULES_REPOSITORY = "3f9a1ea0-5942-4ef1-bdb6-183d5add4b52"
+      
       const response = await fetch(`/api/admin/modules/${moduleId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: null })
+        body: JSON.stringify({ product_id: UNASSIGNED_MODULES_REPOSITORY })
       })
       
       if (!response.ok) {
-        throw new Error("Failed to unassign module")
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to unassign module: ${response.status}`);
       }
       
       toast({
@@ -84,13 +93,12 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to unassign module. Please try again."
+        description: err instanceof Error ? err.message : "Failed to unassign module. Please try again."
       })
     }
   }
 
   const handleEditModule = (moduleId: string) => {
-    // Navigate to the module detail page
     router.push(`/modules/${moduleId}`)
   }
 
@@ -99,13 +107,19 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Modules</h2>
-          <p className="text-muted-foreground">Manage modules assigned to this product</p>
+          <p className="text-muted-foreground">
+            {isAdmin 
+              ? "Manage modules assigned to this product" 
+              : "View modules assigned to this product"}
+          </p>
         </div>
         
-        <Button onClick={() => setShowAssignModal(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Assign Modules
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setShowAssignModal(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Assign Modules
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -125,11 +139,15 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
             <Layers className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-medium">No modules assigned</h3>
             <p className="text-muted-foreground mt-2">
-              Get started by assigning existing modules to this product.
+              {isAdmin 
+                ? "Get started by assigning existing modules to this product."
+                : "This product has no modules assigned to it yet."}
             </p>
-            <Button onClick={() => setShowAssignModal(true)} className="mt-4">
-              Assign Modules
-            </Button>
+            {isAdmin && (
+              <Button onClick={() => setShowAssignModal(true)} className="mt-4">
+                Assign Modules
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -151,25 +169,29 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
                 </div>
               </div>
 
-              <div className="flex space-x-2">
-                <Button variant="outline" size="sm" onClick={() => handleEditModule(module.id)}>
-                  Edit Content
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleUnassignModule(module.id)}>
-                  Unassign
-                </Button>
-              </div>
+              {isAdmin && (
+                <div className="flex space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => handleEditModule(module.id)}>
+                    Edit Content
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleUnassignModule(module.id)}>
+                    Unassign
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      <AssignModuleModal
-        open={showAssignModal}
-        onOpenChange={setShowAssignModal}
-        productId={productId}
-        onAssigned={fetchModules}
-      />
+      {isAdmin && (
+        <AssignModuleModal
+          open={showAssignModal}
+          onOpenChange={setShowAssignModal}
+          productId={productId}
+          onAssigned={fetchModules}
+        />
+      )}
     </div>
   )
 } 

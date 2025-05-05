@@ -92,6 +92,11 @@ export function UserForm({
     const [state, formAction] = useActionState(serverAction, initialState);
     const { toast } = useToast();
 
+    // Add debug logging for clients data
+    React.useEffect(() => {
+        console.log('Clients received in UserForm:', clients);
+    }, [clients]);
+
     const form = useForm<UserFormValues>({
         resolver: zodResolver(UserFormSchema),
         defaultValues: {
@@ -231,11 +236,23 @@ export function UserForm({
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        {(clients || []).map(client => (
+                                        {/* Debug info moved outside JSX */}
+                                        {/* Filter out any clients with empty or null IDs */}
+                                        {(clients || [])
+                                          .filter(client => !!client && !!client.id)
+                                          .map(client => (
                                             <SelectItem key={client.id} value={client.id}>
                                                 {client.name}
                                             </SelectItem>
-                                        ))}
+                                          ))
+                                        }
+                                        
+                                        {/* If no valid clients, display a message */}
+                                        {(!clients || clients.length === 0 || clients.every(c => !c || !c.id)) && (
+                                            <div className="px-2 py-2 text-sm text-muted-foreground">
+                                                No clients available
+                                            </div>
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 <input type="hidden" {...field} name="clientId" value={field.value || ''} /> 

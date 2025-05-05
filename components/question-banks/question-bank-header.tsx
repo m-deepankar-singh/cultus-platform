@@ -23,24 +23,11 @@ export function QuestionBankHeader() {
           size="sm"
           className="h-9"
           onClick={() => {
-            setBankType('assessment');
             setOpen(true);
           }}
         >
           <PlusCircle className="h-4 w-4 mr-2" />
-          Add Assessment Question
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={() => {
-            setBankType('course');
-            setOpen(true);
-          }}
-        >
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Add Course Question
+          Add Question
         </Button>
       </div>
       <QuestionForm open={open} onOpenChange={setOpen} bankType={bankType} />

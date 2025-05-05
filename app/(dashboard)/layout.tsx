@@ -14,7 +14,7 @@ export default function DashboardLayout({
         <div className="sticky top-0 h-screen">
           <DashboardSidebar />
         </div>
-        <main className="flex-1 overflow-y-auto scroll-smooth bg-muted/40 pb-16">{children}</main>
+        <main className="flex-1 overflow-y-auto scroll-smooth pb-16">{children}</main>
       </div>
     </div>
   )

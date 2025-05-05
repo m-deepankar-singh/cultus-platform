@@ -25,6 +25,52 @@ async function getRoleFromProfile(supabase: any, userId: string): Promise<string
   }
 }
 
+// Admin-specific routes (only Admin can access)
+const ADMIN_ONLY_ROUTES = [
+  // User management routes
+  '/users',
+  '/admin/users',
+  
+  // Module creation and editing routes
+  '/modules/create',
+  '/modules/.*/edit',
+  '/api/admin/modules', // Block API endpoints for module CRUD operations
+];
+
+// Routes accessible by Admin and Staff roles
+const ADMIN_AND_STAFF_ROUTES = [
+  // Admin dashboard
+  '/dashboard',
+  
+  // Client management
+  '/clients',
+  '/api/admin/clients',
+  '/api/staff/clients',
+  
+  // Product management
+  '/products',
+  '/api/admin/products',
+  
+  // Learner management
+  '/learners',
+  '/api/admin/learners',
+  '/api/staff/learners',
+  
+  // Module viewing (but not editing)
+  '/modules',
+  '/api/admin/products/*/modules', // Allow viewing modules for a product
+];
+
+// Helper function to check if a path matches a route pattern
+function pathMatchesPattern(pathname: string, pattern: string): boolean {
+  if (pattern.includes('*')) {
+    // Convert glob pattern to regex pattern
+    const regexPattern = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    return regexPattern.test(pathname);
+  }
+  return pathname === pattern || pathname.startsWith(`${pattern}/`);
+}
+
 export async function middleware(request: NextRequest) {
   let { supabase, response } = createClient(request);
   const { pathname } = request.nextUrl;
@@ -33,17 +79,24 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/auth/logout') {
     console.log('Middleware: Handling /auth/logout');
     await supabase.auth.signOut();
-    // Redirect to a public page after logout, e.g., admin login
+    
+    // Get the referer to determine where the user came from
+    const referer = request.headers.get('referer') || '';
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/admin/login'; 
+    
+    // Check if the user was using the student app
+    if (referer.includes('/app/')) {
+      console.log('Middleware: Redirecting to /app/login after student logout');
+      redirectUrl.pathname = '/app/login';
+    } else {
+      // Default to admin login for all other cases
+      console.log('Middleware: Redirecting to /admin/login after admin logout');
+      redirectUrl.pathname = '/admin/login';
+    }
+    
     redirectUrl.search = ''; // Clear any query params
     // Ensure response cookies reflect the signOut operation
     response = NextResponse.redirect(redirectUrl, { headers: response.headers });
-    // Apply potential cookie changes from signOut to the redirect response
-    // This might involve re-creating the client with the redirect response if
-    // the ssr library needs the exact response object it can modify.
-    // Re-check Supabase ssr docs if logout cookies aren't cleared.
-    console.log('Middleware: Redirecting to /admin/login after logout');
     return response;
   }
 
@@ -52,51 +105,82 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   // --- 3. Define Public and Protected Routes --- 
-  const publicPaths = ['/admin/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback']; // Add any other public paths
+  const publicPaths = ['/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback']; // Add any other public paths
+  
+  // Check if route is protected
   const isAdminRoute = pathname.startsWith('/admin') && !pathname.startsWith('/admin/login');
-  const isAppRoute = pathname.startsWith('/app'); // Example protected app route
-  const isGeneralDashboardRoute = pathname.startsWith('/dashboard') || pathname === '/'; // Treat root as dashboard
-  const isProtectedRoute = isAdminRoute || isAppRoute || isGeneralDashboardRoute; // Combine protected areas
+  const isAppRoute = pathname.startsWith('/app');
+  const isProtectedRoute = isAdminRoute || isAppRoute || 
+    ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route)) ||
+    ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route));
 
   // --- 4. Access Control Logic --- 
 
   // Allow access to public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
-      console.log(`Middleware: Allowing public access to ${pathname}`);
-      return response; // Allow request to proceed
+    console.log(`Middleware: Allowing public access to ${pathname}`);
+    return response; // Allow request to proceed
   }
 
   // Redirect unauthenticated users trying to access protected routes
   if (!user && isProtectedRoute) {
     console.warn(`Middleware: Unauthenticated access attempt to ${pathname}, redirecting to login.`);
     const redirectUrl = request.nextUrl.clone();
-    // Redirect to admin login for admin routes, general login otherwise
-    redirectUrl.pathname = isAdminRoute ? '/admin/login' : '/login';
+    
+    // Direct users to the appropriate login page based on the route they're trying to access
+    if (isAppRoute) {
+      // Student app users go to student login
+      console.log(`Middleware: Redirecting app user to /app/login from ${pathname}`);
+      redirectUrl.pathname = '/app/login';
+    } else {
+      // Admin and staff users go to admin login
+      console.log(`Middleware: Redirecting admin/staff user to /admin/login from ${pathname}`);
+      redirectUrl.pathname = '/admin/login';
+    }
+    
     redirectUrl.search = `redirectedFrom=${encodeURIComponent(pathname)}`; // Optional: pass redirect info
     return NextResponse.redirect(redirectUrl, { headers: response.headers });
   }
 
   // User is authenticated, check roles for specific routes
   if (user) {
-    // Admin Route Protection
-    if (isAdminRoute) {
-      const role = await getRoleFromProfile(supabase, user.id);
-      console.log(`Middleware: User ${user.id} accessing admin route ${pathname}. Role: ${role}`);
+    const role = await getRoleFromProfile(supabase, user.id);
+    
+    // Admin-only routes check
+    if (ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+      console.log(`Middleware: User ${user.id} accessing admin-only route ${pathname}. Role: ${role}`);
       if (role !== 'Admin') {
-        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin route ${pathname}. Redirecting.`);
-        // Option 1: Redirect to a generic dashboard or access denied page
+        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin-only route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/dashboard'; // Or a specific '/access-denied' page
+        redirectUrl.pathname = '/dashboard';
         return NextResponse.redirect(redirectUrl, { headers: response.headers });
-        // Option 2: Return a 403 Forbidden response (less user-friendly)
-        // return new NextResponse('Forbidden: Admin access required', { status: 403, headers: response.headers });
       }
-      // If user is Admin, allow access
       console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
     }
     
-    // Add checks for other roles/routes if needed (e.g., Staff, Client Staff)
-
+    // Admin and Staff routes check
+    if (ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+      console.log(`Middleware: User ${user.id} accessing admin/staff route ${pathname}. Role: ${role}`);
+      if (role !== 'Admin' && role !== 'Staff') {
+        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin/staff route ${pathname}. Redirecting.`);
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = '/dashboard';
+        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+      }
+      console.log(`Middleware: User ${user.id} (Role: ${role}) granted access to ${pathname}`);
+    }
+    
+    // Legacy admin route check
+    if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+      console.log(`Middleware: User ${user.id} accessing admin route ${pathname}. Role: ${role}`);
+      if (role !== 'Admin') {
+        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin route ${pathname}. Redirecting.`);
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = '/dashboard';
+        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+      }
+      console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
+    }
   }
 
   // --- 5. Return Response --- 
