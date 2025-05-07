@@ -252,6 +252,7 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Temporary Password</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Status</TableHead>
@@ -262,7 +263,7 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
           <TableBody>
             {filteredLearners.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   No learners found.
                 </TableCell>
               </TableRow>
@@ -278,16 +279,27 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
                 
                 return (
                   <TableRow key={learner.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
-                          <AvatarFallback>{initials}</AvatarFallback>
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {initials}
+                          </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium">{learner.full_name}</span>
+                        <span>{learner.full_name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{learner.email || "-"}</TableCell>
-                    <TableCell>{learner.phone_number || "-"}</TableCell>
+                    <TableCell>{learner.email}</TableCell>
+                    <TableCell>
+                      {learner.temporary_password ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">{learner.temporary_password}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{learner.phone_number || "—"}</TableCell>
                     <TableCell>{learner.client.name}</TableCell>
                     <TableCell>
                       <Badge variant={learner.is_active ? "success" : "secondary"}>

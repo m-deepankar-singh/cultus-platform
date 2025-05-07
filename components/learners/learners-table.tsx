@@ -31,6 +31,7 @@ export interface Learner {
   updated_at: string
   star_rating: number | null
   last_login_at: string | null
+  temporary_password: string | null
   client: {
     id: string
     name: string
@@ -60,7 +61,7 @@ async function LearnersTableServer() {
   // Query the students table directly using Supabase client
   const { data, error } = await supabase
     .from('students')
-    .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at')
+    .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, temporary_password')
   
   if (error) {
     console.error('Error fetching learners:', error)
@@ -82,6 +83,7 @@ async function LearnersTableServer() {
       phone_number: item.phone_number,
       star_rating: item.star_rating,
       last_login_at: item.last_login_at,
+      temporary_password: item.temporary_password,
       client: {
         id: client.id,
         name: client.name

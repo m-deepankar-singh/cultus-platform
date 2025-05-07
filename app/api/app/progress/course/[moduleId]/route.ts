@@ -4,185 +4,144 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 // Import the correct schema for module updates
 import { ModuleProgressUpdateSchema } from '@/lib/schemas/progress';
+import type { NextRequest } from 'next/server';
 
 // Define a schema for UUID validation
 const UuidSchema = z.string().uuid({ message: 'Invalid Module ID format' });
 
+// Types for the expected request payload
+interface CourseProgressUpdatePayload {
+  current_lesson_id?: string;
+  current_lesson_sequence?: number;
+  video_playback_position?: number;
+  saved_quiz_answers?: Record<string, any>;
+  status?: 'NotStarted' | 'InProgress' | 'Completed';
+  progress_percentage?: number;
+}
+
 // Define PATCH handler
 export async function PATCH(
-  request: Request,
-  { params }: { params: { moduleId: string } },
+  request: NextRequest,
+  { params }: { params: { moduleId: string } }
 ) {
   try {
-    // 1. Validate Route Parameter (moduleId)
-    const { moduleId } = await params;
-    const moduleIdValidation = UuidSchema.safeParse(moduleId);
-    if (!moduleIdValidation.success) {
-      return NextResponse.json(
-        { error: 'Bad Request: Invalid Module ID format', details: moduleIdValidation.error.flatten().formErrors },
-        { status: 400 },
-      );
+    // Extract moduleId and validate
+    const moduleId = params?.moduleId;
+    if (!moduleId) {
+      return NextResponse.json({ error: 'Module ID is required' }, { status: 400 });
     }
 
-    // 2. Parse and Validate Request Body
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      return NextResponse.json({ error: 'Bad Request: Invalid JSON body' }, { status: 400 });
-    }
+    // Parse request body
+    const body: CourseProgressUpdatePayload = await request.json();
 
-    // Use the imported schema for validation
-    const bodyValidation = ModuleProgressUpdateSchema.safeParse(body);
-    if (!bodyValidation.success) {
-      return NextResponse.json(
-        { error: 'Bad Request: Invalid request body for module update', details: bodyValidation.error.flatten().fieldErrors },
-        { status: 400 },
-      );
-    }
-    const updateData = bodyValidation.data; // Use validated data
-
-    // 3. Authentication & Authorization
+    // Use the existing Supabase client
     const supabase = await createClient(); 
 
-    // 1. Authentication: Get user session
+    // Get the authenticated user
     const {
       data: { user },
-      error: authError,
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      console.error('Auth Error:', authError);
-      return NextResponse.json(
-        { error: 'Unauthorized: No active session' },
-        { status: 401 },
-      );
+    if (userError || !user) {
+      console.error('User authentication error:', userError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Authorization: Get student record and check status
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students') // Query the students table
-      .select('client_id, is_active') // Select relevant fields
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError) {
-      console.error('Student Fetch Error:', studentFetchError);
-      if (studentFetchError.code === 'PGRST116') { // No student record found for this user ID
-        return NextResponse.json(
-          { error: 'Forbidden: Student record not found' }, // More specific error
-          { status: 403 },
-        );
-      }
-      return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch student record' },
-        { status: 500 },
-      );
-    }
-
-    // Check if student account is active
-    if (!studentRecord.is_active) {
-        return NextResponse.json(
-            { error: 'Forbidden: Student account is inactive' },
-            { status: 403 },
-        );
-    }
-
-    // Ensure the student is associated with a client
-    if (!studentRecord.client_id) { 
-      console.error(`Student ${user.id} has no assigned client_id in students table.`);
-      return NextResponse.json(
-        { error: 'Forbidden: Student not associated with a client' },
-        { status: 403 },
-      );
-    }
-    const studentId = user.id;
-    const clientId = studentRecord.client_id; // Use client_id from the student record
-
-    // 4. Verify Enrollment
-    // 4a. Get product_id from module
+    // Verify the module exists and is a course
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('product_id')
+      .select('id, type')
       .eq('id', moduleId)
-      .maybeSingle(); // Use maybeSingle as module might not exist
+      .eq('type', 'Course')
+      .maybeSingle();
 
-    if (moduleError) {
-      console.error('Error fetching module:', moduleError);
-      return NextResponse.json({ error: 'Internal Server Error fetching module data' }, { status: 500 });
-    }
-    if (!moduleData || !moduleData.product_id) {
-      return NextResponse.json({ error: 'Not Found: Module does not exist or has no product associated' }, { status: 404 });
-    }
-    const productId = moduleData.product_id;
-
-    // 4b. Check client assignment to the product
-    const { count, error: assignmentError } = await supabase
-      .from('client_product_assignments')
-      .select('*', { count: 'exact', head: true }) // Select doesn't matter with head:true, just need count
-      .eq('client_id', clientId)
-      .eq('product_id', productId);
-
-    if (assignmentError) {
-      console.error('Error checking product assignment:', assignmentError);
-      return NextResponse.json({ error: 'Internal Server Error checking enrollment' }, { status: 500 });
-    }
-    // If count is null (error before count) or 0, the assignment doesn't exist.
-    if (count === null || count === 0) {
-      return NextResponse.json(
-        { error: 'Forbidden: Student is not enrolled in the product containing this module' },
-        { status: 403 },
-      );
+    if (moduleError && moduleError.code !== 'PGRST116') {
+      console.error(`Error verifying module ${moduleId}:`, moduleError);
+      return NextResponse.json({ 
+        error: 'Failed to verify course module', 
+        details: moduleError.message 
+      }, { status: 500 });
     }
 
-    console.log('Enrollment Verified for student:', studentId, 'on module:', moduleId);
-    console.log('Validated Update Data:', updateData);
+    if (!moduleData) {
+      return NextResponse.json({ 
+        error: 'Course module not found or not a course type' 
+      }, { status: 404 });
+    }
 
-    // 5. Upsert Progress
-    const progressRecord: {
-      student_id: string;
-      module_id: string;
-      status?: 'NotStarted' | 'InProgress' | 'Completed';
-      score?: number | null;
-      progress_percentage?: number | null;
-      completed_at: string | null;
-      last_updated: string;
-    } = {
-      student_id: studentId,
+    // Get current progress record if it exists
+    const { data: existingProgress, error: progressError } = await supabase
+      .from('student_module_progress')
+      .select('*')
+      .eq('student_id', user.id)
+      .eq('module_id', moduleId)
+      .maybeSingle();
+
+    if (progressError && progressError.code !== 'PGRST116') {
+      console.error(`Error fetching progress for module ${moduleId}, student ${user.id}:`, progressError);
+      return NextResponse.json({ 
+        error: 'Failed to check existing progress', 
+        details: progressError.message 
+      }, { status: 500 });
+    }
+
+    // Build the progress_details JSONB object
+    const progress_details: Record<string, any> = {
+      ...(existingProgress?.progress_details || {}),
+      last_viewed_lesson_sequence: body.current_lesson_sequence,
+      last_completed_lesson_id: body.current_lesson_id,
+      video_playback_position: body.video_playback_position,
+      saved_quiz_answers: body.saved_quiz_answers,
+      // Add other progress details as needed
+    };
+
+    // Clean undefined values to avoid overwriting with nulls
+    Object.keys(progress_details).forEach(key => {
+      if (progress_details[key] === undefined) {
+        delete progress_details[key];
+      }
+    });
+
+    // Prepare the data to upsert
+    const progressData: any = {
+      student_id: user.id,
       module_id: moduleId,
-      ...(updateData.status !== undefined && { status: updateData.status }),
-      ...(updateData.score !== undefined && { score: updateData.score }),
-      ...(updateData.progress_percentage !== undefined && { progress_percentage: updateData.progress_percentage }),
-      completed_at: updateData.status === 'Completed' ? new Date().toISOString() : null,
+      status: body.status || (existingProgress?.status || 'InProgress'),
+      progress_details,
+      progress_percentage: body.progress_percentage,
       last_updated: new Date().toISOString(),
     };
 
-    const { data: upsertedProgress, error: upsertError } = await supabase
-      .from('student_module_progress')
-      .upsert(progressRecord, {
-        onConflict: 'student_id, module_id', // Specify composite primary/unique key
-        // defaultToNull: false // Consider setting this based on your table defaults
-      })
-      .select() // Return the full upserted row
-      .single(); // Expecting one row back
-
-    if (upsertError) {
-      console.error('Error upserting progress:', upsertError);
-      // TODO: Add more specific error handling (e.g., FK violation if moduleId doesn't exist)
-      return NextResponse.json(
-        { error: 'Internal Server Error: Could not update progress' },
-        { status: 500 },
-      );
+    // If "completed", set completed_at timestamp
+    if (body.status === 'Completed') {
+      progressData.completed_at = new Date().toISOString();
     }
 
-    // 6. Return Success Response
-    return NextResponse.json(upsertedProgress, { status: 200 });
-  } catch (error) {
-    console.error('Unexpected Error in PATCH handler:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 },
-    );
+    // Upsert the progress record (insert if doesn't exist, update if it does)
+    const { data: updatedProgress, error: upsertError } = await supabase
+      .from('student_module_progress')
+      .upsert(progressData)
+      .select()
+      .single();
+
+    if (upsertError) {
+      console.error(`Error updating progress for module ${moduleId}, student ${user.id}:`, upsertError);
+      return NextResponse.json({ 
+        error: 'Failed to update progress', 
+        details: upsertError.message 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json(updatedProgress);
+
+  } catch (e) {
+    const error = e as Error;
+    console.error('Unexpected error in PATCH /api/app/progress/course/[moduleId]:', error);
+    return NextResponse.json({ 
+      error: 'An unexpected error occurred.', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
 

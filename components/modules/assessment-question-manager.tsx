@@ -241,76 +241,91 @@ export function AssessmentQuestionManager({
     setError(null)
     
     try {
-      // Validate data before saving
-      if (questions.length === 0) {
+      console.log("saveQuestions called. Current selectedQuestions:", selectedQuestions); // Log entry point
+
+      // Validate data before saving - USE selectedQuestions
+      if (selectedQuestions.length === 0) {
         setError("No questions to save")
         setIsSaving(false)
         toast({
           variant: "destructive",
           title: "Error",
-          description: "There are no questions to save",
+          description: "There are no questions to save for this assessment.", // Clarified message
         })
-        return // Stop the save process
+        console.log("Validation failed: No questions to save.");
+        return 
       }
       
-      // Check minimum number required
-      if (questions.length < 5) {
-        setError("Assessment should have at least 5 questions")
+      // Check minimum number required - USE selectedQuestions
+      if (selectedQuestions.length < 1) { // Changed minimum to 1 as per previous discussions, can be adjusted to 5 if needed
+        setError(`Assessment should have at least 1 question. Found ${selectedQuestions.length}.`)
         setIsSaving(false)
         toast({
           variant: "destructive",
           title: "Validation Error",
-          description: "Assessment should have at least 5 questions",
+          description: `Assessment should have at least 1 question. You have ${selectedQuestions.length}.`,
         })
-        return // Stop the save process
+        console.log(`Validation failed: Minimum 1 question required, found ${selectedQuestions.length}.`);
+        return
       }
       
-      // Update sequence numbers
-      const updatedQuestions = questions.map((question, index) => ({
-        ...question,
-        sequence: index + 1
+      // Update sequence numbers based on the current order in selectedQuestions
+      const updatedQuestionsToSend = selectedQuestions.map((question, index) => ({
+        id: question.id, // Only send essential data for linking/ordering
+        sequence: index + 1 
+        // Do not send full question object unless API expects it for update/creation
+        // If API just links existing questions, only IDs and sequence are needed.
+        // Assuming the PUT request to /assessment-questions primarily updates the *linkage and order*.
       }))
       
-      console.log('Sending questions to save:', updatedQuestions)
+      console.log('Sending Q IDs & sequences to save:', updatedQuestionsToSend); // Updated log
       
-      // Make API call to update all questions
       const response = await fetch(`/api/admin/modules/${moduleId}/assessment-questions`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ questions: updatedQuestions }),
+        // Send only the question IDs and their sequences
+        body: JSON.stringify({ questions: updatedQuestionsToSend }), 
       })
       
-      // Check if response has content before trying to parse it as JSON
       const contentType = response.headers.get("content-type")
-      let data = null
+      let responseData = null
       
       if (contentType && contentType.includes("application/json")) {
         try {
-          data = await response.json()
+          responseData = await response.json()
         } catch (parseError) {
           console.error("Error parsing JSON response:", parseError)
+          // If parsing fails but response was otherwise okay, it might be an empty success response
+          if (response.ok) {
+            toast({
+              title: "Success",
+              description: "Assessment questions have been saved.",
+            });
+            fetchSelectedQuestions(); // Refresh the list from the server
+            setIsSaving(false);
+            return;
+          }
           throw new Error(`Failed to parse server response: ${response.status} ${response.statusText}`)
         }
       }
       
       if (!response.ok) {
-        const errorMessage = data?.error || data?.message || `Failed to save questions: ${response.status} ${response.statusText}`
+        const errorMessage = responseData?.error || responseData?.message || `Failed to save questions: ${response.status} ${response.statusText}`
+        console.error("Save error response:", responseData);
         throw new Error(errorMessage)
       }
       
-      console.log('Received saved questions response:', data)
+      console.log('Received saved questions response:', responseData)
       
-      // Update state with saved data if returned
-      if (data && Array.isArray(data)) {
-        setQuestions(data)
-      }
+      // Assuming API returns the updated list of linked questions with their sequences
+      // Or, simply re-fetch to ensure UI is consistent with DB state.
+      fetchSelectedQuestions(); // Refresh the list from the server
       
-      // Show success notification
       toast({
         title: "Success",
-        description: "Assessment questions have been saved",
+        description: "Assessment questions have been saved.", // Consistent success message
       })
       
     } catch (error) {

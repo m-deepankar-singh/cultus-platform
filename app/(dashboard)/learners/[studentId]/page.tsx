@@ -34,7 +34,7 @@ async function LearnerDetail({ studentId }: { studentId: string }) {
   // Fetch student data
   const { data: student, error } = await supabase
     .from('students')
-    .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at')
+    .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, temporary_password')
     .eq('id', studentId)
     .single();
   
@@ -112,6 +112,15 @@ async function LearnerDetail({ studentId }: { studentId: string }) {
                 <span className="text-sm text-muted-foreground">Phone</span>
                 <span>{student.phone_number || 'Not provided'}</span>
               </div>
+              
+              {student.temporary_password && (
+                <div className="flex flex-col gap-1 col-span-2">
+                  <span className="text-sm text-muted-foreground">Temporary Password</span>
+                  <div className="flex items-center">
+                    <span className="font-mono bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded">{student.temporary_password}</span>
+                  </div>
+                </div>
+              )}
               
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-muted-foreground">Enrolled on</span>

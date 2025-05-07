@@ -7,9 +7,9 @@ export default function AppLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<div className="flex min-h-screen flex-col">
+		<div className="flex h-screen flex-col overflow-hidden">
 			<AppHeader />
-			<main className="flex-1 bg-muted/40 p-4 md:p-8">{children}</main>
+			<main className="flex-1 overflow-auto min-h-0 bg-muted/40 p-4 md:p-8">{children}</main>
 			{/* Add Footer if needed */}
 		</div>
 	);

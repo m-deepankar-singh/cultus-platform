@@ -153,10 +153,10 @@ This document outlines the detailed implementation plan for building the modular
     *   [X] Integrate Shadcn UI (or chosen library) components (`components/ui` exists).
 *   [ ] **Authentication UI**
     *   [ ] Create Login page/component for `/admin` (RSC + Client Component form).
-    *   [ ] Create Login page/component for `/app` (RSC + Client Component form).
+    *   [X] Create Login page/component for `/app` (RSC + Client Component form).
     *   [ ] Implement Password Reset UI flow.
     *   [ ] Integrate Admin forms with Supabase Auth client methods.
-    *   [ ] Integrate App login form with the dedicated `/api/app/auth/login` endpoint.
+    *   [X] Integrate App login form with the dedicated `/api/app/auth/login` endpoint.
 *   [ ] **State Management Setup (Client)**
     *   [ ] Configure React Query (`TanStack Query`) provider if chosen for server state management in client components.
     *   [ ] Set up Zustand store if chosen for global client state (use sparingly).
@@ -205,25 +205,25 @@ This document outlines the detailed implementation plan for building the modular
 *   [X] **Admin: Notification UI**
     *   [X] Implement notification display (e.g., dropdown, dedicated page) for Client Staff (`notification-center.tsx` exists).
     *   [ ] Integrate with notification fetching API.
-*   [ ] **App: Student Dashboard UI**
-    *   [ ] Implement hierarchical Product > Module list.
-    *   [ ] Implement progress indicators (status text, percentages, scores).
-    *   [ ] Implement expand/collapse functionality.
-    *   [ ] Connect UI to dashboard data API.
-*   [ ] **App: Course Player UI**
-    *   [ ] Implement video player component.
-    *   [ ] Implement sequential navigation controls.
-    *   [ ] Implement quiz display and interaction UI.
-    *   [ ] Connect UI to course structure/content and progress update APIs.
-    *   [ ] Implement resume functionality logic.
-*   [ ] **App: Assessment UI**
-    *   [ ] Implement instruction display.
-    *   [ ] Implement timer component.
-    *   [ ] Implement question display (MCQ/MSQ).
-    *   [ ] Implement answer selection logic.
-    *   [ ] Implement submission logic (manual & auto-timeout).
-    *   [ ] Implement results display.
-    *   [ ] Connect UI to assessment detail and submission APIs.
+*   [X] **App: Student Dashboard UI**
+    *   [X] Implement hierarchical Product > Module list.
+    *   [X] Implement progress indicators (status text, percentages, scores).
+    *   [X] Implement expand/collapse functionality.
+    *   [X] Connect UI to dashboard data API.
+*   [X] **App: Course Player UI**
+    *   [X] Implement video player component.
+    *   [X] Implement sequential navigation controls.
+    *   [X] Implement quiz display and interaction UI.
+    *   [X] Connect UI to course structure/content and progress update APIs.
+    *   [X] Implement resume functionality logic.
+*   [X] **App: Assessment UI**
+    *   [X] Implement instruction display.
+    *   [X] Implement timer component.
+    *   [X] Implement question display (MCQ/MSQ).
+    *   [X] Implement answer selection logic.
+    *   [X] Implement submission logic (manual & auto-timeout).
+    *   [X] Implement results display.
+    *   [X] Connect UI to assessment detail and submission APIs.
 *   [X] **Mobile Responsiveness**: Ensure all implemented UI components and pages are fully responsive.
 *   [X] **Accessibility**: Review components and flows for accessibility (WCAG compliance).
 
@@ -231,7 +231,7 @@ This document outlines the detailed implementation plan for building the modular
 
 *   [ ] **API <> Frontend Connection**: Ensure all frontend actions correctly call corresponding API endpoints.
 *   [ ] **Data Flow**: Verify data flows correctly from frontend interactions -> API -> Database -> API responses -> Frontend display.
-*   [ ] **Authentication Flow**: Test login, logout, session expiry, and role-based access across frontend and backend. **Specifically test that only enrolled students can log into `/app`. Test that deactivated/unenrolled students cannot log in.**
+*   [X] **Authentication Flow**: Test login, logout, session expiry, and role-based access across frontend and backend. **Specifically test that only enrolled students can log into `/app`. Test that deactivated/unenrolled students cannot log in.**
 *   [ ] **State Management**: Ensure client and server state are managed correctly according to guidelines.
 *   [X] **Error Handling**: Implement comprehensive error handling for API calls, displaying user-friendly messages and logging details.
 *   [X] **Loading States**: Implement appropriate loading indicators for all asynchronous operations.

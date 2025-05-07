@@ -25,6 +25,30 @@ async function getRoleFromProfile(supabase: any, userId: string): Promise<string
   }
 }
 
+// New helper function to check if user is a student by checking students table
+async function isUserStudent(supabase: any, userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { data, error } = await supabase
+      .from('students')
+      .select('id, is_active')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code !== 'PGRST116') { // Ignore "No rows found" errors silently
+        console.error(`Middleware: Error checking student status for user ${userId}:`, error.message);
+      }
+      return false;
+    }
+    
+    return data && data.is_active === true;
+  } catch (err) {
+    console.error(`Middleware: Unexpected error checking student status for user ${userId}:`, err);
+    return false;
+  }
+}
+
 // Admin-specific routes (only Admin can access)
 const ADMIN_ONLY_ROUTES = [
   // User management routes
@@ -105,12 +129,13 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   // --- 3. Define Public and Protected Routes --- 
-  const publicPaths = ['/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback']; // Add any other public paths
+  const publicPaths = ['/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback', '/api/app/auth/login']; // Add any other public paths
   
   // Check if route is protected
   const isAdminRoute = pathname.startsWith('/admin') && !pathname.startsWith('/admin/login');
-  const isAppRoute = pathname.startsWith('/app');
-  const isProtectedRoute = isAdminRoute || isAppRoute || 
+  const isAppRoute = pathname.startsWith('/app') && !pathname.startsWith('/app/login');
+  const isApiAppRoute = pathname.startsWith('/api/app');
+  const isProtectedRoute = isAdminRoute || isAppRoute || isApiAppRoute || 
     ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route)) ||
     ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route));
 
@@ -128,7 +153,7 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone();
     
     // Direct users to the appropriate login page based on the route they're trying to access
-    if (isAppRoute) {
+    if (isAppRoute || isApiAppRoute) {
       // Student app users go to student login
       console.log(`Middleware: Redirecting app user to /app/login from ${pathname}`);
       redirectUrl.pathname = '/app/login';
@@ -144,6 +169,22 @@ export async function middleware(request: NextRequest) {
 
   // User is authenticated, check roles for specific routes
   if (user) {
+    // For student app routes, check students table
+    if (isAppRoute || isApiAppRoute) {
+      const isStudent = await isUserStudent(supabase, user.id);
+      if (!isStudent) {
+        console.warn(`Middleware: User ${user.id} attempting to access student route ${pathname} but is not an active student.`);
+        const redirectUrl = request.nextUrl.clone();
+        // Redirect non-students away from student app
+        redirectUrl.pathname = '/admin/login';
+        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+      }
+      console.log(`Middleware: Student ${user.id} granted access to ${pathname}`);
+      // Allow access to student routes for student users
+      return response;
+    }
+    
+    // For admin/staff routes, check profiles table
     const role = await getRoleFromProfile(supabase, user.id);
     
     // Admin-only routes check

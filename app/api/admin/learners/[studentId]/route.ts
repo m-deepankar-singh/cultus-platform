@@ -72,6 +72,18 @@ export async function GET(
         });
     }
 
+    // 3.5 Fetch Student Data (including temporary_password)
+    const { data: studentData, error: studentError } = await supabase
+      .from('students')
+      .select('*')
+      .eq('id', studentId)
+      .single();
+
+    if (studentError) {
+      console.error('Student Data Fetch Error:', studentError);
+      // Continue with profile data even if student data fetch fails
+    }
+
     // 4. Fetch Progress Summary (High-Level - Adapted for available tables)
     // TODO: Define the exact structure and logic for the progress summary.
     // Example: Fetch course progress from 'student_course_progress'
@@ -100,6 +112,7 @@ export async function GET(
     // 5. Combine and Return Response
     const learnerDetails = {
       ...learnerProfile,
+      ...(studentData || {}), // Include student data if available
       progressSummary,
     };
 

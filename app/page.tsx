@@ -13,7 +13,7 @@ export default function HomePage() {
           <Link href="/dashboard" passHref legacyBehavior>
             <a className={styles.navButton}>Admin</a>
           </Link>
-          <Link href="/login" passHref legacyBehavior>
+          <Link href="/app/login" passHref legacyBehavior>
             <a className={styles.navButton}>Login</a>
           </Link>
         </div>
