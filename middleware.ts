@@ -282,6 +282,6 @@ export const config = {
      * 
      * Refined matcher to exclude specific public paths and common static assets.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/auth/callback|admin/login|login|auth/forgot-password|auth/update-password).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/auth/callback|admin/login|app/login|login|auth/forgot-password|auth/update-password).*)',
   ],
 }; 

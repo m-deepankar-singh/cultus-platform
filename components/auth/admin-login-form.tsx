@@ -47,17 +47,34 @@ export function AdminLoginForm() {
 		setIsLoading(true);
 		setSubmissionError(null);
 		try {
+			console.log("Login attempt for:", values.email);
+			console.log("Current location:", window.location.href);
+			console.log("Current origin:", window.location.origin);
+			
+			// Debug: Check Supabase URL and anon key availability (masked for security)
+			console.log("Supabase configuration check:", {
+				url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Available" : "❌ Missing",
+				anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 
+					`✅ Available (starts with: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 3)}...)` : 
+					"❌ Missing"
+			});
+			
+			// Consider adding a redirect URL for Vercel deployment
 			const { error } = await supabase.auth.signInWithPassword({
 				email: values.email,
 				password: values.password,
+				options: {
+					redirectTo: `${window.location.origin}/dashboard`
+				}
 			});
 
 			if (error) {
+				console.error("Login error details:", error.message, error.status);
 				throw error;
 			}
 
+			console.log("Auth successful, redirecting to dashboard");
 			router.push("/dashboard");
-
 		} catch (error: any) {
 			const errorMessage = error.message || "An unexpected error occurred. Please try again.";
 			console.error("Login failed:", error);

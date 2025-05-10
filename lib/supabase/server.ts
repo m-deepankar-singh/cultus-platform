@@ -29,6 +29,11 @@ export async function createClient() {
           }
         },
       },
+      auth: {
+        flowType: 'pkce',
+        persistSession: true,
+        detectSessionInUrl: true
+      }
     }
   );
 }
