@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, ShieldX } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchema = z.object({
@@ -31,6 +31,7 @@ export function AppLoginForm() {
 	const [isLoading, setIsLoading] = React.useState(false);
 	const [showTempPasswordAlert, setShowTempPasswordAlert] = React.useState(false);
 	const [submissionError, setSubmissionError] = React.useState<string | null>(null);
+	const [isInvalidCredentials, setIsInvalidCredentials] = React.useState(false);
 	const router = useRouter();
 	const { toast } = useToast();
 
@@ -46,6 +47,7 @@ export function AppLoginForm() {
 		setIsLoading(true);
 		setShowTempPasswordAlert(false);
 		setSubmissionError(null);
+		setIsInvalidCredentials(false);
 		try {
 			const response = await fetch("/api/app/auth/login", {
 				method: "POST",
@@ -69,6 +71,7 @@ export function AppLoginForm() {
 			if (!response.ok) {
 				const errorMessage = result.error || `HTTP error! status: ${response.status}`;
 				if (response.status === 401 && errorMessage.includes("Invalid login credentials")) {
+					setIsInvalidCredentials(true);
 					setShowTempPasswordAlert(true);
 					throw new Error("Invalid login credentials. If you're a new user, please use the temporary password provided in your welcome email.");
 				}
@@ -98,8 +101,23 @@ export function AppLoginForm() {
 
 	return (
 		<>
-			{submissionError && !showTempPasswordAlert && (
-				<Alert variant="destructive" className="mb-6">
+			<div className="text-center mb-8">
+				<h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-600 dark:from-white dark:to-neutral-400">Student Login</h1>
+				<p className="text-neutral-600 dark:text-neutral-300">Enter your credentials to access your learning dashboard</p>
+			</div>
+			
+			{isInvalidCredentials && (
+				<Alert variant="destructive" className="mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
+					<ShieldX className="h-5 w-5" />
+					<AlertTitle className="font-medium">Incorrect Email or Password</AlertTitle>
+					<AlertDescription className="mt-1">
+						Please check your credentials and try again. Make sure your caps lock is off.
+					</AlertDescription>
+				</Alert>
+			)}
+			
+			{submissionError && !isInvalidCredentials && (
+				<Alert variant="destructive" className="mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm">
 					<AlertCircle className="h-4 w-4" />
 					<AlertTitle>Login Error</AlertTitle>
 					<AlertDescription>{submissionError}</AlertDescription>
@@ -107,7 +125,7 @@ export function AppLoginForm() {
 			)}
 			
 			{showTempPasswordAlert && (
-				<Alert variant="default" className="mb-6 border-yellow-500/50 text-yellow-700 dark:border-yellow-500/30 dark:text-yellow-300 [&>svg]:text-yellow-500 dark:[&>svg]:text-yellow-400">
+				<Alert variant="default" className="mb-6 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-yellow-500/50 text-yellow-700 dark:border-yellow-500/30 dark:text-yellow-300 [&>svg]:text-yellow-500 dark:[&>svg]:text-yellow-400">
 					<AlertCircle className="h-4 w-4" />
 					<AlertTitle>Are you a new user?</AlertTitle>
 					<AlertDescription>
@@ -119,19 +137,21 @@ export function AppLoginForm() {
 			)}
 			
 			<Form {...form}>
-				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 					<FormField
 						control={form.control}
 						name="email"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel>Email</FormLabel>
+								<FormLabel className="text-neutral-700 dark:text-neutral-200">Email</FormLabel>
 								<FormControl>
 									<Input
 										type="email"
 										placeholder="student@example.com"
 										{...field}
 										disabled={isLoading}
+										className={`bg-white/70 dark:bg-black/50 backdrop-blur-sm border-neutral-200 dark:border-neutral-800 ${isInvalidCredentials ? 'border-red-400 dark:border-red-500 focus-visible:ring-red-400 dark:focus-visible:ring-red-500' : ''}`}
+										autoComplete="email"
 									/>
 								</FormControl>
 								<FormMessage />
@@ -143,27 +163,33 @@ export function AppLoginForm() {
 						name="password"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel>Password</FormLabel>
+								<FormLabel className="text-neutral-700 dark:text-neutral-200">Password</FormLabel>
 								<FormControl>
 									<Input
 										type="password"
 										placeholder="••••••••"
 										{...field}
 										disabled={isLoading}
+										className={`bg-white/70 dark:bg-black/50 backdrop-blur-sm border-neutral-200 dark:border-neutral-800 ${isInvalidCredentials ? 'border-red-400 dark:border-red-500 focus-visible:ring-red-400 dark:focus-visible:ring-red-500' : ''}`}
+										autoComplete="current-password"
 									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>
 						)}
 					/>
-					<Button type="submit" className="w-full" disabled={isLoading}>
+					<Button 
+						type="submit" 
+						className="w-full bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 mt-2"
+						disabled={isLoading}
+					>
 						{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-						Log in
+						Sign In
 					</Button>
 				</form>
 			</Form>
 			
-			<div className="mt-6 text-sm text-muted-foreground">
+			<div className="mt-6 text-sm text-center text-neutral-600 dark:text-neutral-400">
 				<p>First time logging in? Use the temporary password provided in your welcome email.</p>
 			</div>
 		</>

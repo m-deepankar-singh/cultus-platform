@@ -1,44 +1,38 @@
 import { redirect } from "next/navigation"
-import DotGridAnimation from '@/components/DotGridAnimation';
-import styles from './HomePage.module.css';
-import Image from 'next/image';
 import Link from 'next/link';
+import { BackgroundPaths } from "@/components/ui/background-paths";
+import Image from 'next/image';
 
 export default function HomePage() {
   return (
-    <main className={styles.body}>
-      <div className={styles.container}>
+    <main>
         {/* Container for top-right navigation buttons */}
-        <div className={styles.topRightButtons}>
-          <Link href="/dashboard" passHref legacyBehavior>
-            <a className={styles.navButton}>Admin</a>
+      <div className="absolute top-4 right-4 z-20 flex gap-4">
+        <Link href="/dashboard" passHref>
+          <span className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-md text-black dark:text-white font-medium transition-all duration-200">
+            Admin
+          </span>
           </Link>
-          <Link href="/app/login" passHref legacyBehavior>
-            <a className={styles.navButton}>Login</a>
+        <Link href="/app/login" passHref>
+          <span className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-md text-black dark:text-white font-medium transition-all duration-200">
+            Login
+          </span>
           </Link>
         </div>
 
-        {/* The DotGridAnimation component will handle the dot grid rendering and logic */}
-        <DotGridAnimation />
-        <div className={styles.contentContainer}>
-          <div className={styles.logoContainer}>
-            {/* Use Next.js Image component for optimization */}
+      {/* Logo overlay */}
+      <div className="absolute top-8 left-8 z-20">
             <Image 
-              src="/Cultus-white (1).png" // Assumes image is in public directory
+          src="/Cultus-white (1).png"
               alt="Cultus Logo" 
-              width={400} // Provide approximate width 
-              height={200} // Provide approximate height
-              className={styles.centerLogo}
-              priority // Prioritize loading the logo
-            />
-          </div>
-          <div className={styles.buttonContainer}>
-            <button className={styles.ctaButton}>
-              Start learning
-            </button>
-          </div>
-        </div>
+          width={150}
+          height={75}
+          priority
+          className="dark:opacity-100 opacity-80"
+        />
       </div>
+
+      <BackgroundPaths title="Cultus Learning" />
     </main>
   );
 }

@@ -3,6 +3,16 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { updateCourseProgressAction, type CourseProgressUpdateData } from '@/app/actions/progress';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { AnimatedCard } from '@/components/ui/animated-card';
+import { cn } from '@/lib/utils';
+import { Check, CheckCircle, PlayCircleIcon, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react';
+import CustomVideoPlayer from '@/components/common/CustomVideoPlayer';
+import type ReactPlayer from 'react-player/file';
 
 // Updated types to include quiz questions
 interface QuizQuestionOption {
@@ -66,42 +76,46 @@ interface CurrentQuizAnswers {
 const CoursePlayerSkeleton = () => (
   <div className="container mx-auto p-4 animate-pulse">
     <header className="mb-6">
-      <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/2"></div>
+      <div className="h-8 bg-neutral-300 dark:bg-neutral-700 rounded w-3/4 mb-2"></div>
+      <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-1/2"></div>
     </header>
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
       <aside className="md:col-span-1">
-        <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-        <div className="border rounded-md bg-gray-200 dark:bg-gray-750 dark:border-gray-700">
+        <div className="h-6 bg-neutral-300 dark:bg-neutral-700 rounded w-1/4 mb-4"></div>
+        <div className="rounded-md bg-white/60 dark:bg-black/40 backdrop-blur-sm border border-white/20 dark:border-neutral-800/30">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="p-3 border-b border-gray-300 dark:border-gray-600">
+            <div key={i} className="p-3 border-b border-neutral-200 dark:border-neutral-800/30">
               <div className="flex items-center">
-                <div className="w-6 h-6 rounded-full bg-gray-400 dark:bg-gray-600 mr-2"></div>
-                <div className="h-4 bg-gray-400 dark:bg-gray-600 rounded w-3/4"></div>
+                <div className="w-6 h-6 rounded-full bg-neutral-400 dark:bg-neutral-600 mr-2"></div>
+                <div className="h-4 bg-neutral-400 dark:bg-neutral-600 rounded w-3/4"></div>
               </div>
             </div>
           ))}
         </div>
       </aside>
       <main className="md:col-span-3">
-        <div className="border rounded-md p-4 bg-gray-200 dark:bg-gray-750 dark:border-gray-700">
-          <div className="h-7 bg-gray-300 dark:bg-gray-700 rounded w-1/2 mb-3"></div>
-          <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-full mb-2"></div>
-          <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-5/6 mb-4"></div>
-          <div className="aspect-video bg-gray-300 dark:bg-gray-600 rounded-md mb-4"></div>
+        <AnimatedCard className="overflow-hidden border border-white/20 dark:border-neutral-800/30">
+          <div className="p-4">
+            <div className="h-7 bg-neutral-300 dark:bg-neutral-700 rounded w-1/2 mb-3"></div>
+            <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-full mb-2"></div>
+            <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-5/6 mb-4"></div>
+            <div className="aspect-video bg-neutral-300 dark:bg-neutral-600 rounded-md mb-4"></div>
           <div className="flex justify-between mt-6">
-            <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
-            <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
+              <div className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-1/4"></div>
+              <div className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-1/4"></div>
+            </div>
           </div>
-        </div>
+        </AnimatedCard>
       </main>
     </div>
-    <section className="mt-6 p-4 bg-gray-200 dark:bg-gray-750 rounded-md dark:border dark:border-gray-700">
-      <div className="h-5 bg-gray-300 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
-      <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-4 mb-2">
-        <div className="bg-gray-400 dark:bg-gray-500 h-4 rounded-full w-1/2"></div>
+    <section className="mt-6">
+      <AnimatedCard className="p-4 overflow-hidden border border-white/20 dark:border-neutral-800/30">
+        <div className="h-5 bg-neutral-300 dark:bg-neutral-700 rounded w-1/3 mb-2"></div>
+        <div className="w-full bg-neutral-300 dark:bg-neutral-600 rounded-full h-4 mb-2">
+          <div className="bg-neutral-400 dark:bg-neutral-500 h-4 rounded-full w-1/2"></div>
       </div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/2"></div>
+        <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-1/2"></div>
+      </AnimatedCard>
     </section>
   </div>
 );
@@ -110,7 +124,7 @@ export default function CoursePlayerPage() {
   const params = useParams();
   const router = useRouter();
   const moduleId = params.id as string; // The dynamic segment [id] from the folder structure
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<ReactPlayer>(null);
 
   const [coursePageData, setCoursePageData] = useState<CoursePageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -219,18 +233,15 @@ export default function CoursePlayerPage() {
   // When current lesson changes, seek to the saved video position if available
   // Also reset quiz state if moving to a new lesson
   useEffect(() => {
-    if (videoRef.current && currentLesson?.video_url) {
-      // Ensure video is reset for custom controls logic if applicable
-      setIsVideoPlaying(false); // Reset playing state for new lesson
-      // videoRef.current.load(); // Consider if explicit load is needed for new src / controls change
+    if (playerRef.current && currentLesson?.video_url) {
+      setIsVideoPlaying(false); 
+      // playerRef.current.getInternalPlayer()?.load(); // If direct load is needed for new src
 
       const seekPosition = coursePageData?.progress?.video_playback_position ?? 0;
-      // Only set currentTime if it's different to avoid interrupting playback unnecessarily
-      if (Math.abs(videoRef.current.currentTime - seekPosition) > 1) {
-        videoRef.current.currentTime = seekPosition;
+      if (playerRef.current.getCurrentTime() !== seekPosition && Math.abs((playerRef.current.getCurrentTime() || 0) - seekPosition) > 1) {
+        playerRef.current.seekTo(seekPosition);
       }
     }
-    // Reset quiz state when lesson changes
     setIsQuizActive(false);
     setCurrentQuizAnswers({});
     setQuizTimeLeft(null);
@@ -309,10 +320,10 @@ export default function CoursePlayerPage() {
     
     if (index >= 0 && index < coursePageData.course.lessons.length) {
       // Save the current video position before navigating away
-      if (videoRef.current && currentLesson?.video_url) {
+      if (playerRef.current && currentLesson?.video_url) {
         await saveProgress({
           current_lesson_sequence: currentLessonIndex,
-          video_playback_position: videoRef.current.currentTime,
+          video_playback_position: playerRef.current.getCurrentTime(),
           status: 'InProgress', // Keep status as InProgress, completion is handled differently
           progress_percentage: calculateProgressPercentage(),
         });
@@ -362,10 +373,10 @@ export default function CoursePlayerPage() {
 
   // Handle video events (play, pause, timeupdate, ended)
   const handleVideoTimeUpdate = useCallback(() => {
-    if (!videoRef.current || isSaving) return;
+    if (!playerRef.current || isSaving) return;
     
-    const currentTime = videoRef.current.currentTime;
-    const duration = videoRef.current.duration;
+    const currentTime = playerRef.current.getCurrentTime();
+    const duration = playerRef.current.getDuration();
     
     if (duration && currentTime > 0) {
       const saveInterval = 30; // seconds
@@ -535,335 +546,245 @@ export default function CoursePlayerPage() {
   };
 
   const handleTogglePlayPause = () => {
-    if (!videoRef.current) return;
+    if (!playerRef.current) return;
     if (isVideoPlaying) {
-      videoRef.current.pause();
+      playerRef.current.getInternalPlayer()?.pause();
     } else {
-      videoRef.current.play();
+      playerRef.current.getInternalPlayer()?.play();
     }
     // setIsVideoPlaying(!isVideoPlaying); // The onPlay/onPause handlers on video will manage this
   };
 
   if (isLoading) {
-    // In a real app, replace with a skeleton loader component
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="p-4 text-lg">Loading course content...</div>
-        {/* TODO: Implement skeleton UI */}
-      </div>
-    );
+    return <CoursePlayerSkeleton />;
   }
 
   if (error) {
-    // In a real app, replace with a more user-friendly error component
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="text-red-600 text-xl mb-4">Error</div>
-        <p className="text-center mb-4">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Try Again
-        </button>
+      <div className="container mx-auto p-4">
+        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
+          <div className="p-6 flex items-center justify-center">
+            <AlertCircle className="h-5 w-5 mr-2" />
+            <p>{error}</p>
+          </div>
+        </AnimatedCard>
       </div>
     );
   }
 
-  if (!coursePageData || !currentLesson) {
-    return <div className="p-4">No course data found for this module, or no lessons available.</div>;
+  if (!coursePageData || !coursePageData.course) {
+    return (
+      <div className="container mx-auto p-4">
+        <AnimatedCard className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">
+          <div className="p-6 text-center">
+            <p>Course not found or not available.</p>
+            <Button 
+              onClick={() => router.push('/app/dashboard')}
+              className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            >
+              Return to Dashboard
+            </Button>
+          </div>
+        </AnimatedCard>
+      </div>
+    );
   }
-
-  const { course } = coursePageData;
-
-  // Visual progress indicator
-  const visualProgressPercentage = coursePageData.progress?.status === 'Completed' 
-    ? 100 
-    : calculateProgressPercentage();
-  const hasQuiz = currentLesson.quiz_questions && currentLesson.quiz_questions.length > 0;
-  const isQuizLocked = hasQuiz && !isCurrentVideoWatched() && !showQuizSummary;
-  // For starting quiz, we only care if video is watched for the *current* lesson, not if the lesson is *fully complete* (which might require quiz submission)
-  const canStartQuiz = hasQuiz && (coursePageData?.progress?.fully_watched_video_ids?.includes(currentLesson.id) ?? false) && !isQuizActive && !showQuizSummary;
 
   return (
     <div className="container mx-auto p-4">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">{course.name}</h1>
-        <p className="text-gray-700 dark:text-gray-300">{course.description}</p>
-        {saveMessage && (
-          <div className={`mt-2 text-sm px-3 py-1 rounded-md inline-block ${
-            saveMessage.includes('Failed') 
-              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
-              : saveMessage.includes('Saving') || saveMessage.includes('Submitting')
-                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200'
-                : 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-200'
-          }`}>
-            {saveMessage}
-          </div>
+        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400">
+          {coursePageData.course.name}
+        </h1>
+        {coursePageData.course.description && (
+          <p className="text-lg text-neutral-600 dark:text-neutral-400">
+            {coursePageData.course.description}
+          </p>
         )}
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Lesson Navigation Sidebar */}
+        {/* Lessons sidebar */}
         <aside className="md:col-span-1">
-          <h2 className="text-xl font-semibold mb-4 dark:text-white">Lessons</h2>
-          <div className="border rounded-md overflow-hidden bg-white dark:bg-gray-800 dark:border-gray-700">
-            {course.lessons && course.lessons.length > 0 ? (
-              <ul className="divide-y dark:divide-gray-700">
-                {course.lessons.map((lesson, index) => (
-                  <li 
+          <h2 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-white">Lessons</h2>
+          <div className="rounded-md overflow-hidden bg-white/60 dark:bg-black/40 backdrop-blur-sm border border-white/20 dark:border-neutral-800/30">
+            {coursePageData.course.lessons.map((lesson, index) => {
+              const isComplete = isLessonConsideredComplete(lesson);
+              const isCurrent = index === currentLessonIndex;
+              
+              return (
+                <button
                     key={lesson.id} 
-                    className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${ 
-                      index === currentLessonIndex ? 'bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 dark:border-blue-400' : ''
-                    }`}
-                    onClick={() => navigateToLesson(index)}
-                  >
-                    <div className="flex items-center">
-                      <span className={`mr-2 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm 
-                        ${(isLessonConsideredComplete(lesson)) 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
-                        }`}>
-                        {(isLessonConsideredComplete(lesson)) ? '✓' : index + 1}
-                      </span>
-                      <span className={`font-medium ${index === currentLessonIndex ? 'text-blue-700 dark:text-blue-300' : 'dark:text-gray-200'}`}>
+                  onClick={() => setCurrentLessonIndex(index)}
+                  className={cn(
+                    "w-full text-left px-4 py-3 border-b border-neutral-200 dark:border-neutral-800/30 flex items-center transition-colors",
+                    isCurrent 
+                      ? "bg-neutral-100/80 dark:bg-neutral-800/50" 
+                      : "hover:bg-neutral-100/50 dark:hover:bg-neutral-800/30",
+                    isComplete 
+                      ? "text-neutral-800 dark:text-neutral-200" 
+                      : "text-neutral-600 dark:text-neutral-400"
+                  )}
+                >
+                  <div className="mr-3 flex-shrink-0">
+                    {isComplete ? (
+                      <CheckCircle className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+                    ) : (
+                      <div className="h-5 w-5 rounded-full border-2 border-neutral-400 dark:border-neutral-600 flex items-center justify-center">
+                        <span className="text-xs">{index + 1}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className={cn(
+                    "line-clamp-2",
+                    isCurrent ? "font-semibold" : ""
+                  )}>
                         {lesson.title}
                       </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="p-4 dark:text-gray-400">No lessons available for this course module.</p>
-            )}
+                </button>
+              );
+            })}
           </div>
         </aside>
 
-        {/* Main Content Area - Current Lesson */}
+        {/* Main content area */}
         <main className="md:col-span-3">
-          {isCourseCompleted && (
-            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-lg shadow-xl text-center max-w-md w-full">
-                <h3 className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400 mb-4">Congratulations!</h3>
-                <p className="text-gray-700 dark:text-gray-300 mb-6 sm:text-lg">
-                  You have successfully completed the course: <span className="font-semibold">{course.name}</span>.
-                </p>
-                <button
-                  onClick={() => router.push('/app/dashboard')}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-lg font-medium"
-                >
-                  Back to Dashboard
-                </button>
+          {currentLesson && (
+            <AnimatedCard className="overflow-hidden border border-white/20 dark:border-neutral-800/30">
+              <div className="p-5 border-b border-neutral-200 dark:border-neutral-800/30">
+                <h2 className="text-xl font-semibold text-neutral-800 dark:text-white">
+                  {currentLesson.title}
+                </h2>
+                {currentLesson.description && (
+                  <p className="mt-2 text-neutral-600 dark:text-neutral-400">
+                    {currentLesson.description}
+                  </p>
+                )}
               </div>
-            </div>
-          )}
-
-          {currentLesson ? (
-            <div className={`border rounded-md p-4 bg-white dark:bg-gray-800 dark:border-gray-700 ${isCourseCompleted ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h2 className="text-2xl font-semibold mb-3 dark:text-white">{currentLesson.title}</h2>
               
-              {currentLesson.description && (
-                <p className="mb-4 text-gray-700 dark:text-gray-300">{currentLesson.description}</p>
-              )}
-              
+              <div className="p-5">
               {currentLesson.video_url && (
-                <div className="mb-4 aspect-video bg-black rounded-md overflow-hidden relative">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full"
-                    src={currentLesson.video_url}
-                    controls={isCurrentVideoWatched()} // Show controls only if video has been watched
-                    onTimeUpdate={handleVideoTimeUpdate}
-                    onEnded={handleVideoEnded}
-                    onPlay={() => setIsVideoPlaying(true)}
-                    onPause={() => setIsVideoPlaying(false)}
-                    // Consider adding playsInline for better mobile experience
-                    playsInline 
+                  <CustomVideoPlayer 
+                    url={currentLesson.video_url}
+                    playerRef={playerRef}
+                    onPlay={() => {
+                        setIsVideoPlaying(true);
+                        if (currentLesson?.id) saveProgress({ current_lesson_id: currentLesson.id, status: 'InProgress' });
+                    }}
+                    onPause={() => {
+                        setIsVideoPlaying(false);
+                        if (playerRef.current && currentLesson?.id) {
+                            saveProgress({
+                                current_lesson_id: currentLesson.id,
+                                video_playback_position: playerRef.current.getCurrentTime(),
+                                status: 'InProgress'
+                            });
+                        }
+                    }}
+                    onEnded={() => {
+                      setIsVideoPlaying(false);
+                      if (currentLesson.id) {
+                        // Mark video as watched on end
+                        if (!completedLessonIds.includes(currentLesson.id)) {
+                          setCompletedLessonIds(prev => [...prev, currentLesson.id]);
+                          // Also save this completion
+                          saveProgress({
+                            lessonVideoIdCompleted: currentLesson.id,
+                            status: 'InProgress' // Or check if course is now completed
+                          });
+                        }
+                      }
+                    }}
+                    onProgress={(state) => {
+                        // Optional: handle progress updates for more granular saving if needed
+                        // For example, save every X seconds as you were doing with handleVideoTimeUpdate
+                        // This is now handled by the onPause event primarily for simplicity
+                        // but you can re-implement periodic saving here based on state.playedSeconds
+                         if (!isSaving && state.playedSeconds > 0 && state.playedSeconds < (playerRef.current?.getDuration() || 0)) {
+                            const saveInterval = 30; // seconds
+                            const timeSinceLastSave = Math.floor(state.playedSeconds) % saveInterval;
+                            const lastKnownPosition = coursePageData?.progress?.video_playback_position ?? 0;
+
+                            if ( (timeSinceLastSave === 0 && Math.abs(state.playedSeconds - lastKnownPosition) > 1) || 
+                                 (state.playedSeconds / (playerRef.current?.getDuration() || 1) > 0.95) 
+                               ) {
+                              saveProgress({
+                                current_lesson_sequence: currentLessonIndex,
+                                video_playback_position: state.playedSeconds,
+                                status: 'InProgress',
+                                progress_percentage: calculateProgressPercentage(),
+                              });
+                            }
+                        }
+                    }}
+                    initialSeek={coursePageData?.progress?.video_playback_position ?? 0}
                   />
-                  {!isCurrentVideoWatched() && (
-                    <div className="absolute inset-x-0 bottom-0 flex justify-center pb-2">
-                      <button
-                        onClick={handleTogglePlayPause}
-                        className="p-2 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-opacity"
-                        aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                      >
-                        {isVideoPlaying ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
-                          </svg> // Placeholder, replace with actual play icon if needed
-                        )}
-                         {/* Using a simpler Play icon for now */}
-                        {isVideoPlaying ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* Display Quiz for lessons with quiz_questions */} 
-              {hasQuiz && (
-                <div className="mt-6 p-4 border rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-                  <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-gray-200">Lesson Quiz</h3>
+                {/* Quiz section would go here */}
+                
+                <div className="flex justify-between mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentLessonIndex(prev => Math.max(0, prev - 1))}
+                    disabled={currentLessonIndex === 0}
+                    className="border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
+                  >
+                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous Lesson
+                  </Button>
                   
-                  {isQuizLocked && (
-                    <div className="p-4 text-center bg-gray-100 dark:bg-gray-600 rounded-md">
-                      <p className="dark:text-gray-300">Please complete the video to unlock the quiz.</p>
-                      {/* Lock Icon (optional) */}
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto mt-2 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V10a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 6H8V6a2 2 0 114 0v2z" clipRule="evenodd" /></svg>
-                    </div>
-                  )}
-
-                  {/* This is the correct "Start Quiz" button with all conditions */} 
-                  {!isQuizLocked && !isQuizActive && canStartQuiz && (
-                    <button
-                      onClick={startQuiz}
-                      className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors dark:bg-blue-600 dark:hover:bg-blue-700"
-                      disabled={isSaving}
+                  {currentLessonIndex < coursePageData.course.lessons.length - 1 ? (
+                    <Button 
+                      onClick={() => setCurrentLessonIndex(prev => Math.min(coursePageData.course.lessons.length - 1, prev + 1))}
+                      className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
                     >
-                      Start Quiz (2:00 min)
-                    </button>
-                  )}
-                  
-                  {isQuizActive && (
-                    <>
-                      <div className="flex justify-between items-center mb-3">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Time Remaining:</p>
-                        <p className="text-lg font-semibold text-red-500 dark:text-red-400">
-                          {Math.floor((quizTimeLeft || 0) / 60)}:{(quizTimeLeft || 0) % 60 < 10 ? '0' : ''}{(quizTimeLeft || 0) % 60}
-                        </p>
-                      </div>
-                      {currentLesson.quiz_questions!.map((question, qIndex) => (
-                        <div key={question.id} className="mb-4 p-3 border-b dark:border-gray-600 last:border-b-0">
-                          <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">{qIndex + 1}. {question.text}</p>
-                          <div className="space-y-2">
-                            {question.options.map(option => (
-                              <label key={option.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer">
-                                <input 
-                                  type={question.type === 'MCQ' || question.type === 'TF' ? 'radio' : 'checkbox'} 
-                                  name={`question-${question.id}`}
-                                  value={option.id}
-                                  checked={question.type === 'MSQ' 
-                                    ? (currentQuizAnswers[question.id] as string[] || []).includes(option.id)
-                                    : currentQuizAnswers[question.id] === option.id
-                                  }
-                                  onChange={() => handleQuizAnswerChange(question.id, option.id, question.type === 'MSQ')}
-                                  className="form-radio h-4 w-4 text-blue-600 dark:text-blue-500 border-gray-300 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-900"
-                                />
-                                <span className="text-gray-700 dark:text-gray-300">{option.text}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <button 
-                        onClick={handleQuizSubmit}
-                        className="w-full mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors dark:bg-green-600 dark:hover:bg-green-700"
-                        disabled={isSaving}
-                      >
-                        {isSaving ? 'Submitting...' : 'Submit Quiz'}
-                      </button>
-                    </>
-                  )}
-                  
-                  {showQuizSummary && lastQuizAttemptData && (
-                    <div className={`p-4 text-center rounded-md ${lastQuizAttemptData.pass_fail_status === 'passed' ? 'bg-green-50 dark:bg-green-800' : 'bg-red-50 dark:bg-red-800' }`}>
-                      <h4 className={`text-lg font-semibold mb-2 ${lastQuizAttemptData.pass_fail_status === 'passed' ? 'text-green-700 dark:text-green-200' : 'text-red-700 dark:text-red-200' }`}>
-                        Quiz {lastQuizAttemptData.pass_fail_status === 'passed' ? 'Passed!' : 'Failed'}
-                      </h4>
-                      <p className="text-gray-700 dark:text-gray-300 mb-1">
-                        Your score: {lastQuizAttemptData.score}/{lastQuizAttemptData.total_questions_in_quiz}
-                      </p>
-                      {lastQuizAttemptData.pass_fail_status === 'failed' && (
-                        <p className="text-gray-600 dark:text-gray-400 mb-3">You need 4 out of 5 correct answers to pass. Please try again.</p>
-                      )}
-                      {lastQuizAttemptData.pass_fail_status === 'passed' && (
-                         <p className="text-gray-600 dark:text-gray-400 mb-3">Great job! Moving to the next lesson...</p>
-                      )}
-                      <button
-                        onClick={() => {
-                          setShowQuizSummary(false);
-                          setSaveMessage(null); // Clear any persistent submission messages
-                          if (lastQuizAttemptData.pass_fail_status === 'passed') {
-                            goToNextLesson(); // Auto-advance if passed
-                          } else {
-                            // Reset for retry: Ensure Start Quiz button is available
-                            setIsQuizActive(false); // Ensures start button can show
-                            setQuizTimeLeft(null); // Timer reset for next attempt
-                          }
-                          setLastQuizAttemptData(null);
-                        }}
-                        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors dark:bg-blue-600 dark:hover:bg-blue-700"
-                      >
-                        {lastQuizAttemptData.pass_fail_status === 'passed' ? 'Continue to Next Lesson' : 'Try Again'}
-                      </button>
-                    </div>
+                      Next Lesson <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      className="bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-600 hover:to-emerald-700 dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500 text-white"
+                    >
+                      Complete Course <Check className="ml-2 h-4 w-4" />
+                    </Button>
                   )}
                 </div>
-              )}
-              
-              {/* Mark as completed button (for non-video/non-quiz lessons or manual completion) - This might be removed or rethought */}
-              {/* {!currentLesson.video_url && !hasQuiz && !completedLessonIds.includes(currentLesson.id) && (
-                <button
-                  onClick={() => markVideoAsCompleted(currentLesson.id)} // Re-purpose or create new for non-video/quiz
-                  className="mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Saving...' : 'Mark as Completed'}
-                </button>
-              )} */} 
-              
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={goToPreviousLesson}
-                  disabled={currentLessonIndex === 0 || isSaving || isQuizActive || isCourseCompleted}
-                  className={`px-4 py-2 rounded transition-colors ${ 
-                    currentLessonIndex === 0 || isSaving || isQuizActive || isCourseCompleted
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
-                      : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700'
-                  }`}
-                >
-                  Previous Lesson
-                </button>
-                <button
-                  onClick={goToNextLesson}
-                  disabled={currentLessonIndex === (course.lessons?.length || 0) - 1 || isSaving || isQuizActive || isCourseCompleted}
-                  className={`px-4 py-2 rounded transition-colors ${ 
-                    currentLessonIndex === (course.lessons?.length || 0) - 1 || isSaving || isQuizActive || isCourseCompleted
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
-                      : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700'
-                  }`}
-                >
-                  Next Lesson
-                </button>
               </div>
-            </div>
-          ) : (
-            <div className="border rounded-md p-4 bg-white dark:bg-gray-800 dark:border-gray-700">
-              <p className="dark:text-gray-300">Select a lesson from the sidebar to begin or an error occurred loading the lesson.</p>
-            </div>
+            </AnimatedCard>
           )}
         </main>
       </div>
 
-      <section className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-md dark:border dark:border-gray-700">
-        <h3 className="text-lg font-semibold mb-2 dark:text-white">Your Progress</h3>
-        <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-4 mb-2">
-          <div
-            className="bg-blue-500 dark:bg-blue-400 h-4 rounded-full transition-all duration-300 ease-in-out"
-            style={{ width: `${visualProgressPercentage}%` }}
-          ></div>
+      {/* Progress section */}
+      <section className="mt-6">
+        <AnimatedCard className="p-5 overflow-hidden border border-white/20 dark:border-neutral-800/30">
+          <h3 className="text-lg font-semibold mb-3 text-neutral-800 dark:text-white">Course Progress</h3>
+          
+          <div className="mb-2">
+            <Progress 
+              value={
+                coursePageData.course.lessons.length > 0 
+                  ? (completedLessonIds.length / coursePageData.course.lessons.length) * 100 
+                  : 0
+              } 
+              className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-neutral-700 [&>div]:to-neutral-800 dark:[&>div]:from-neutral-300 dark:[&>div]:to-white"
+            />
+          </div>
+          
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-neutral-600 dark:text-neutral-400">
+              {completedLessonIds.length} of {coursePageData.course.lessons.length} lessons completed
+            </span>
+            <span className="font-medium text-neutral-800 dark:text-white">
+              {Math.round((completedLessonIds.length / Math.max(1, coursePageData.course.lessons.length)) * 100)}%
+            </span>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {visualProgressPercentage}% completed ({coursePageData.progress?.status === 'Completed' ? course.lessons.length : coursePageData.course.lessons.filter(isLessonConsideredComplete).length} of {course.lessons.length} lessons completed)
-        </p>
+
+          {isSaving && (
+            <p className="text-sm mt-2 text-neutral-500 dark:text-neutral-400">
+              {saveMessage || 'Saving progress...'}
+            </p>
+          )}
+        </AnimatedCard>
       </section>
     </div>
   );

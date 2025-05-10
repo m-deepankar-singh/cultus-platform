@@ -24,18 +24,14 @@ export function AnimatedCard({ children, className, ...props }: AnimatedCardProp
     
     const card = cardRef.current;
     
-    // Create elements and set up animations based on theme
-    if (theme === "dark") {
-      // Dark mode animations
-      
-      // Create shine element
+    // Create shine element for hover effect
       const shine = document.createElement("div");
-      shine.className = "absolute inset-0 bg-gradient-to-tr from-primary/0 via-primary/5 to-primary/0 opacity-0 pointer-events-none";
+    shine.className = "absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 opacity-0 pointer-events-none";
       card.appendChild(shine);
       
-      // Create glow border
+    // Create border glow
       const border = document.createElement("div");
-      border.className = "absolute inset-0 rounded-lg border border-primary/20 pointer-events-none opacity-0";
+    border.className = "absolute inset-0 rounded-lg border border-white/20 dark:border-neutral-700/40 pointer-events-none opacity-0";
       card.appendChild(border);
       
       // Mouse enter animation
@@ -48,7 +44,9 @@ export function AnimatedCard({ children, className, ...props }: AnimatedCardProp
         
         gsap.to(border, {
           opacity: 1,
-          boxShadow: "0 0 15px rgba(var(--primary) / 0.2)",
+        boxShadow: theme === "dark" 
+          ? "0 0 15px rgba(255, 255, 255, 0.1)" 
+          : "0 0 15px rgba(0, 0, 0, 0.05)",
           duration: 0.3
         });
         
@@ -69,7 +67,7 @@ export function AnimatedCard({ children, className, ...props }: AnimatedCardProp
         
         gsap.to(border, {
           opacity: 0,
-          boxShadow: "0 0 0px rgba(var(--primary) / 0)",
+        boxShadow: "0 0 0px rgba(0, 0, 0, 0)",
           duration: 0.3
         });
         
@@ -109,63 +107,13 @@ export function AnimatedCard({ children, className, ...props }: AnimatedCardProp
         shine.remove();
         border.remove();
       };
-    } else {
-      // Light mode animations - more subtle
-      
-      // Create subtle shadow
-      const shadow = document.createElement("div");
-      shadow.className = "absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 opacity-0 pointer-events-none -z-10";
-      card.appendChild(shadow);
-      
-      // Mouse enter animation for light mode
-      const handleMouseEnter = () => {
-        gsap.to(shadow, {
-          opacity: 0.7,
-          duration: 0.3,
-          ease: "power2.out"
-        });
-        
-        gsap.to(card, {
-          y: -3,
-          boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.1)",
-          duration: 0.3,
-          ease: "power2.out"
-        });
-      };
-      
-      // Mouse leave animation for light mode
-      const handleMouseLeave = () => {
-        gsap.to(shadow, {
-          opacity: 0,
-          duration: 0.3,
-          ease: "power2.out"
-        });
-        
-        gsap.to(card, {
-          y: 0,
-          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)",
-          duration: 0.3,
-          ease: "power2.out"
-        });
-      };
-      
-      card.addEventListener("mouseenter", handleMouseEnter);
-      card.addEventListener("mouseleave", handleMouseLeave);
-      
-      return () => {
-        card.removeEventListener("mouseenter", handleMouseEnter);
-        card.removeEventListener("mouseleave", handleMouseLeave);
-        shadow.remove();
-      };
-    }
   }, [theme, mounted]);
   
   return (
     <div
       ref={cardRef}
       className={cn(
-        "relative bg-card text-card-foreground rounded-lg p-4 transition-all duration-300",
-        theme === "dark" ? "dark:bg-black/40 backdrop-blur-sm" : "bg-white shadow-sm",
+        "relative rounded-lg p-5 transition-all duration-300 bg-white/60 dark:bg-black/40 backdrop-blur-sm border border-white/20 dark:border-neutral-800/30 shadow-sm",
         className
       )}
       {...props}

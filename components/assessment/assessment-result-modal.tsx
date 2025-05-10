@@ -14,6 +14,7 @@ import { Award, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Gauge } from "@/components/ui/gauge";
+import { cn } from "@/lib/utils";
 
 interface AssessmentResultModalProps {
   assessmentId: string;
@@ -123,26 +124,31 @@ export function AssessmentResultModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border border-white/20 dark:border-neutral-800/30">
         <DialogHeader>
           <DialogTitle className="flex items-center text-xl">
-            <Award className="mr-2 h-5 w-5 text-primary" />
-            Assessment Results
+            <Award className="mr-2 h-5 w-5 text-neutral-800 dark:text-neutral-300" />
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400">
+              Assessment Results
+            </span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-neutral-600 dark:text-neutral-400">
             {result?.assessment_name || "Assessment"} Results
           </DialogDescription>
         </DialogHeader>
 
         {loading ? (
           <div className="py-8 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-800 dark:border-neutral-300"></div>
           </div>
         ) : error ? (
           <div className="py-8 text-center">
-            <AlertCircle className="mx-auto h-10 w-10 text-destructive mb-2" />
-            <p className="text-destructive">{error}</p>
-            <Button onClick={onClose} className="mt-4">
+            <AlertCircle className="mx-auto h-10 w-10 text-red-500 dark:text-red-400 mb-2" />
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+            <Button 
+              onClick={onClose} 
+              className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            >
               Close
             </Button>
           </div>
@@ -157,48 +163,61 @@ export function AssessmentResultModal({
                 }
                 strokeWidth={10}
                 className={{
-                  textClassName: "text-2xl"
+                  textClassName: "text-2xl font-semibold text-neutral-800 dark:text-white"
                 }}
               />
             </div>
 
             <div className="flex justify-center items-center gap-2">
               <Badge 
-                variant={result.passed ? "success" : "destructive"}
-                className="text-sm py-1 px-3"
+                variant={result.passed ? "outline" : "outline"}
+                className={cn(
+                  "text-sm py-1.5 px-3 backdrop-blur-sm border",
+                  result.passed 
+                    ? "border-emerald-200 bg-emerald-50/40 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-400" 
+                    : "border-red-200 bg-red-50/40 text-red-700 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-400"
+                )}
               >
                 {result.passed ? (
-                  <CheckCircle className="mr-1 h-4 w-4" />
+                  <CheckCircle className="mr-1.5 h-4 w-4" />
                 ) : (
-                  <XCircle className="mr-1 h-4 w-4" />
+                  <XCircle className="mr-1.5 h-4 w-4" />
                 )}
                 {result.passed ? "Passed" : "Not Passed"}
               </Badge>
             </div>
 
-            <div className="space-y-2 bg-muted p-4 rounded-md">
+            <div className="space-y-2 bg-neutral-100/50 dark:bg-neutral-800/40 backdrop-blur-sm p-4 rounded-md border border-neutral-200/50 dark:border-neutral-700/30">
               <div className="flex justify-between text-sm">
-                <span>Score:</span>
-                <span className="font-medium">{result.score}%</span>
+                <span className="text-neutral-600 dark:text-neutral-400">Score:</span>
+                <span className="font-medium text-neutral-800 dark:text-white">{result.score}%</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Correct Answers:</span>
-                <span className="font-medium">{result.correct_answers} of {result.total_questions}</span>
+                <span className="text-neutral-600 dark:text-neutral-400">Correct Answers:</span>
+                <span className="font-medium text-neutral-800 dark:text-white">{result.correct_answers} of {result.total_questions}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Submitted:</span>
-                <span className="font-medium">{formatDate(result.submitted_at)}</span>
+                <span className="text-neutral-600 dark:text-neutral-400">Submitted:</span>
+                <span className="font-medium text-neutral-800 dark:text-white">{formatDate(result.submitted_at)}</span>
               </div>
             </div>
 
             <div className="pt-4 flex justify-end">
-              <Button onClick={onClose}>Close</Button>
+              <Button 
+                onClick={onClose}
+                className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+              >
+                Close
+              </Button>
             </div>
           </div>
         ) : (
           <div className="py-8 text-center">
-            <p>No results found for this assessment.</p>
-            <Button onClick={onClose} className="mt-4">
+            <p className="text-neutral-600 dark:text-neutral-400">No results found for this assessment.</p>
+            <Button 
+              onClick={onClose} 
+              className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            >
               Close
             </Button>
           </div>

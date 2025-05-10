@@ -24,6 +24,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { AnimatedCard } from '@/components/ui/animated-card';
+import { cn } from '@/lib/utils';
 
 // Types for the assessment data
 interface AssessmentQuestion {
@@ -60,23 +62,48 @@ interface AssessmentResult {
 
 const AssessmentLoadingSkeleton = () => (
   <div className="container mx-auto p-4 animate-pulse">
-    <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
-    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/2 mb-6"></div>
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-4">
-      <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mb-3"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-full mb-2"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-5/6 mb-4"></div>
+    <div className="h-8 bg-neutral-300 dark:bg-neutral-700 rounded w-1/3 mb-4"></div>
+    <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-1/2 mb-6"></div>
+    <div className="bg-white/60 dark:bg-black/40 backdrop-blur-sm rounded-lg border border-white/20 dark:border-neutral-800/30 p-6 mb-4">
+      <div className="h-6 bg-neutral-300 dark:bg-neutral-700 rounded w-3/4 mb-3"></div>
+      <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-full mb-2"></div>
+      <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-5/6 mb-4"></div>
       <div className="grid grid-cols-1 gap-3 mt-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-10 bg-gray-300 dark:bg-gray-700 rounded"></div>
+          <div key={i} className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded"></div>
         ))}
       </div>
     </div>
     <div className="flex justify-between">
-      <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
-      <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
+      <div className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-24"></div>
+      <div className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-24"></div>
     </div>
   </div>
+);
+
+// Custom styled Progress component with neutral colors
+const NeutralProgress = ({ value, className, ...props }: React.ComponentProps<typeof Progress>) => (
+  <Progress 
+    value={value} 
+    className={cn(
+      "[&>div]:bg-gradient-to-r [&>div]:from-neutral-700 [&>div]:to-neutral-800 dark:[&>div]:from-neutral-300 dark:[&>div]:to-white", 
+      className
+    )} 
+    {...props} 
+  />
+);
+
+// Custom styled Radio component with neutral colors
+const NeutralRadioGroupItem = ({ className, ...props }: React.ComponentProps<typeof RadioGroupItem>) => (
+  <RadioGroupItem 
+    className={cn(
+      "border-neutral-300 dark:border-neutral-600 text-neutral-800 dark:text-white",
+      "data-[state=checked]:border-neutral-800 data-[state=checked]:bg-neutral-800 data-[state=checked]:text-white",
+      "dark:data-[state=checked]:border-neutral-300 dark:data-[state=checked]:bg-neutral-300 dark:data-[state=checked]:text-neutral-900",
+      className
+    )} 
+    {...props} 
+  />
 );
 
 export default function TakeAssessmentPage() {
@@ -287,9 +314,16 @@ export default function TakeAssessmentPage() {
   if (isError) {
     return (
       <div className="container mx-auto p-4 text-center">
-        <h2 className="text-xl text-red-600">Error Loading Assessment</h2>
-        <p>{error?.message || 'An unknown error occurred'}</p>
-        <Button onClick={() => router.push('/app/dashboard')} className="mt-4">Back to Dashboard</Button>
+        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
+          <h2 className="text-xl font-bold">Error Loading Assessment</h2>
+          <p className="mt-2">{error?.message || 'An unknown error occurred'}</p>
+          <Button 
+            onClick={() => router.push('/app/dashboard')} 
+            className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+          >
+            Back to Dashboard
+          </Button>
+        </AnimatedCard>
       </div>
     );
   }
@@ -297,11 +331,16 @@ export default function TakeAssessmentPage() {
   if (submissionError) {
     return (
       <div className="container mx-auto p-4 text-center">
-        <h2 className="text-xl text-red-600">Submission Error</h2>
-        <p>{submissionError}</p>
-        <Button onClick={() => { setSubmissionError(null); /* Optionally, re-enable submit button or navigate */ }} className="mt-4">
-          Try Again or Go Back
+        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
+          <h2 className="text-xl font-bold">Submission Error</h2>
+          <p className="mt-2">{submissionError}</p>
+          <Button 
+            onClick={() => { setSubmissionError(null); }} 
+            className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+          >
+            Try Again
         </Button>
+        </AnimatedCard>
       </div>
     );
   }
@@ -309,8 +348,15 @@ export default function TakeAssessmentPage() {
   if (!assessmentData) {
     return (
       <div className="container mx-auto p-4 text-center">
-        <p>Assessment data could not be loaded or is not available.</p>
-        <Button onClick={() => router.push('/app/dashboard')} className="mt-4">Back to Dashboard</Button>
+        <AnimatedCard className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">
+          <p className="mb-4">Assessment data could not be loaded or is not available.</p>
+          <Button 
+            onClick={() => router.push('/app/dashboard')} 
+            className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+          >
+            Back to Dashboard
+          </Button>
+        </AnimatedCard>
       </div>
     );
   }
@@ -323,42 +369,51 @@ export default function TakeAssessmentPage() {
   return (
     <div className="container mx-auto p-4">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold">{assessment.name}</h1>
+        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400">
+          {assessment.name}
+        </h1>
         {assessment.instructions && (
-          <p className="mt-2 text-gray-600 dark:text-gray-400">{assessment.instructions}</p>
+          <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-4">
+            {assessment.instructions}
+          </p>
         )}
         
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+        <AnimatedCard className="mt-4 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-neutral-600 dark:text-neutral-400">
               Question {currentQuestionIndex + 1} of {assessment.questions.length}
             </span>
-            <Progress value={progress} className="w-24" />
+              <NeutralProgress value={progress} className="w-32 h-2" />
           </div>
           
           {timeRemaining !== null && (
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span className={`font-medium ${timeRemaining < 60 ? 'text-red-500' : ''}`}>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/40 dark:bg-neutral-800/40 backdrop-blur-sm border border-white/20 dark:border-neutral-800/30">
+                <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
+                <span className={cn(
+                  "font-medium",
+                  timeRemaining < 60 
+                    ? "text-red-500 dark:text-red-400" 
+                    : "text-neutral-700 dark:text-neutral-300"
+                )}>
                 {formatTime(timeRemaining)}
               </span>
             </div>
           )}
         </div>
-        
-        <Separator className="mt-4" />
+        </AnimatedCard>
       </header>
 
       <main>
         {currentQuestion && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-xl">
+          <AnimatedCard className="mb-6 overflow-hidden">
+            <div className="p-5 border-b border-neutral-200 dark:border-neutral-800/30">
+              <h2 className="text-xl font-semibold text-neutral-800 dark:text-white">
                 {currentQuestionIndex + 1}. {currentQuestion.question_text}
-              </CardTitle>
-            </CardHeader>
+              </h2>
+            </div>
             
-            <CardContent>
+            <div className="p-5">
               {currentQuestion.question_type === 'MCQ' && (
                 <RadioGroup
                   value={questionAnswer as string}
@@ -366,9 +421,9 @@ export default function TakeAssessmentPage() {
                   className="space-y-4"
                 >
                   {currentQuestion.options.map((option) => (
-                    <div key={option.id} className="flex items-center space-x-2">
-                      <RadioGroupItem value={option.id} id={option.id} />
-                      <Label htmlFor={option.id}>{option.text}</Label>
+                    <div key={option.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
+                      <NeutralRadioGroupItem value={option.id} id={option.id} />
+                      <Label htmlFor={option.id} className="text-neutral-700 dark:text-neutral-300">{option.text}</Label>
                     </div>
                   ))}
                 </RadioGroup>
@@ -377,15 +432,16 @@ export default function TakeAssessmentPage() {
               {currentQuestion.question_type === 'MSQ' && (
                 <div className="space-y-4">
                   {currentQuestion.options.map((option) => (
-                    <div key={option.id} className="flex items-center space-x-2">
+                    <div key={option.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
                       <Checkbox
                         id={option.id}
                         checked={(questionAnswer as string[]).includes(option.id)}
                         onCheckedChange={(checked) => 
                           handleMultiAnswerChange(currentQuestion.id, option.id, checked === true)
                         }
+                        className="border-neutral-300 dark:border-neutral-600 data-[state=checked]:bg-neutral-800 data-[state=checked]:border-neutral-800 dark:data-[state=checked]:bg-neutral-300 dark:data-[state=checked]:border-neutral-300"
                       />
-                      <Label htmlFor={option.id}>{option.text}</Label>
+                      <Label htmlFor={option.id} className="text-neutral-700 dark:text-neutral-300">{option.text}</Label>
                     </div>
                   ))}
                 </div>
@@ -397,41 +453,50 @@ export default function TakeAssessmentPage() {
                   onValueChange={(value) => handleSingleAnswerChange(currentQuestion.id, value)}
                   className="space-y-4"
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="true" id={`${currentQuestion.id}-true`} />
-                    <Label htmlFor={`${currentQuestion.id}-true`}>True</Label>
+                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
+                    <NeutralRadioGroupItem value="true" id={`${currentQuestion.id}-true`} />
+                    <Label htmlFor={`${currentQuestion.id}-true`} className="text-neutral-700 dark:text-neutral-300">True</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="false" id={`${currentQuestion.id}-false`} />
-                    <Label htmlFor={`${currentQuestion.id}-false`}>False</Label>
+                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
+                    <NeutralRadioGroupItem value="false" id={`${currentQuestion.id}-false`} />
+                    <Label htmlFor={`${currentQuestion.id}-false`} className="text-neutral-700 dark:text-neutral-300">False</Label>
                   </div>
                 </RadioGroup>
               )}
-            </CardContent>
+            </div>
             
-            <CardFooter className="flex justify-between">
+            <div className="p-5 border-t border-neutral-200 dark:border-neutral-800/30 flex justify-between">
               <Button
                 variant="outline"
                 onClick={goToPreviousQuestion}
                 disabled={currentQuestionIndex === 0}
+                className="border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
               
               {currentQuestionIndex < assessment.questions.length - 1 ? (
-                <Button onClick={goToNextQuestion}>
+                <Button 
+                  onClick={goToNextQuestion}
+                  className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+                >
                   Next <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={confirmSubmit} disabled={isSubmitting}>
+                <Button 
+                  onClick={confirmSubmit} 
+                  disabled={isSubmitting}
+                  className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+                >
                   Submit Assessment
                 </Button>
               )}
-            </CardFooter>
-          </Card>
+            </div>
+          </AnimatedCard>
         )}
         
-        <div className="flex flex-wrap gap-2 mb-6">
+        <AnimatedCard className="mb-6 p-4">
+          <div className="flex flex-wrap gap-2">
           {assessment.questions.map((_, index) => (
             <Button
               key={index}
@@ -439,54 +504,75 @@ export default function TakeAssessmentPage() {
                       (answers[assessment.questions[index].id] ? "outline" : "ghost")}
               size="sm"
               onClick={() => setCurrentQuestionIndex(index)}
-              className="w-10 h-10 p-0"
+                className={cn(
+                  "w-10 h-10 p-0",
+                  index === currentQuestionIndex ? 
+                    "bg-gradient-to-r from-neutral-800 to-neutral-900 dark:from-neutral-200 dark:to-white text-white dark:text-neutral-900" :
+                    answers[assessment.questions[index].id] ? 
+                      "border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300" :
+                      "text-neutral-500 dark:text-neutral-400"
+                )}
             >
               {index + 1}
             </Button>
           ))}
         </div>
+        </AnimatedCard>
         
         <div className="mt-6 text-center">
-          <Button onClick={confirmSubmit} disabled={isSubmitting}>
+          <Button 
+            onClick={confirmSubmit} 
+            disabled={isSubmitting}
+            className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 px-8"
+          >
             Submit Assessment
           </Button>
         </div>
       </main>
 
       <AlertDialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border border-white/20 dark:border-neutral-800/30">
           <AlertDialogHeader>
-            <AlertDialogTitle>Submit Assessment?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-neutral-800 dark:text-white">Submit Assessment?</AlertDialogTitle>
+            <AlertDialogDescription className="text-neutral-600 dark:text-neutral-400">
               Are you sure you want to submit your assessment? You won't be able to change your answers after submission.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSubmitAssessment}>Submit</AlertDialogAction>
+            <AlertDialogCancel className="border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleSubmitAssessment}
+              className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            >
+              Submit
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={isResultDialogOpen} onOpenChange={setIsResultDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border border-white/20 dark:border-neutral-800/30">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+            <AlertDialogTitle className="flex items-center gap-2 text-neutral-800 dark:text-white">
               {assessmentResult?.passed ? (
                 <>
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <CheckCircle className="h-5 w-5 text-emerald-500" />
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-emerald-400 dark:from-emerald-400 dark:to-emerald-300">
                   Assessment Passed!
+                  </span>
                 </>
               ) : (
                 <>
                   <AlertCircle className="h-5 w-5 text-red-500" />
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-400 dark:from-red-400 dark:to-red-300">
                   Assessment Not Passed
+                  </span>
                 </>
               )}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-neutral-600 dark:text-neutral-400">
               <div className="py-4">
-                <p className="text-lg font-medium mb-2">
+                <p className="text-lg font-medium mb-2 text-neutral-800 dark:text-white">
                   Your score: {assessmentResult?.score}%
                 </p>
                 <p>
@@ -501,7 +587,12 @@ export default function TakeAssessmentPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={handleFinish}>Return to Dashboard</AlertDialogAction>
+            <AlertDialogAction 
+              onClick={handleFinish}
+              className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            >
+              Return to Dashboard
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

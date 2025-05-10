@@ -20,15 +20,17 @@ export function AnimatedButton({
   const { theme } = useTheme();
   
   useEffect(() => {
-    if (!buttonRef.current || theme !== "dark") return;
+    if (!buttonRef.current) return;
     
     const button = buttonRef.current;
     
     // Mouse enter animation
     const handleMouseEnter = () => {
       gsap.to(button, {
-        scale: 1.05,
-        boxShadow: "0 0 15px rgba(var(--primary) / 0.4)",
+        scale: 1.03,
+        boxShadow: theme === "dark" 
+          ? "0 0 15px rgba(255, 255, 255, 0.1)" 
+          : "0 0 15px rgba(0, 0, 0, 0.1)",
         duration: 0.3,
         ease: "power2.out"
       });
@@ -38,7 +40,7 @@ export function AnimatedButton({
     const handleMouseLeave = () => {
       gsap.to(button, {
         scale: 1,
-        boxShadow: "0 0 0px rgba(var(--primary) / 0)",
+        boxShadow: "0 0 0px rgba(0, 0, 0, 0)",
         duration: 0.3,
         ease: "power2.out"
       });
@@ -92,7 +94,6 @@ export function AnimatedButton({
       ref={buttonRef}
       className={cn(
         "relative overflow-hidden transition-all duration-300",
-        theme === "dark" && "dark:border-primary/20 dark:hover:border-primary/40",
         className
       )}
       {...props}

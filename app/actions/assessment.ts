@@ -466,11 +466,11 @@ export async function submitAssessmentAction(
       .upsert({
         student_id: studentId,
         module_id: moduleId,
-        status: passed ? 'Completed' : 'InProgress',
+        status: 'Completed', // Always mark as Completed when submitted
         score,
         progress_percentage: 100,
         last_updated: submissionTime,
-        completed_at: passed ? submissionTime : null
+        completed_at: submissionTime // Always update completed_at since submission is complete
       }, { onConflict: 'student_id, module_id' });
 
     revalidatePath('/app/dashboard');

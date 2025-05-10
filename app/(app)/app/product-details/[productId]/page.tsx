@@ -8,8 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Target } from 'lucide-react';
+import { BookOpen, Target, ChevronRight } from 'lucide-react';
 import { AssessmentResultModal } from '@/components/assessment/assessment-result-modal';
+import { AnimatedCard } from '@/components/ui/animated-card';
+import { cn } from '@/lib/utils';
 
 interface ProductDetailsPageProps {
   params: Promise<{
@@ -67,6 +69,25 @@ const getModuleCtaText = (module: ModuleDetail): string => {
     default:
       return module.type === 'Assessment' ? 'Start Assessment' : 'Start Course';
   }
+};
+
+// Status color helper
+const getStatusColor = (status: string): string => {
+  switch (status) {
+    case 'Completed':
+      return 'bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400';
+    case 'InProgress':
+      return 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400';
+    default:
+      return 'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+  }
+};
+
+// Type color helper
+const getTypeColor = (type: string): string => {
+  return type === 'Course' 
+    ? 'bg-sky-500/20 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' 
+    : 'bg-violet-500/20 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400';
 };
 
 // This is now a Client Component
@@ -196,7 +217,7 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
   if (loading) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-400 dark:border-neutral-300"></div>
       </div>
     );
   }
@@ -204,9 +225,9 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
   if (error) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0">
-        <div className="p-4 bg-destructive/10 rounded-md text-destructive">
-          {error}
-        </div>
+        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
+          <div className="p-4">{error}</div>
+        </AnimatedCard>
       </div>
     );
   }
@@ -214,9 +235,9 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
   if (!productData) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0">
-        <div className="p-4 bg-destructive/10 rounded-md text-destructive">
-          Product not found
-        </div>
+        <AnimatedCard className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">
+          <div className="p-4">Product not found</div>
+        </AnimatedCard>
       </div>
     );
   }
@@ -224,60 +245,90 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
   // 4. Render UI
   return (
     <div className="container mx-auto py-8 px-4 md:px-0">
-      <h1 className="text-3xl font-bold mb-2">{productData.name}</h1>
-      {productData.description && <p className="text-lg text-muted-foreground mb-8">{productData.description}</p>}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400">
+          {productData.name}
+        </h1>
+        {productData.description && 
+          <p className="text-lg text-neutral-600 dark:text-neutral-400">
+            {productData.description}
+          </p>
+        }
+      </div>
 
       <div className="space-y-4">
         {productData.modules.length > 0 ? (
           productData.modules.map((module) => (
-            <Card key={module.id} className="overflow-hidden">
-              <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <AnimatedCard 
+              key={module.id} 
+              className="overflow-hidden border border-white/20 dark:border-neutral-800/30"
+            >
+              <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex-grow">
-                  <div className="flex items-center gap-2 mb-1">
-                     {/* Added Icon based on type */}
-                     {module.type === 'Course' ? <BookOpen className="h-4 w-4 text-blue-500 mr-1" /> : <Target className="h-4 w-4 text-green-500 mr-1" />}
-                     <Badge variant={module.type === 'Course' ? 'secondary' : 'outline'}>{module.type}</Badge>
-                     <h3 className="text-lg font-semibold ml-1">{module.name}</h3>
+                  <div className="flex items-center gap-2 mb-2">
+                     {/* Module type badge */}
+                     <span className={cn(
+                       "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+                       getTypeColor(module.type)
+                     )}>
+                       {module.type === 'Course' ? 
+                         <BookOpen className="h-3 w-3 mr-1" /> : 
+                         <Target className="h-3 w-3 mr-1" />
+                       }
+                       {module.type}
+                     </span>
+                     <h3 className="text-lg font-semibold text-neutral-800 dark:text-white ml-1">
+                       {module.name}
+                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground ml-6">
-                    <span>Status:</span>
-                     <Badge variant={
-                         module.status === 'Completed' ? 'success' :
-                         module.status === 'InProgress' ? 'default' : 'outline'
-                      }>{module.status.replace(/([A-Z])/g, ' $1').trim()}</Badge>
+                  <div className="flex flex-wrap items-center gap-2 text-sm ml-0 md:ml-6">
+                    <span className="text-neutral-500 dark:text-neutral-400">Status:</span>
+                     <span className={cn(
+                       "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium",
+                       getStatusColor(module.status)
+                     )}>
+                       {module.status.replace(/([A-Z])/g, ' $1').trim()}
+                     </span>
                      {/* Show progress bar and percentage only when In Progress */}
                      {module.status === 'InProgress' && (
-                       <>
+                       <div className="flex items-center gap-2 ml-1">
                          <Progress value={module.progress_percentage} className="w-24 h-2" />
-                         <span>({module.progress_percentage}%)</span>
-                       </>
+                         <span className="text-neutral-500 dark:text-neutral-400">({module.progress_percentage}%)</span>
+                       </div>
                      )}
                   </div>
                 </div>
-                {/* Modified to use the modal for completed assessments */}
+                {/* Action buttons with consistent styling */}
                 {module.type === 'Assessment' && module.status === 'Completed' ? (
                   <Button 
-                    variant="secondary" 
-                    className="w-full md:w-auto mt-2 md:mt-0"
+                    className="w-full md:w-auto mt-2 md:mt-0 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
                     onClick={() => handleViewResult(module.id)}
                   >
-                    View Results
+                    View Results <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 ) : (
                   <Link href={getModuleLink(module)} passHref>
                     <Button 
-                      variant={module.status === 'Completed' ? 'secondary' : 'default'} 
-                      className="w-full md:w-auto mt-2 md:mt-0"
+                      className={cn(
+                        "w-full md:w-auto mt-2 md:mt-0",
+                        module.status === 'Completed' 
+                          ? "bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-600 hover:to-emerald-700 dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500 text-white"
+                          : "bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+                      )}
                     >
-                      {getModuleCtaText(module)}
+                      {getModuleCtaText(module)} <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </Link>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </AnimatedCard>
           ))
         ) : (
-          <p className="text-muted-foreground">This product currently has no modules.</p>
+          <AnimatedCard>
+            <div className="p-6 text-center">
+              <p className="text-neutral-500 dark:text-neutral-400">This product currently has no modules.</p>
+            </div>
+          </AnimatedCard>
         )}
       </div>
 
