@@ -207,8 +207,16 @@ export function ClientsTable() {
                 <TableRow key={client.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted overflow-hidden">
+                        {client.logo_url ? (
+                          <img
+                            src={client.logo_url}
+                            alt={`${client.name} logo`}
+                            className="object-contain w-full h-full"
+                          />
+                        ) : (
                         <Building2 className="h-5 w-5 text-muted-foreground" />
+                        )}
                       </div>
                       <div className="font-medium">{client.name}</div>
                     </div>

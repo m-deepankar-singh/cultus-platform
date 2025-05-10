@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -81,52 +81,72 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
   const [questionType, setQuestionType] = useState<'MCQ' | 'MSQ'>(questionToEdit?.question_type || 'MCQ');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Prepare form default values
-  const getDefaultValues = (): Partial<FormValues> => {
+  // Memoized function to get default values
+  const getDefaultValues = useCallback((): Partial<FormValues> => {
     if (questionToEdit) {
       if (questionToEdit.question_type === 'MCQ') {
         return {
           question_text: questionToEdit.question_text,
           question_type: 'MCQ',
-          options: questionToEdit.options,
+          options: questionToEdit.options.map(opt => ({ ...opt })), // Deep copy options
           correct_answer: questionToEdit.correct_answer as string,
           topic: questionToEdit.topic || '',
           difficulty: questionToEdit.difficulty || 'none',
           bank_type: bankType,
         };
-      } else {
+      } else { // MSQ
         return {
           question_text: questionToEdit.question_text,
           question_type: 'MSQ',
-          options: questionToEdit.options,
-          correct_answers: (questionToEdit.correct_answer as { answers: string[] }).answers,
+          options: questionToEdit.options.map(opt => ({ ...opt })), // Deep copy options
+          // Ensure correct_answers is an array, even if it's initially null/undefined from DB
+          correct_answers: Array.isArray((questionToEdit.correct_answer as { answers: string[] })?.answers)
+            ? [...(questionToEdit.correct_answer as { answers: string[] }).answers] // Deep copy
+            : [],
           topic: questionToEdit.topic || '',
           difficulty: questionToEdit.difficulty || 'none',
           bank_type: bankType,
         };
       }
     }
-    
+    // For new questions, use the current `questionType` state
     return {
       question_text: '',
-      question_type: questionType,
+      question_type: questionType, // Uses the local questionType state for new questions
       options: [
         { id: 'opt_a', text: '' },
         { id: 'opt_b', text: '' },
       ],
-      ...(questionType === 'MCQ' ? { correct_answer: '' } : { correct_answers: [] }),
+      ...(questionType === 'MCQ' ? { correct_answer: '' } : { correct_answers: [] }), // Uses local questionType state
       topic: '',
       difficulty: 'none',
       bank_type: bankType,
     };
-  };
+  }, [questionToEdit, bankType, questionType]); // Dependencies for useCallback
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    // defaultValues are set by useEffect/reset, but useForm needs an initial value.
+    // This will use the initial state of questionToEdit & questionType on first mount.
     defaultValues: getDefaultValues(),
   });
 
-  // Update form when question type changes
+  useEffect(() => {
+    if (open) {
+      // Determine the type based on the question being edited, or default for new questions
+      const initialType = questionToEdit?.question_type || 'MCQ';
+      // Only set if different to avoid unnecessary re-renders if the type is already correct.
+      if (questionType !== initialType) {
+        setQuestionType(initialType);
+      }
+      // Reset the form with the (potentially new) default values.
+      // getDefaultValues is memoized and will have an updated reference if questionToEdit or questionType changed,
+      // triggering this effect again if needed for the reset to use the latest state.
+      form.reset(getDefaultValues());
+    }
+  }, [open, questionToEdit, form, getDefaultValues, questionType]); // Added questionType because setQuestionType can cause it to change
+
+  // Update form when question type changes manually by the user
   const handleQuestionTypeChange = (value: 'MCQ' | 'MSQ') => {
     setQuestionType(value);
     form.setValue('question_type', value);

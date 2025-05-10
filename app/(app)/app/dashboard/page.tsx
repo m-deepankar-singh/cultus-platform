@@ -1,7 +1,16 @@
-import React from 'react';
-import { CoursesDashboard } from "@/components/courses-dashboard";
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from 'next/navigation';
+"use client";
+
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { AnimatedButton } from "@/components/ui/animated-button";
+import { Gauge } from "@/components/ui/gauge";
+import { GaugeProgress, CompletionGauge } from "@/components/analytics/gauge-progress-display";
+import gsap from "gsap";
+import { cn } from "@/lib/utils";
+import { BookOpen, Award, Clock, BarChart, ChevronRight } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 // TypeScript interfaces for the data structure
 interface Module {
@@ -26,48 +35,28 @@ interface Product {
   modules: Module[];
 }
 
-interface ProductAssignment {
-  product_id: string;
-  products: {
-    id: string;
-    name: string;
-    description: string | null;
-    modules: {
-      id: string;
-      name: string;
-      type: 'Course' | 'Assessment';
-      sequence: number;
-    }[];
-  };
-}
-
-interface ModuleProgress {
-  module_id: string;
-  status: 'NotStarted' | 'InProgress' | 'Completed';
-  progress_percentage: number | null;
-  completed_at: string | null;
-}
-
-// This is a React Server Component (RSC)
-// It fetches data and passes it to the CoursesDashboard client component.
-
-export default async function DashboardPage() {
-  // First, ensure the user is authenticated
-  const supabase = await createClient();
+export default function Dashboard() {
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | undefined>(undefined);
+  
+  // Fetch data from Supabase
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const supabase = createClient();
+        
+        // Check if user is authenticated
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    // If not authenticated, redirect to login
-    redirect('/app/login');
-  }
-  
-  // Initialize empty products array
-  let products: Product[] = [];
-  let errorOccurred = false;
-  let errorMessage = '';
-
-  try {
-    // First, get the student record to ensure we have the correct client_id
+          window.location.href = '/app/login';
+          return;
+        }
+        
+        // Get the student record to ensure we have the correct client_id
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('client_id')
@@ -76,20 +65,20 @@ export default async function DashboardPage() {
     
     if (studentError) {
       console.error('Error fetching student data:', studentError);
-      errorOccurred = true;
-      errorMessage = 'Unable to fetch your student profile';
-      return <CoursesDashboard products={[]} error={errorMessage} />;
+          setError('Unable to fetch your student profile');
+          setLoading(false);
+          return;
     }
 
     if (!studentData || !studentData.client_id) {
       console.error('No client_id found for student');
-      errorOccurred = true;
-      errorMessage = 'Your account is not properly set up with a school or organization';
-      return <CoursesDashboard products={[]} error={errorMessage} />;
-    }
+          setError('Your account is not properly set up with a school or organization');
+          setLoading(false);
+          return;
+        }
 
-    // Now fetch product assignments using the client_id from the student record
-    const { data, error } = await supabase
+        // Fetch product assignments using the client_id from the student record
+        const { data, error: productsError } = await supabase
       .from('client_product_assignments')
       .select(`
         product_id,
@@ -97,6 +86,7 @@ export default async function DashboardPage() {
           id,
           name,
           description,
+          image_url,
           modules (
             id,
             name,
@@ -107,12 +97,15 @@ export default async function DashboardPage() {
       `)
       .eq('client_id', studentData.client_id);
 
-    if (error) {
-      console.error('Error fetching products:', error);
-      errorOccurred = true;
-      errorMessage = error.message;
-    } else if (data && data.length > 0) {
-      // Get progress data for each module first
+        if (productsError) {
+          console.error('Error fetching products:', productsError);
+          setError(productsError.message);
+          setLoading(false);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Get progress data for each module
       const { data: progressData, error: progressError } = await supabase
         .from('student_module_progress')
         .select('module_id, status, progress_percentage, completed_at')
@@ -125,13 +118,13 @@ export default async function DashboardPage() {
       // Map progress data to a lookup object for easier access
       const progressMap = new Map();
       if (progressData) {
-        progressData.forEach((progress: ModuleProgress) => {
+            progressData.forEach((progress: any) => {
           progressMap.set(progress.module_id, progress);
         });
       }
       
       // Transform data to the expected format with product status and progress calculation
-      products = data.map((item: any) => {
+          const formattedProducts = data.map((item: any) => {
         const modules = item.products.modules.map((module: any) => {
           const progress = progressMap.get(module.id);
           return {
@@ -171,21 +164,278 @@ export default async function DashboardPage() {
           id: item.products.id,
           name: item.products.name,
           description: item.products.description,
+          image_url: item.products.image_url,
           modules,
           product_progress_percentage: productProgressPercentage,
           product_status: productStatus
         };
       });
-    } else {
-      // No products found - this is not an error, just empty state
-      console.log('No products assigned to this student');
-    }
+      
+          setProducts(formattedProducts);
+        }
+        
+        setLoading(false);
   } catch (error: any) {
     console.error('Error in dashboard page data fetching:', error);
-    errorOccurred = true;
-    errorMessage = error.message || 'An unknown error occurred';
+        setError(error.message || 'An unknown error occurred');
+        setLoading(false);
+      }
+    }
+    
+    fetchData();
+  }, []);
+  
+  // GSAP animations
+  useEffect(() => {
+    setMounted(true);
+    
+    if (theme === "dark" && !loading) {
+      // Animate cards on mount
+      gsap.fromTo(
+        ".dashboard-card",
+        { 
+          y: 30, 
+          opacity: 0 
+        },
+        { 
+          y: 0, 
+          opacity: 1, 
+          duration: 0.8, 
+          ease: "power3.out", 
+          stagger: 0.15 
+        }
+      );
+      
+      // Animate progress bars
+      gsap.fromTo(
+        ".progress-bar",
+        { width: "0%" },
+        { 
+          width: (i, target) => {
+            return target.getAttribute("data-progress") + "%";
+          }, 
+          duration: 1.5, 
+          ease: "power2.out",
+          delay: 0.5
+        }
+      );
+    }
+  }, [theme, loading]);
+  
+  // Calculate stats
+  const coursesInProgress = products.filter(p => p.product_status === 'InProgress').length;
+  const completedProducts = products.filter(p => p.product_status === 'Completed').length;
+  
+  // Get modules that are assessments and not completed
+  const upcomingAssessments = products.flatMap(product => 
+    product.modules
+      .filter(module => module.type === 'Assessment' && module.status !== 'Completed')
+      .map(module => ({
+        id: module.id,
+        title: module.name,
+        productId: product.id,
+        status: module.status,
+        progress: module.progress_percentage
+      }))
+  ).slice(0, 2); // Only show the first 2
+  
+  if (!mounted || loading) {
+    return <div className="flex items-center justify-center h-full">Loading...</div>;
   }
-
-  // Return the CoursesDashboard with either the products data or error message
-  return <CoursesDashboard products={products} error={errorOccurred ? errorMessage : undefined} />;
+  
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <h2 className="text-xl font-semibold text-destructive">Error</h2>
+        <p>{error}</p>
+        <AnimatedButton onClick={() => window.location.reload()}>
+          Try Again
+        </AnimatedButton>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col space-y-2">
+        <h1 className={cn(
+          "text-3xl font-bold tracking-tight",
+          theme === "dark" && "gradient-text"
+        )}>
+          Welcome back!
+        </h1>
+        <p className="text-muted-foreground">
+          Continue your learning journey and track your progress.
+        </p>
+      </div>
+      
+      {/* Progress Overview */}
+      <AnimatedCard className="dashboard-card">
+        <div className="flex flex-col space-y-4">
+          <h2 className="text-xl font-semibold">Your Learning Progress</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className={cn(
+              "p-4 rounded-lg flex flex-col items-center justify-center text-center space-y-2",
+              theme === "dark" ? "bg-secondary/50" : "bg-secondary"
+            )}>
+              <div className="mb-2">
+                <GaugeProgress
+                  percentComplete={Math.round(products.reduce((acc, p) => 
+                    acc + (p.product_status === 'InProgress' ? 1 : 0), 0) / (products.length || 1) * 100)}
+                  size={80}
+                  variant="info"
+                  showLabel={false}
+                />
+              </div>
+              <span className="text-sm text-muted-foreground">Products In Progress</span>
+              <span className="text-2xl font-bold">{coursesInProgress}</span>
+            </div>
+            <div className={cn(
+              "p-4 rounded-lg flex flex-col items-center justify-center text-center space-y-2",
+              theme === "dark" ? "bg-secondary/50" : "bg-secondary"
+            )}>
+              <div className="mb-2">
+                <GaugeProgress
+                  percentComplete={Math.round((completedProducts / (products.length || 1)) * 100)}
+                  size={80}
+                  variant="success"
+                  showLabel={false}
+                />
+              </div>
+              <span className="text-sm text-muted-foreground">Completed Products</span>
+              <span className="text-2xl font-bold">{completedProducts}</span>
+            </div>
+            <div className={cn(
+              "p-4 rounded-lg flex flex-col items-center justify-center text-center space-y-2",
+              theme === "dark" ? "bg-secondary/50" : "bg-secondary"
+            )}>
+              <div className="mb-2">
+                <Gauge
+                  value={Math.round(products.reduce((acc, p) => acc + p.product_progress_percentage, 0) / (products.length || 1))}
+                  size={80}
+                  primary={{
+                    0: "danger",
+                    30: "warning",
+                    60: "info",
+                    85: "success"
+                  }}
+                  strokeWidth={8}
+                />
+              </div>
+              <span className="text-sm text-muted-foreground">Average Progress</span>
+              <span className="text-2xl font-bold">
+                {Math.round(products.reduce((acc, p) => acc + p.product_progress_percentage, 0) / (products.length || 1))}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </AnimatedCard>
+      
+      {/* Products */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Your Products</h2>
+        </div>
+        {products.length === 0 ? (
+          <AnimatedCard className="dashboard-card">
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No products assigned yet.</p>
+            </div>
+          </AnimatedCard>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {products.map((product) => (
+              <AnimatedCard key={product.id} className="dashboard-card">
+                <div className="relative h-32 w-full mb-4 rounded-md overflow-hidden">
+                  <div 
+                    className="absolute inset-0 bg-cover bg-center" 
+                    style={{ backgroundImage: product.image_url ? `url(${product.image_url})` : 'linear-gradient(to right, #4f46e5, #7c3aed)' }}
+                  />
+                  <div className={cn(
+                    "absolute inset-0",
+                    theme === "dark" && "bg-gradient-to-t from-black/80 to-transparent"
+                  )}></div>
+                  <div className="absolute bottom-2 left-2 right-2">
+                    <div className="flex justify-between items-center text-sm text-white">
+                      <span>{product.modules.filter(m => m.status === 'Completed').length}/{product.modules.length} modules</span>
+                    </div>
+                    <div className="h-1 bg-white/30 rounded-full mt-1">
+                      <div 
+                        className="h-full bg-primary rounded-full progress-bar" 
+                        data-progress={product.product_progress_percentage}
+                        style={{ width: `${mounted ? product.product_progress_percentage : 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+                <h3 className="font-semibold">{product.name}</h3>
+                <p className="text-sm text-muted-foreground line-clamp-2 mt-1 mb-4">{product.description || "No description available"}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 mr-4">
+                    <Link href={`/app/product-details/${product.id}`} passHref>
+                      <AnimatedButton className="w-full" variant="secondary">
+                        {product.product_status === 'NotStarted' ? 'Start Learning' : 
+                         product.product_status === 'Completed' ? 'View Details' : 'Continue Learning'}
+                      </AnimatedButton>
+                    </Link>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <Gauge 
+                      value={product.product_progress_percentage}
+                      size={50}
+                      strokeWidth={5}
+                      primary={
+                        product.product_progress_percentage < 30 ? "danger" : 
+                        product.product_progress_percentage < 60 ? "warning" : 
+                        product.product_progress_percentage < 85 ? "info" : 
+                        "success"
+                      }
+                      showValue={false}
+                    />
+                  </div>
+                </div>
+              </AnimatedCard>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Upcoming Assessments */}
+      {upcomingAssessments.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Upcoming Assessments</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {upcomingAssessments.map((assessment) => (
+              <AnimatedCard key={assessment.id} className="dashboard-card">
+                <div className="flex justify-between">
+                  <div>
+                    <h3 className="font-semibold">{assessment.title}</h3>
+                    <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span>Status: {assessment.status}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Gauge 
+                      value={assessment.progress} 
+                      size={60}
+                      primary={assessment.progress < 30 ? "danger" : assessment.progress < 70 ? "warning" : "info"}
+                      strokeWidth={6}
+                    />
+                  </div>
+                </div>
+                <Link href={`/app/assessment/${assessment.id}/take`} passHref>
+                  <AnimatedButton className="w-full mt-4">
+                    {assessment.status === 'NotStarted' ? 'Start Assessment' : 'Continue Assessment'}
+                  </AnimatedButton>
+                </Link>
+              </AnimatedCard>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

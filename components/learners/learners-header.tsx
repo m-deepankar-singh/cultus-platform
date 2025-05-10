@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { AddLearnerDialog } from "./add-learner-dialog"
+import { BulkUploadDialog } from "./bulk-upload-dialog"
+import { ExportLearnersButton } from "./export-learners-button"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Client {
@@ -54,6 +56,8 @@ export function LearnersHeader() {
         <p className="text-muted-foreground">Manage learners and view their progress.</p>
       </div>
       <div className="flex items-center gap-2">
+        <ExportLearnersButton />
+        <BulkUploadDialog onLearnersBulkUploaded={handleLearnerAdded} />
         <AddLearnerDialog 
           clients={clients} 
           onLearnerAdded={handleLearnerAdded} 

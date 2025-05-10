@@ -18,7 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchema = z.object({
 	email: z.string().email({ message: "Invalid email address." }),
@@ -29,6 +30,7 @@ type AdminLoginFormValues = z.infer<typeof formSchema>;
 
 export function AdminLoginForm() {
 	const [isLoading, setIsLoading] = React.useState(false);
+	const [submissionError, setSubmissionError] = React.useState<string | null>(null);
 	const router = useRouter();
 	const { toast } = useToast();
 	const supabase = createClient();
@@ -43,6 +45,7 @@ export function AdminLoginForm() {
 
 	async function onSubmit(values: AdminLoginFormValues) {
 		setIsLoading(true);
+		setSubmissionError(null);
 		try {
 			const { error } = await supabase.auth.signInWithPassword({
 				email: values.email,
@@ -53,18 +56,16 @@ export function AdminLoginForm() {
 				throw error;
 			}
 
-			// Redirect to dashboard on successful login
-			router.push("/dashboard"); // Adjust if your dashboard route is different
-			// Optionally show a success toast, though redirect is often enough
-			// toast({ title: "Login Successful", description: "Redirecting..." });
+			router.push("/dashboard");
 
 		} catch (error: any) {
+			const errorMessage = error.message || "An unexpected error occurred. Please try again.";
 			console.error("Login failed:", error);
+			setSubmissionError(errorMessage);
 			toast({
 				variant: "destructive",
 				title: "Login Failed",
-				description:
-					error.message || "An unexpected error occurred. Please try again.",
+				description: errorMessage,
 			});
 		} finally {
 			setIsLoading(false);
@@ -74,6 +75,13 @@ export function AdminLoginForm() {
 	return (
 		<Form {...form}>
 			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+				{submissionError && (
+					<Alert variant="destructive">
+						<AlertCircle className="h-4 w-4" />
+						<AlertTitle>Login Error</AlertTitle>
+						<AlertDescription>{submissionError}</AlertDescription>
+					</Alert>
+				)}
 				<FormField
 					control={form.control}
 					name="email"

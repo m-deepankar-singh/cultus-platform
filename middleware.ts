@@ -193,7 +193,7 @@ export async function middleware(request: NextRequest) {
       if (role !== 'Admin') {
         console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin-only route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/dashboard';
+        redirectUrl.pathname = '/admin/login';
         return NextResponse.redirect(redirectUrl, { headers: response.headers });
       }
       console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
@@ -205,19 +205,19 @@ export async function middleware(request: NextRequest) {
       if (role !== 'Admin' && role !== 'Staff') {
         console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin/staff route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/dashboard';
+        redirectUrl.pathname = '/admin/login';
         return NextResponse.redirect(redirectUrl, { headers: response.headers });
       }
       console.log(`Middleware: User ${user.id} (Role: ${role}) granted access to ${pathname}`);
     }
     
     // Legacy admin route check
-    if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+    if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
       console.log(`Middleware: User ${user.id} accessing admin route ${pathname}. Role: ${role}`);
       if (role !== 'Admin') {
         console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/dashboard';
+        redirectUrl.pathname = '/admin/login';
         return NextResponse.redirect(redirectUrl, { headers: response.headers });
       }
       console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);

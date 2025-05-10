@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -81,64 +84,54 @@ export default function TakeAssessmentPage() {
   const router = useRouter();
   const moduleId = params.id as string;
 
-  const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(null);
   const [autoSaveInterval, setAutoSaveInterval] = useState<NodeJS.Timeout | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  // Fetch assessment details on page load
+  const {
+    data: assessmentData,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<AssessmentData | null, Error>({
+    queryKey: queryKeys.assessmentDetails(moduleId),
+    queryFn: async () => {
+      if (!moduleId) throw new Error("Module ID is missing.");
+      const result = await apiClient<AssessmentData>(`/api/app/assessments/${moduleId}/details`);
+      if (result.error) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!moduleId,
+  });
+
   useEffect(() => {
-    const fetchAssessmentDetails = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/app/assessments/${moduleId}/details`);
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch assessment details: ${response.status} ${errorText}`);
+    if (assessmentData) {
+      if (assessmentData.in_progress_attempt?.saved_answers) {
+        setAnswers(assessmentData.in_progress_attempt.saved_answers);
         }
 
-        const data: AssessmentData = await response.json();
-        setAssessmentData(data);
-
-        // Initialize answers from saved progress if available
-        if (data.in_progress_attempt?.saved_answers) {
-          setAnswers(data.in_progress_attempt.saved_answers);
-        }
-
-        // Initialize timer
-        if (data.in_progress_attempt?.remaining_time_seconds) {
-          setTimeRemaining(data.in_progress_attempt.remaining_time_seconds);
-        } else if (data.assessment.time_limit_minutes) {
-          setTimeRemaining(data.assessment.time_limit_minutes * 60); // Convert minutes to seconds
-        }
-
-      } catch (err) {
-        console.error('Error fetching assessment:', err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
-        setIsLoading(false);
+      if (assessmentData.in_progress_attempt?.remaining_time_seconds) {
+        setTimeRemaining(assessmentData.in_progress_attempt.remaining_time_seconds);
+      } else if (assessmentData.assessment.time_limit_minutes) {
+        setTimeRemaining(assessmentData.assessment.time_limit_minutes * 60);
       }
-    };
-
-    if (moduleId) {
-      fetchAssessmentDetails();
+    } else if (!isLoading && !isError) {
+      // Handle case where assessmentData is null after successful fetch (e.g. not found, or empty response)
+      // This might already be handled by the main error/loading/no-data checks below
+      // but specific logic for null data after fetch can go here if needed.
+      // For now, let's assume the main checks are sufficient.
     }
-  }, [moduleId]);
+  }, [assessmentData, isLoading, isError]);
 
-  // Set up timer and auto-save
   useEffect(() => {
-    if (!timeRemaining || !assessmentData) return;
+    if (!timeRemaining || !assessmentData || isLoading || isError) return;
 
-    // Timer countdown
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev && prev <= 1) {
@@ -150,10 +143,9 @@ export default function TakeAssessmentPage() {
       });
     }, 1000);
 
-    // Auto-save every minute
     const saveInterval = setInterval(() => {
       handleAutoSave();
-    }, 60000); // 60 seconds
+    }, 60000);
     
     setAutoSaveInterval(saveInterval);
 
@@ -161,13 +153,11 @@ export default function TakeAssessmentPage() {
       clearInterval(timer);
       clearInterval(saveInterval);
     };
-  }, [timeRemaining, assessmentData]);
+  }, [timeRemaining, assessmentData, isLoading, isError]);
 
-  // Save progress before unloading/navigating away
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       handleAutoSave();
-      // Standard way to show a confirmation dialog
       e.preventDefault();
       e.returnValue = '';
       return '';
@@ -183,14 +173,12 @@ export default function TakeAssessmentPage() {
     };
   }, [answers, moduleId]);
 
-  // Format time remaining
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Auto-save progress
   const handleAutoSave = async () => {
     if (!moduleId || !assessmentData || Object.keys(answers).length === 0) return;
 
@@ -206,12 +194,10 @@ export default function TakeAssessmentPage() {
     }
   };
 
-  // Handle time up
   const handleTimeUp = () => {
     handleSubmitAssessment();
   };
 
-  // Handle answer change for MCQ
   const handleSingleAnswerChange = (questionId: string, answerId: string) => {
     setAnswers(prev => ({
       ...prev,
@@ -219,7 +205,6 @@ export default function TakeAssessmentPage() {
     }));
   };
 
-  // Handle answer change for MSQ
   const handleMultiAnswerChange = (questionId: string, answerId: string, checked: boolean) => {
     setAnswers(prev => {
       const currentAnswers = Array.isArray(prev[questionId]) ? prev[questionId] as string[] : [];
@@ -238,7 +223,6 @@ export default function TakeAssessmentPage() {
     });
   };
 
-  // Navigate to next question
   const goToNextQuestion = () => {
     if (!assessmentData) return;
     
@@ -247,58 +231,51 @@ export default function TakeAssessmentPage() {
     }
   };
 
-  // Navigate to previous question
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
-  // Show submit confirmation dialog
   const confirmSubmit = () => {
     setIsSubmitDialogOpen(true);
   };
 
-  // Submit assessment
   const handleSubmitAssessment = async () => {
     if (!moduleId || !assessmentData) return;
     
+    setIsSubmitting(true);
+    setSubmissionError(null);
+    
     try {
-      setIsSubmitting(true);
       setIsSubmitDialogOpen(false);
       
-      // Explicitly type the result from the action
       const result: SubmitAssessmentActionResult = await submitAssessmentAction({
         moduleId,
         answers
       });
       
-      // Use a type guard to ensure we only access success properties when success is true
       if (result.success) {
         setAssessmentResult({
-          score: result.score, // Now type-safe
-          passed: result.passed, // Now type-safe
-          correctAnswers: result.correct_answers, // Now type-safe
-          totalQuestions: result.total_questions // Now type-safe
+          score: result.score,
+          passed: result.passed,
+          correctAnswers: result.correct_answers,
+          totalQuestions: result.total_questions
         });
         setIsResultDialogOpen(true);
       } else {
-        // Handle failure case: result.success is false
         console.error('Error submitting assessment:', result.error, result.errorDetails);
-        setError(result.error || 'An unknown error occurred while submitting the assessment.');
-        // Do not open the result dialog on failure
+        setSubmissionError(result.error || 'An unknown error occurred while submitting the assessment.');
       }
       
     } catch (err) {
-      // Catch any unexpected errors from the action call itself (e.g., network issues)
       console.error('Critical error submitting assessment:', err);
-      setError(err instanceof Error ? err.message : 'A critical unknown error occurred.');
+      setSubmissionError(err instanceof Error ? err.message : 'A critical unknown error occurred.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Return to dashboard after viewing results
   const handleFinish = () => {
     router.push('/app/dashboard');
   };
@@ -307,14 +284,23 @@ export default function TakeAssessmentPage() {
     return <AssessmentLoadingSkeleton />;
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="container mx-auto p-4 text-center">
-        <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold mb-4">Error Loading Assessment</h1>
-        <p className="mb-6 text-gray-600 dark:text-gray-400">{error}</p>
-        <Button onClick={() => router.push(`/app/assessment/${moduleId}`)}>
-          Return to Assessment Overview
+        <h2 className="text-xl text-red-600">Error Loading Assessment</h2>
+        <p>{error?.message || 'An unknown error occurred'}</p>
+        <Button onClick={() => router.push('/app/dashboard')} className="mt-4">Back to Dashboard</Button>
+      </div>
+    );
+  }
+
+  if (submissionError) {
+    return (
+      <div className="container mx-auto p-4 text-center">
+        <h2 className="text-xl text-red-600">Submission Error</h2>
+        <p>{submissionError}</p>
+        <Button onClick={() => { setSubmissionError(null); /* Optionally, re-enable submit button or navigate */ }} className="mt-4">
+          Try Again or Go Back
         </Button>
       </div>
     );
@@ -323,8 +309,8 @@ export default function TakeAssessmentPage() {
   if (!assessmentData) {
     return (
       <div className="container mx-auto p-4 text-center">
-        <h1 className="text-2xl font-bold mb-4">Assessment Not Found</h1>
-        <Button onClick={() => router.push('/app/dashboard')}>Back to Dashboard</Button>
+        <p>Assessment data could not be loaded or is not available.</p>
+        <Button onClick={() => router.push('/app/dashboard')} className="mt-4">Back to Dashboard</Button>
       </div>
     );
   }
@@ -467,7 +453,6 @@ export default function TakeAssessmentPage() {
         </div>
       </main>
 
-      {/* Submit Confirmation Dialog */}
       <AlertDialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -483,7 +468,6 @@ export default function TakeAssessmentPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Results Dialog */}
       <AlertDialog open={isResultDialogOpen} onOpenChange={setIsResultDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

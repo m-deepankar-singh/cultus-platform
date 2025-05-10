@@ -2,6 +2,7 @@
 
 import { createClient as createSupabaseClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { removeFileByUrl } from "@/lib/supabase/upload-helpers"
 
 // Types matching the API response
 export interface Client {
@@ -19,6 +20,7 @@ export interface CreateClientParams {
   name: string
   contact_email?: string | null
   address?: string | null
+  logo_url?: string | null
 }
 
 export interface UpdateClientParams {
@@ -26,6 +28,7 @@ export interface UpdateClientParams {
   contact_email?: string | null
   address?: string | null
   is_active?: boolean
+  logo_url?: string | null
 }
 
 /**
@@ -34,12 +37,18 @@ export interface UpdateClientParams {
 export async function createClient(data: CreateClientParams): Promise<Client> {
   const supabase = await createSupabaseClient()
   
+  console.log('Creating client with data:', {
+    ...data,
+    logo_url: data.logo_url ? 'URL exists' : 'No URL'
+  })
+  
   const { data: client, error } = await supabase
     .from("clients")
     .insert([{
       name: data.name,
       contact_email: data.contact_email || null,
       address: data.address || null,
+      logo_url: data.logo_url || null,
       is_active: true
     }])
     .select("*")
@@ -49,6 +58,12 @@ export async function createClient(data: CreateClientParams): Promise<Client> {
     console.error("Error creating client:", error)
     throw new Error(`Failed to create client: ${error.message}`)
   }
+  
+  console.log('Client created successfully:', {
+    id: client.id,
+    name: client.name,
+    logo_url: client.logo_url ? 'URL saved' : 'No URL saved'
+  })
   
   revalidatePath("/clients")
   return client
@@ -60,15 +75,50 @@ export async function createClient(data: CreateClientParams): Promise<Client> {
 export async function updateClient(id: string, data: UpdateClientParams): Promise<Client> {
   const supabase = await createSupabaseClient()
   
-  const { data: client, error } = await supabase
+  console.log('Updating client with data:', {
+    id,
+    ...data,
+    logo_url: data.logo_url ? 'URL exists' : 'No URL'
+  })
+  
+  // If we're updating the logo and there's an existing one, we should check
+  // if we need to remove the old logo first
+  if (data.logo_url !== undefined) {
+    const { data: existingClient } = await supabase
     .from("clients")
-    .update({
+      .select("logo_url")
+      .eq("id", id)
+      .single()
+    
+    console.log('Existing client logo_url:', existingClient?.logo_url || 'none')
+    
+    // If client has a logo and we're either removing it or replacing it,
+    // attempt to remove the old file from storage
+    if (existingClient?.logo_url && existingClient.logo_url !== data.logo_url) {
+      await removeFileByUrl(existingClient.logo_url).catch(err => {
+        // Log but don't block the update
+        console.warn("Failed to remove old logo file:", err)
+      })
+    }
+  }
+  
+  const updateData = {
       name: data.name,
       contact_email: data.contact_email,
       address: data.address,
+    logo_url: data.logo_url,
       is_active: data.is_active !== undefined ? data.is_active : undefined,
       updated_at: new Date().toISOString()
+  }
+  
+  console.log('Update data being sent to database:', {
+    ...updateData,
+    logo_url: updateData.logo_url ? 'URL exists' : 'No URL'
     })
+  
+  const { data: client, error } = await supabase
+    .from("clients")
+    .update(updateData)
     .eq("id", id)
     .select("*")
     .single()
@@ -77,6 +127,12 @@ export async function updateClient(id: string, data: UpdateClientParams): Promis
     console.error("Error updating client:", error)
     throw new Error(`Failed to update client: ${error.message}`)
   }
+  
+  console.log('Client updated successfully:', {
+    id: client.id,
+    name: client.name,
+    logo_url: client.logo_url ? 'URL saved' : 'No URL saved'
+  })
   
   revalidatePath("/clients")
   return client

@@ -248,7 +248,7 @@ export async function GET(
       if (savedProgressData) {
         inProgressAttempt = {
           saved_answers: savedProgressData.saved_answers || {},
-          start_time: savedProgressData.started_at,
+          start_time: savedProgressData.started_at === "null" ? null : savedProgressData.started_at,
           remaining_time_seconds: savedProgressData.remaining_time_seconds
         };
       }

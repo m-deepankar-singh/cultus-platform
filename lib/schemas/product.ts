@@ -4,11 +4,16 @@ import { z } from 'zod';
 export const ProductSchema = z.object({
   name: z.string().min(1, { message: 'Product name is required' }),
   description: z.string().optional().nullable(),
-  is_active: z.boolean().default(true).optional(),
+  image_url: z.union([
+    z.string().url({ message: "Invalid image URL format" }),
+    z.null()
+  ]).optional(),
+  // is_active: z.boolean().default(true).optional(), // Removed is_active
   // Add other relevant product fields here if needed
 });
 
 // Schema for updating an existing product (allows partial updates)
+// UpdateProductSchema will automatically inherit changes from ProductSchema
 export const UpdateProductSchema = ProductSchema.partial();
 
 // Schema for validating a product ID (UUID) from route parameters

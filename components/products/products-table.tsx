@@ -2,10 +2,11 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { BookOpen, FileText, MoreHorizontal, PlusCircle, Search, SlidersHorizontal } from "lucide-react"
+import { BookOpen, FileText, MoreHorizontal, PlusCircle, Search, SlidersHorizontal, Image as ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,13 +30,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 interface Product {
   id: string
   name: string
   description: string | null
+  image_url: string | null
   created_at: string
   updated_at: string
 }
@@ -82,21 +83,23 @@ export function ProductsTable({ products }: ProductsTableProps) {
         method: 'DELETE',
       })
 
-      if (response.ok) {
+      if (response.status === 204 || response.ok) {
         toast({
           title: "Product deleted",
           description: `Successfully deleted "${productToDelete.name}"`,
         })
         router.refresh()
       } else {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({ error: "Failed to parse error response" }))
+        console.error("Delete error data:", errorData);
         throw new Error(errorData.error || 'Failed to delete product')
       }
     } catch (error) {
+      console.error("Delete product error:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "An error occurred while deleting the product."
+        title: "Error deleting product",
+        description: error instanceof Error ? error.message : "An unknown error occurred."
       })
     } finally {
       setIsDeleting(false)
@@ -105,12 +108,16 @@ export function ProductsTable({ products }: ProductsTableProps) {
   }
 
   const formatDate = (dateString: string) => {
+    try {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     }).format(date)
+    } catch (e) {
+      return "Invalid date";
+    }
   }
 
   return (
@@ -128,28 +135,19 @@ export function ProductsTable({ products }: ProductsTableProps) {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
             <Button onClick={handleCreateProduct}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Product
             </Button>
           </div>
         </div>
-
-        {showFilters && (
-          <div className="mt-4 flex flex-col gap-4 rounded-md border p-4 sm:flex-row">
-            {/* Add filters if needed */}
-          </div>
-        )}
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[80px]">Image</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Created</TableHead>
@@ -160,7 +158,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
           <TableBody>
             {filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -168,10 +166,22 @@ export function ProductsTable({ products }: ProductsTableProps) {
               filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted overflow-hidden">
+                      {product.image_url ? (
+                        <Image 
+                          src={product.image_url}
+                          alt={product.name || "Product image"}
+                          width={40} 
+                          height={40} 
+                          className="object-contain"
+                        />
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted">
-                        <BookOpen className="h-5 w-5 text-muted-foreground" />
-                      </div>
                       <Link href={`/products/${product.id}`} className="font-medium hover:underline">
                         {product.name}
                       </Link>
@@ -192,7 +202,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem asChild>
                           <Link href={`/products/${product.id}`} className="flex w-full">
                             View details
                           </Link>
@@ -202,7 +212,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          className="text-red-600"
+                          className="text-red-600 hover:!text-red-600 focus:!text-red-600"
                           onClick={() => handleDeleteClick(product)}
                         >
                           Delete product
@@ -220,7 +230,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
       <ProductForm
         open={showProductForm}
         onOpenChange={setShowProductForm}
-        product={selectedProduct}
+        product={selectedProduct as any}
       />
 
       <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
@@ -237,7 +247,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
             <AlertDialogAction 
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>

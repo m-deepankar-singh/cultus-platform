@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button'; // Assuming you have a Button component
 
 // Define interfaces for the assessment data based on GET /api/app/assessments/[moduleId]/details response
@@ -64,57 +67,31 @@ export default function AssessmentPlayerPage() {
   const router = useRouter();
   const moduleId = params.id as string;
 
-  const [assessmentPageData, setAssessmentPageData] = useState<AssessmentPageData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Add state for eligibility messages if needed
-  // const [eligibilityMessage, setEligibilityMessage] = useState<string | null>(null);
-
-
-  useEffect(() => {
+  const { 
+    data: assessmentPageData, 
+    isLoading, 
+    isError, 
+    error 
+  } = useQuery<AssessmentPageData | null, Error>({
+    queryKey: queryKeys.assessmentDetails(moduleId),
+    queryFn: async () => {
     if (!moduleId) {
-      setIsLoading(false);
-      setError("Module ID is missing.");
-      return;
-    }
-
-    const fetchAssessmentDetails = async () => {
-      setIsLoading(true);
-      setError(null);
-      // setEligibilityMessage(null);
-      try {
-        const response = await fetch(`/api/app/assessments/${moduleId}/details`);
-        if (!response.ok) {
-          // Handle specific error codes for eligibility if API provides them
-          // e.g., if (response.status === 403) { setEligibilityMessage(...); throw new Error(...)}
-          const errorData = await response.text();
-          throw new Error(`Failed to fetch assessment details: ${response.status} ${response.statusText}. ${errorData}`);
-        }
-        const data: AssessmentPageData = await response.json();
-        setAssessmentPageData(data);
-
-        // Example: Check for eligibility based on API response
-        // if (data.eligibility && !data.eligibility.can_take_assessment) {
-        //   setEligibilityMessage(data.eligibility.message || "You are not eligible to take this assessment at this time.");
-        //   // Potentially prevent further interaction by not setting assessmentPageData or setting a flag
-        // }
-
-      } catch (err) {
-        console.error("Error fetching assessment details:", err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching assessment data.');
-      } finally {
-        setIsLoading(false);
+        throw new Error("Module ID is missing.");
       }
-    };
-
-    fetchAssessmentDetails();
-  }, [moduleId]);
+      const result = await apiClient<AssessmentPageData>(`/api/app/assessments/${moduleId}/details`);
+      if (result.error) {
+        throw new Error(result.error);
+        }
+      return result.data; 
+    },
+    enabled: !!moduleId,
+  });
 
   const handleStartResumeAssessment = async () => {
     if (!assessmentPageData) return; // Guard clause
 
     try {
-      setIsLoading(true);
+      // setIsLoading(true); // Removed, as this was for the page data loading state
       
       // If there is an in-progress attempt, we'll resume it, otherwise start a new one
       const isResume = !!assessmentPageData.in_progress_attempt;
@@ -130,8 +107,9 @@ export default function AssessmentPlayerPage() {
       }
     } catch (err) {
       console.error("Error starting assessment:", err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred while starting the assessment.');
-      setIsLoading(false);
+      // setError(err instanceof Error ? err.message : 'An unknown error occurred while starting the assessment.'); // Removed
+      // If this handler needs to show an error, it should use its own state or a toast notification.
+      // setIsLoading(false); // Removed
     }
   };
 
@@ -140,25 +118,15 @@ export default function AssessmentPlayerPage() {
     return <AssessmentPageSkeleton />;
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="text-red-600 dark:text-red-100 text-xl mb-4">Error</div>
-        <p className="text-center mb-4 dark:text-gray-300">{error}</p>
+        <p className="text-center mb-4 dark:text-gray-300">{error?.message || 'An unknown error occurred'}</p>
         <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     );
   }
-  
-  // if (eligibilityMessage && !assessmentPageData) { // Or some other condition to show only eligibility message
-  //   return (
-  //     <div className="container mx-auto p-6 text-center">
-  //       <h1 className="text-2xl font-semibold mb-4">Assessment Access</h1>
-  //       <p className="text-lg text-orange-600 dark:text-orange-400">{eligibilityMessage}</p>
-  //       <Button onClick={() => router.push('/app/dashboard')} className="mt-6">Back to Dashboard</Button>
-  //     </div>
-  //   );
-  // }
 
   if (!assessmentPageData) {
     return <div className="container mx-auto p-6 text-center">No assessment data found for this module.</div>;

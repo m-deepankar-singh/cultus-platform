@@ -275,6 +275,9 @@ export function CoursesDashboard({ products: realProducts, error }: CoursesDashb
     const overallStatus = product.product_status || getProductStatus(product);
     const overallProgress = product.product_progress_percentage || getProductProgressPercentage(product);
     const isExpanded = !!expandedCards[product.id];
+    
+    // Debug log for image URLs
+    console.log(`Rendering product card: ${product.name}, image_url:`, product.image_url);
 
     return (
       <div key={product.id} className="product-card-item opacity-0">

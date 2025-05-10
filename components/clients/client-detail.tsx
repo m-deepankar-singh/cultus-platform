@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ClientForm } from "@/components/clients/client-form"
 import { Client } from "@/app/actions/clientActions"
+import Image from "next/image"
 
 interface ClientDetailProps {
   client: Client
@@ -41,9 +42,19 @@ export function ClientDetail({ client }: ClientDetailProps) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center">
-            <div className="mr-4 flex h-12 w-12 items-center justify-center rounded-md border bg-muted">
-              <Building2 className="h-6 w-6 text-muted-foreground" />
+          <div className="flex items-start">
+            <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-md border bg-muted overflow-hidden">
+              {client.logo_url ? (
+                <Image 
+                  src={client.logo_url}
+                  alt={`${client.name} logo`}
+                  width={64}
+                  height={64}
+                  className="object-contain w-full h-full"
+                />
+              ) : (
+                <Building2 className="h-6 w-6 text-muted-foreground" />
+              )}
             </div>
             <div>
               <p className="text-sm font-medium">Name</p>

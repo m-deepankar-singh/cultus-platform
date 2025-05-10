@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 import { createClient, updateClient } from "@/app/actions/clientActions"
+import { FileUpload } from "@/components/ui/file-upload"
+import { uploadClientLogo } from "@/lib/supabase/upload-helpers"
 
 // Form schema for client creation/editing
 const formSchema = z.object({
@@ -33,6 +35,7 @@ const formSchema = z.object({
   }),
   contact_email: z.string().email({ message: "Invalid email address" }).optional().nullable(),
   address: z.string().optional().nullable(),
+  logo_url: z.string().optional().nullable(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -45,6 +48,7 @@ interface ClientFormProps {
     name: string
     contact_email: string | null
     address: string | null
+    logo_url: string | null
     is_active: boolean
   }
   onSuccess?: () => void
@@ -61,12 +65,34 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
       name: client?.name || "",
       contact_email: client?.contact_email || "",
       address: client?.address || "",
+      logo_url: client?.logo_url || "",
     },
   })
+
+  // Effect to reset form when client prop changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: client?.name || "",
+        contact_email: client?.contact_email || "",
+        address: client?.address || "",
+        logo_url: client?.logo_url || null, // Ensure logo_url is null if no logo
+      })
+    } else {
+      // Optional: Reset form when dialog closes to clear state
+      form.reset({
+        name: "",
+        contact_email: "",
+        address: "",
+        logo_url: null,
+      })
+    }
+  }, [client, open, form])
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     try {
+      console.log('Submitting form with data:', data)
       if (isEditing && client) {
         // Update existing client
         await updateClient(client.id, data)
@@ -82,7 +108,7 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
           description: `${data.name} has been created successfully.`,
         })
       }
-      form.reset()
+      form.reset() // Reset after successful submission
       setOpen(false)
       if (onSuccess) onSuccess()
     } catch (error) {
@@ -97,8 +123,41 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
     }
   }
 
+  // Handle logo upload
+  const handleLogoUpload = async (file: File): Promise<string> => {
+    try {
+      // For existing clients, use their ID as the folder path
+      const url = await uploadClientLogo(file, client?.id)
+      console.log('Logo uploaded successfully, URL:', url)
+      
+      // Update the form with the new logo URL
+      form.setValue("logo_url", url, { shouldValidate: true, shouldDirty: true })
+      return url
+    } catch (error) {
+      console.error("Logo upload error:", error)
+      throw error
+    }
+  }
+
+  // Handle logo removal
+  const handleLogoRemove = () => {
+    console.log('Logo removed from form')
+    form.setValue("logo_url", null, { shouldValidate: true, shouldDirty: true })
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen)
+      if (!isOpen) {
+        // Reset form explicitly when dialog is closed via 'x' or overlay click
+        form.reset({
+          name: "",
+          contact_email: "",
+          address: "",
+          logo_url: null,
+        })
+      }
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Client" : "Add New Client"}</DialogTitle>
@@ -158,11 +217,41 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
                 </FormItem>
               )}
             />
+            
+            <FormField
+              control={form.control}
+              name="logo_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Logo</FormLabel>
+                  <FormControl>
+                    <FileUpload
+                      currentImageUrl={field.value}
+                      onFileUpload={handleLogoUpload}
+                      onRemove={handleLogoRemove}
+                      accept="image/*"
+                      maxSizeMB={1}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <DialogFooter>
               <Button 
                 type="button" 
                 variant="outline" 
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false)
+                  // Reset form when cancel button is clicked
+                  form.reset({
+                    name: "",
+                    contact_email: "",
+                    address: "",
+                    logo_url: null,
+                  })
+                }}
                 disabled={isSubmitting}
               >
                 Cancel

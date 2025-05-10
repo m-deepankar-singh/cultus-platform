@@ -38,25 +38,17 @@ export async function GET(request: Request) {
     // 2. Parse Query Parameters
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get('search');
-    const isActiveFilter = searchParams.get('isActive'); // Expects 'true' or 'false'
 
     // 3. Build Supabase Query
     let query = supabase
       .from('products')
-      .select('*'); // Select all columns, adjust if specific columns are needed
+      .select('*');
 
     // Apply filters
     if (searchQuery) {
-      // Using ilike for case-insensitive search on the name field
       query = query.ilike('name', `%${searchQuery}%`);
     }
-    if (isActiveFilter !== null) {
-      // Ensure the filter value is a boolean interpretation
-      const isActive = isActiveFilter.toLowerCase() === 'true';
-      query = query.eq('is_active', isActive);
-    }
 
-    // Add ordering (e.g., by name)
     query = query.order('name', { ascending: true });
 
     // 4. Execute Query & Handle Response
@@ -122,6 +114,11 @@ export async function POST(request: Request) {
 
     const productData = validationResult.data;
 
+    console.log('Attempting to create product with data:', {
+      ...productData,
+      image_url: productData.image_url || 'No image_url provided'
+    });
+
     // 3. Insert Product into Database
     const { data: newProduct, error: dbError } = await supabase
       .from('products')
@@ -140,6 +137,12 @@ export async function POST(request: Request) {
         console.error('Product creation failed silently after insert.');
         return NextResponse.json({ error: 'Failed to create product' }, { status: 500 });
     }
+
+    console.log('Product created successfully:', {
+      id: newProduct.id,
+      name: newProduct.name,
+      image_url: newProduct.image_url || 'No image_url saved'
+    });
 
     return NextResponse.json(newProduct, { status: 201 }); // 201 Created status
 

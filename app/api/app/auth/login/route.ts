@@ -24,58 +24,14 @@ export async function POST(request: Request) {
     }
 
     // Get validated data
-    const { email, password } = validationResult.data;
+    const { email: rawEmail, password } = validationResult.data;
+    const email = rawEmail.trim(); // Explicitly trim the email
     
     console.log(`Student login attempt for email: ${email}`);
+    console.log(`Supabase URL being used: ${process.env.NEXT_PUBLIC_SUPABASE_URL}`);
 
-    // First check if this email exists in the students table
-    console.log(`Checking student record for email: ${email}`);
-    
-    // Create a service client to bypass RLS policies for checking if the student exists
-    const serviceClient = await createServiceClient();
-    
-    // Use the service client to check for student existence - this bypasses RLS
-    const { data: allMatchingStudents, error: listError } = await serviceClient
-      .from('students')
-      .select('id, email, client_id, is_active')
-      .ilike('email', email);
-    
-    if (listError) {
-      console.error('Error listing students by email:', listError);
-      return NextResponse.json(
-        { error: 'Error verifying student email' },
-        { status: 500 }
-      );
-    }
-    
-    console.log(`Found ${allMatchingStudents?.length || 0} students matching email: ${email}`);
-    
-    // If no student records found with this email
-    if (!allMatchingStudents || allMatchingStudents.length === 0) {
-      console.warn(`No student record found for email: ${email}`);
-      return NextResponse.json(
-        { error: 'Invalid credentials or user is not a student' },
-        { status: 401 }
-      );
-    }
-    
-    // Find exact match first (case insensitive)
-    const studentByEmail = allMatchingStudents.find(
-      student => student.email.toLowerCase() === email.toLowerCase()
-    ) || allMatchingStudents[0]; // Fallback to first match if no exact match
-    
-    console.log('Selected student record:', studentByEmail?.id, studentByEmail?.email);
-    
-    // Check if student is active
-    if (!studentByEmail.is_active) {
-      console.warn(`Inactive student login attempt: ${email}`);
-      return NextResponse.json(
-        { error: 'Your account is inactive. Please contact your administrator.' },
-        { status: 403 }
-      );
-    }
-
-    // Now attempt Supabase authentication
+    // FIRST: Attempt to sign in with Supabase Auth directly
+    // This is a more reliable way to check credentials first
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
       email, 
       password 
@@ -99,15 +55,48 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get user ID
+    // Get user ID from successful auth
     const userId = authData.user.id;
+    console.log(`Auth succeeded for user ID: ${userId}`);
     
-    // Additional verification to ensure the authenticated user ID matches the student ID
-    if (userId !== studentByEmail.id) {
-      console.error(`User ID mismatch: Auth ID ${userId} != Student ID ${studentByEmail.id}`);
+    // SECOND: Now check if this user ID exists in the students table
+    // This bypasses any email case-sensitivity issues by using the UUID directly
+    const serviceClient = await createServiceClient();
+    const { data: student, error: studentError } = await serviceClient
+      .from('students')
+      .select('id, email, client_id, is_active, full_name')
+      .eq('id', userId)
+      .single();
+    
+    if (studentError) {
+      console.error('Error finding student by ID:', studentError);
+      // Sign out since auth succeeded but student lookup failed
       await supabase.auth.signOut();
       return NextResponse.json(
-        { error: 'User verification failed' },
+        { error: 'Error verifying student record' },
+        { status: 500 }
+      );
+    }
+    
+    if (!student) {
+      console.warn(`No student record found for authenticated user ID: ${userId}`);
+      // Sign out since auth succeeded but no student record exists
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: 'User authenticated but no student record found. Please contact your administrator.' },
+        { status: 403 }
+      );
+    }
+    
+    console.log(`Found student record:`, student);
+    
+    // Check if student is active
+    if (!student.is_active) {
+      console.warn(`Inactive student login attempt: ${email} (${userId})`);
+      // Sign out since student is inactive
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: 'Your account is inactive. Please contact your administrator.' },
         { status: 403 }
       );
     }
@@ -131,8 +120,9 @@ export async function POST(request: Request) {
         message: 'Login successful',
         user: {
           id: userId,
-          email: email,
-          client_id: studentByEmail.client_id
+          email: student.email,
+          client_id: student.client_id,
+          full_name: student.full_name
         },
         accessToken: authData.session?.access_token 
       }, 

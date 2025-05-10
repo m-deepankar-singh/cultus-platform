@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Adjust path if needed
-import { ProductIdSchema, UpdateProductSchema } from '@/lib/schemas/product'; // Import schemas
+import { createClient } from '@/lib/supabase/server'; // Keep this for the instance
+import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
+import { ProductIdSchema, UpdateProductSchema } from '@/lib/schemas/product';
+import { removeFileByUrl } from '@/lib/supabase/upload-helpers';
+import { z } from 'zod'; // Added z import
 
 // Handler for fetching details of a specific product
 export async function GET(
@@ -8,7 +11,7 @@ export async function GET(
   { params }: { params: { productId: string } }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClient(); // supabase is SupabaseClient here
     const paramsObj = await params;
 
     // 1. Authentication & Authorization
@@ -75,13 +78,75 @@ export async function GET(
   }
 }
 
+// Shared function to handle product update logic (for PUT and PATCH)
+async function handleProductUpdate(
+  productId: string,
+  updateData: Partial<z.infer<typeof UpdateProductSchema>>,
+  supabase: SupabaseClient // Changed type to SupabaseClient directly
+) {
+  // If image_url is being updated (either to a new URL or to null)
+  if (updateData.image_url !== undefined) {
+    const { data: existingProduct, error: fetchError } = await supabase // supabase is already awaited
+      .from('products')
+      .select('image_url')
+      .eq('id', productId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error fetching existing product for image removal:', fetchError);
+      // Decide if this should be a fatal error for the update
+    }
+
+    // If existing product had an image_url and it's different from the new one (or new one is null)
+    if (existingProduct?.image_url && existingProduct.image_url !== updateData.image_url) {
+      console.log(`Attempting to remove old product image: ${existingProduct.image_url}`);
+      await removeFileByUrl(existingProduct.image_url).catch(err => {
+        console.warn("Failed to remove old product image file:", err);
+      });
+    }
+  }
+  console.log('Updating product in DB with data:', {
+    ...updateData,
+    image_url: updateData.image_url === null 
+      ? 'null (removing image)' 
+      : typeof updateData.image_url === 'string' 
+        ? `URL: ${updateData.image_url.substring(0, 30)}...` 
+        : 'No change/not provided'
+  });
+
+  const { data: updatedProduct, error: dbError } = await supabase // supabase is already awaited
+    .from('products')
+    .update(updateData) // image_url will be part of updateData if provided
+    .eq('id', productId)
+    .select()
+    .single();
+
+  if (dbError) {
+    throw dbError; // Let the calling handler format the response
+  }
+  if (!updatedProduct) {
+    // This implies the product was not found or RLS prevented update
+    const notFoundError = new Error(`Product with ID ${productId} not found or update failed`);
+    (notFoundError as any).status = 404;
+    throw notFoundError;
+  }
+  console.log('Product updated successfully in DB:', {
+    id: updatedProduct.id,
+    name: updatedProduct.name,
+    image_url: updatedProduct.image_url
+      ? `URL: ${updatedProduct.image_url.substring(0, 30)}...`
+      : 'No image URL saved'
+  });
+  return updatedProduct;
+}
+
 // Handler for updating an existing product
 export async function PUT(
   request: Request, 
   { params }: { params: { productId: string } }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClient(); // supabase is SupabaseClient here
     const paramsObj = await params;
 
     // 1. Authentication & Authorization
@@ -136,32 +201,14 @@ export async function PUT(
       return NextResponse.json({ error: 'No update data provided' }, { status: 400 });
     }
 
-    // 4. Update Product in Database
-    const { data: updatedProduct, error: dbError } = await supabase
-      .from('products')
-      .update(updateData)
-      .eq('id', productId)
-      .select() // Select the updated record
-      .single();
-
-    // 5. Handle Response & Errors
-    if (dbError) {
-      console.error(`Database error updating product ${productId}:`, dbError);
-      // Could add specific checks for codes like foreign key violations if necessary
-      return NextResponse.json({ error: 'Failed to update product', details: dbError.message }, { status: 500 });
-    }
-
-    // .single() returns null if the record doesn't exist (or RLS prevents access)
-    // We check this *after* dbError to ensure it wasn't a different error
-    if (!updatedProduct) {
-      return NextResponse.json({ error: `Product with ID ${productId} not found or update failed` }, { status: 404 });
-    }
-
+    const updatedProduct = await handleProductUpdate(productId, updateData, supabase);
     return NextResponse.json(updatedProduct, { status: 200 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Unexpected error in PUT /api/admin/products/[productId]:`, error);
-    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    const status = error.status || 500;
+    const message = error.message || 'An unexpected error occurred';
+    return NextResponse.json({ error: message, details: error.details || null }, { status });
   }
 }
 
@@ -171,7 +218,7 @@ export async function PATCH(
   { params }: { params: { productId: string } }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClient(); // supabase is SupabaseClient here
     const paramsObj = await params;
 
     // 1. Authentication & Authorization
@@ -227,29 +274,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'No update data provided' }, { status: 400 });
     }
 
-    // 4. Update Product in Database (same as PUT but semantically for partial updates)
-    const { data: updatedProduct, error: dbError } = await supabase
-      .from('products')
-      .update(updateData)
-      .eq('id', productId)
-      .select() // Select the updated record
-      .single();
-
-    // 5. Handle Response & Errors
-    if (dbError) {
-      console.error(`Database error updating product ${productId}:`, dbError);
-      return NextResponse.json({ error: 'Failed to update product', details: dbError.message }, { status: 500 });
-    }
-
-    if (!updatedProduct) {
-      return NextResponse.json({ error: `Product with ID ${productId} not found or update failed` }, { status: 404 });
-    }
-
+    const updatedProduct = await handleProductUpdate(productId, updateData, supabase);
     return NextResponse.json(updatedProduct, { status: 200 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Unexpected error in PATCH /api/admin/products/[productId]:`, error);
-    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    const status = error.status || 500;
+    const message = error.message || 'An unexpected error occurred';
+    return NextResponse.json({ error: message, details: error.details || null }, { status });
   }
 }
 
@@ -293,6 +325,19 @@ export async function DELETE(
     }
     const { productId } = paramValidation.data;
 
+    // Before deleting the product, fetch its image_url to remove it from storage
+    const { data: existingProduct, error: fetchError } = await supabase
+      .from('products')
+      .select('image_url')
+      .eq('id', productId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error fetching product for image removal before delete:', fetchError);
+      // Potentially return an error if fetching fails, as we might not be able to clean up the image
+      return NextResponse.json({ error: 'Failed to prepare product for deletion', details: fetchError.message }, { status: 500 });
+    }
+
     // 3. Perform Deletion
     // Note: Dependencies (modules, client_product_assignments, etc.) should ideally be handled
     // by database constraints (e.g., ON DELETE CASCADE or SET NULL). 
@@ -313,6 +358,15 @@ export async function DELETE(
       }
       // Other database errors
       return NextResponse.json({ error: 'Failed to delete product', details: dbError.message }, { status: 500 });
+    }
+
+    // If deletion was successful and an image_url existed, remove it from storage
+    if (existingProduct?.image_url) {
+      console.log(`Attempting to remove product image after deletion: ${existingProduct.image_url}`);
+      await removeFileByUrl(existingProduct.image_url).catch(err => {
+        console.warn("Failed to remove product image file after deletion:", err);
+        // Non-fatal, product is already deleted from DB.
+      });
     }
 
     // If dbError is null, the delete was successful (or the row didn't exist, 

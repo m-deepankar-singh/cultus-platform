@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata = {
   title: "Upskilling Platform",
   description: "Platform for upskilling learners",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} bg-background`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <QueryProvider>
           <SidebarProvider>
             {children}
@@ -34,6 +34,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-import './globals.css'
