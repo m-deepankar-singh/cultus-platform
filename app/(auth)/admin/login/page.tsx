@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 
 export default function AdminLoginPage() {
+	// Log the Supabase URL to verify environment variables are loading correctly
+	console.log("Supabase URL check:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Available" : "❌ Missing");
+	
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-12">
 			<Card className="w-full max-w-md">

@@ -2,8 +2,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export function createClient(request: NextRequest) {
-  // Create an initial response object to be potentially modified
-  let response = NextResponse.next({
+  // Create an initial supabaseResponse object
+  let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -17,26 +17,24 @@ export function createClient(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          // Apply cookies to the request object first (name and value only)
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           
-          // Create the response *after* modifying the request cookies
-          // Pass the modified request object to NextResponse.next()
-          response = NextResponse.next({
+          // Create a new response after cookies are set on the request
+          supabaseResponse = NextResponse.next({
             request: {
-              headers: request.headers, // Maintain original headers
+              headers: request.headers,
             },
           });
-
-          // Apply cookies to the response object created from the *modified* request
+          
+          // Now set the cookies on the response object
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+            supabaseResponse.cookies.set(name, value, options);
           });
         },
       },
     }
   );
 
-  return { supabase, response };
+  return { supabase, response: supabaseResponse };
 } 

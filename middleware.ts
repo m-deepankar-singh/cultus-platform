@@ -96,7 +96,7 @@ function pathMatchesPattern(pathname: string, pattern: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  let { supabase, response } = createClient(request);
+  let { supabase, response: supabaseResponse } = createClient(request);
   const { pathname } = request.nextUrl;
 
   // --- 1. Handle Logout --- 
@@ -120,8 +120,14 @@ export async function middleware(request: NextRequest) {
     
     redirectUrl.search = ''; // Clear any query params
     // Ensure response cookies reflect the signOut operation
-    response = NextResponse.redirect(redirectUrl, { headers: response.headers });
-    return response;
+    let redirectResponse = NextResponse.redirect(redirectUrl);
+    
+    // Copy all cookies from supabaseResponse to redirectResponse
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    
+    return redirectResponse;
   }
 
   // --- 2. Refresh Session (Essential) ---
@@ -144,7 +150,7 @@ export async function middleware(request: NextRequest) {
   // Allow access to public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
     console.log(`Middleware: Allowing public access to ${pathname}`);
-    return response; // Allow request to proceed
+    return supabaseResponse; // Allow request to proceed
   }
 
   // Redirect unauthenticated users trying to access protected routes
@@ -164,7 +170,14 @@ export async function middleware(request: NextRequest) {
     }
     
     redirectUrl.search = `redirectedFrom=${encodeURIComponent(pathname)}`; // Optional: pass redirect info
-    return NextResponse.redirect(redirectUrl, { headers: response.headers });
+    let redirectResponse = NextResponse.redirect(redirectUrl);
+    
+    // Copy all cookies from supabaseResponse to redirectResponse
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    
+    return redirectResponse;
   }
 
   // User is authenticated, check roles for specific routes
@@ -177,11 +190,18 @@ export async function middleware(request: NextRequest) {
         const redirectUrl = request.nextUrl.clone();
         // Redirect non-students away from student app
         redirectUrl.pathname = '/admin/login';
-        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+        let redirectResponse = NextResponse.redirect(redirectUrl);
+        
+        // Copy all cookies from supabaseResponse to redirectResponse
+        supabaseResponse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, cookie.value);
+        });
+        
+        return redirectResponse;
       }
       console.log(`Middleware: Student ${user.id} granted access to ${pathname}`);
       // Allow access to student routes for student users
-      return response;
+      return supabaseResponse;
     }
     
     // For admin/staff routes, check profiles table
@@ -194,7 +214,14 @@ export async function middleware(request: NextRequest) {
         console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin-only route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/admin/login';
-        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+        let redirectResponse = NextResponse.redirect(redirectUrl);
+        
+        // Copy all cookies from supabaseResponse to redirectResponse
+        supabaseResponse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, cookie.value);
+        });
+        
+        return redirectResponse;
       }
       console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
     }
@@ -206,7 +233,14 @@ export async function middleware(request: NextRequest) {
         console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin/staff route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/admin/login';
-        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+        let redirectResponse = NextResponse.redirect(redirectUrl);
+        
+        // Copy all cookies from supabaseResponse to redirectResponse
+        supabaseResponse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, cookie.value);
+        });
+        
+        return redirectResponse;
       }
       console.log(`Middleware: User ${user.id} (Role: ${role}) granted access to ${pathname}`);
     }
@@ -218,7 +252,14 @@ export async function middleware(request: NextRequest) {
         console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/admin/login';
-        return NextResponse.redirect(redirectUrl, { headers: response.headers });
+        let redirectResponse = NextResponse.redirect(redirectUrl);
+        
+        // Copy all cookies from supabaseResponse to redirectResponse
+        supabaseResponse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, cookie.value);
+        });
+        
+        return redirectResponse;
       }
       console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
     }
@@ -226,19 +267,8 @@ export async function middleware(request: NextRequest) {
 
   // --- 5. Return Response --- 
   // If no redirect happened, return the response potentially modified by ssr
-  // As a safeguard, ensure the response cookies reflect any final changes made
-  // to the request cookies during the middleware execution.
-  // Note: This might be redundant if the closure modification of `response` works as expected.
-  const latestRequestCookies = request.cookies.getAll();
-  latestRequestCookies.forEach(cookie => {
-    // We only have name/value from request cookies, need to set them on response
-    // This won't include options like HttpOnly, Path, etc., which `setAll` should have handled.
-    // This is truly just a fallback/debugging step.
-    response.cookies.set(cookie.name, cookie.value);
-  });
-
   console.log(`Middleware: Allowing authenticated user ${user?.id || 'N/A'} access to ${pathname}`);
-  return response;
+  return supabaseResponse;
 }
 
 export const config = {
