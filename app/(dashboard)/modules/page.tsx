@@ -22,33 +22,6 @@ export default async function ModulesPage() {
   
   const isAdmin = userProfile?.role === 'Admin'
   
-  // Fetch all modules
-  const { data: modules, error } = await supabase
-    .from("modules")
-    .select(`
-      id,
-      name,
-      type,
-      created_at,
-      updated_at,
-      sequence,
-      product_id,
-      configuration,
-      products (
-        id,
-        name
-      )
-    `)
-    .order('created_at', { ascending: false })
-  
-  if (error) {
-    console.error("Error fetching modules:", error)
-  }
-  
-  // Separate modules by type
-  const courseModules = modules?.filter(module => module.type === 'Course') || []
-  const assessmentModules = modules?.filter(module => module.type === 'Assessment') || []
-  
   return (
     <div className="container py-10 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -74,10 +47,10 @@ export default async function ModulesPage() {
         <TabsContent value="all">
           <Card>
             <CardHeader>
-              <CardTitle>All Modules ({modules?.length || 0})</CardTitle>
+              <CardTitle>All Modules</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModulesTable modules={modules || []} isAdmin={isAdmin} />
+              <ModulesTable initialModules={[]} isAdmin={isAdmin} initialType="all" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -85,10 +58,10 @@ export default async function ModulesPage() {
         <TabsContent value="course">
           <Card>
             <CardHeader>
-              <CardTitle>Course Modules ({courseModules.length})</CardTitle>
+              <CardTitle>Course Modules</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModulesTable modules={courseModules} isAdmin={isAdmin} />
+              <ModulesTable initialModules={[]} isAdmin={isAdmin} initialType="Course" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -96,10 +69,10 @@ export default async function ModulesPage() {
         <TabsContent value="assessment">
           <Card>
             <CardHeader>
-              <CardTitle>Assessment Modules ({assessmentModules.length})</CardTitle>
+              <CardTitle>Assessment Modules</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModulesTable modules={assessmentModules} isAdmin={isAdmin} />
+              <ModulesTable initialModules={[]} isAdmin={isAdmin} initialType="Assessment" />
             </CardContent>
           </Card>
         </TabsContent>

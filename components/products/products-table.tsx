@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { BookOpen, FileText, MoreHorizontal, PlusCircle, Search, SlidersHorizontal, Image as ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { ProductForm } from "@/components/products/product-form"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
+import { DataPagination } from "@/components/ui/data-pagination"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,24 +42,96 @@ interface Product {
   updated_at: string
 }
 
-interface ProductsTableProps {
-  products: Product[]
+interface PaginatedResponse {
+  data: Product[];
+  metadata: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
 }
 
-export function ProductsTable({ products }: ProductsTableProps) {
+interface ProductsTableProps {
+  products: Product[] // Initial products, will be replaced by API call
+}
+
+// Constants
+const ITEMS_PER_PAGE = 10;
+
+export function ProductsTable({ products: initialProducts }: ProductsTableProps) {
+  // State
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [showProductForm, setShowProductForm] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [products, setProducts] = useState<Product[]>(initialProducts)
+  const [loading, setLoading] = useState(false)
+  
   const { toast } = useToast()
   const router = useRouter()
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
-  })
+  // Fetch products
+  const fetchProducts = async () => {
+    setLoading(true)
+    try {
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: ITEMS_PER_PAGE.toString(),
+      })
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm)
+      }
+      
+      // Fetch data from API
+      const response = await fetch(`/api/admin/products?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching products: ${response.status}`)
+      }
+      
+      const result: PaginatedResponse = await response.json()
+      
+      // Update state with paginated data
+      setProducts(result.data)
+      setTotalCount(result.metadata.totalCount)
+      setTotalPages(result.metadata.totalPages)
+    } catch (error) {
+      console.error("Failed to fetch products:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load products. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Fetch products when page or search term changes
+  useEffect(() => {
+    fetchProducts()
+  }, [currentPage, debouncedSearchTerm])
+  
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1) // Reset to first page when search changes
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   const handleCreateProduct = () => {
     setSelectedProduct(undefined)
@@ -88,7 +161,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
           title: "Product deleted",
           description: `Successfully deleted "${productToDelete.name}"`,
         })
-        router.refresh()
+        fetchProducts() // Refresh data after deletion
       } else {
         const errorData = await response.json().catch(() => ({ error: "Failed to parse error response" }))
         console.error("Delete error data:", errorData);
@@ -105,6 +178,11 @@ export function ProductsTable({ products }: ProductsTableProps) {
       setIsDeleting(false)
       setProductToDelete(null)
     }
+  }
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
   const formatDate = (dateString: string) => {
@@ -156,14 +234,20 @@ export function ProductsTable({ products }: ProductsTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  Loading products...
+                </TableCell>
+              </TableRow>
+            ) : products.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
                   No products found.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredProducts.map((product) => (
+              products.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
                     <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted overflow-hidden">
@@ -227,9 +311,28 @@ export function ProductsTable({ products }: ProductsTableProps) {
         </Table>
       </div>
 
+      {/* Pagination */}
+      {!loading && totalPages > 0 && (
+        <div className="p-4">
+          <DataPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+
       <ProductForm
         open={showProductForm}
-        onOpenChange={setShowProductForm}
+        onOpenChange={(isOpen) => {
+          setShowProductForm(isOpen);
+          if (!isOpen) {
+            // Refresh products after form closes
+            fetchProducts();
+          }
+        }}
         product={selectedProduct as any}
       />
 

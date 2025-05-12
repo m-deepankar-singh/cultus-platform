@@ -27,6 +27,16 @@ interface Product {
   description: string | null
 }
 
+interface PaginatedResponse {
+  data: Product[];
+  metadata: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
+}
+
 interface AssignProductModalProps {
   open: boolean
   setOpen: (open: boolean) => void
@@ -60,10 +70,16 @@ export function AssignProductModal({
         throw new Error(`Error: ${response.status}`)
       }
       
-      const data = await response.json()
+      const result: PaginatedResponse = await response.json()
+      
+      // Make sure result.data exists and is an array
+      if (!result.data || !Array.isArray(result.data)) {
+        console.error("Invalid API response format:", result)
+        throw new Error("Invalid response format from server")
+      }
       
       // Filter out products already assigned to this client
-      const availableProducts = data.filter(
+      const availableProducts = result.data.filter(
         (product: Product) => !existingProductIds.includes(product.id)
       )
       

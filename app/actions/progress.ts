@@ -162,7 +162,7 @@ export async function updateCourseProgressAction(
       const total_questions_in_quiz = rawQuizQuestions.length; // Use actual number of questions
 
       // --- GRADING LOGIC ---
-      rawQuizQuestions.forEach(question => {
+      rawQuizQuestions.forEach((question, index) => {
         const studentAnswer = lesson_quiz_submission.answers[question.id];
         if (studentAnswer === undefined) return; // Question not answered
 
@@ -171,13 +171,42 @@ export async function updateCourseProgressAction(
             score++;
           }
         } else if (question.question_type === 'MSQ') {
-          const correctAnswerArray = Array.isArray(question.correct_answer) ? question.correct_answer : [question.correct_answer];
+          // Handle different correct_answer formats that could be in the database
+          let correctAnswerArray: string[] = [];
+          
+          if (Array.isArray(question.correct_answer)) {
+            if (question.correct_answer.length > 0 && typeof question.correct_answer[0] === 'object' && question.correct_answer[0] !== null) {
+              // Format: [{"answers":["opt_a","opt_b",...]}]
+              const answerObj = question.correct_answer[0] as any;
+              if (answerObj.answers && Array.isArray(answerObj.answers)) {
+                correctAnswerArray = answerObj.answers;
+              }
+            } else {
+              // Format: ["opt_a", "opt_b", ...]
+              correctAnswerArray = question.correct_answer as string[];
+            }
+          } else if (typeof question.correct_answer === 'object' && question.correct_answer !== null) {
+            // Format: {"answers":["opt_a","opt_b",...]}
+            const answerObj = question.correct_answer as any;
+            if (answerObj.answers && Array.isArray(answerObj.answers)) {
+              correctAnswerArray = answerObj.answers;
+            }
+          } else if (typeof question.correct_answer === 'string') {
+            // Format: Single string (shouldn't happen for MSQ but handle it)
+            correctAnswerArray = [question.correct_answer];
+          }
+          
           const studentAnswerArray = Array.isArray(studentAnswer) ? studentAnswer : [studentAnswer];
           
           // For MSQ, all correct options must be selected and no incorrect options.
-          // And the number of selected options must match the number of correct options.
-          if (studentAnswerArray.length === correctAnswerArray.length && 
-              studentAnswerArray.every(sa => correctAnswerArray.includes(sa))) {
+          // The order shouldn't matter, just that all correct options are selected.
+          const hasCorrectLength = studentAnswerArray.length === correctAnswerArray.length;
+          const allStudentAnswersAreCorrect = studentAnswerArray.every(answer => correctAnswerArray.includes(answer));
+          const allCorrectAnswersSelected = correctAnswerArray.every(answer => studentAnswerArray.includes(answer));
+          
+          const isCorrect = hasCorrectLength && allStudentAnswersAreCorrect && allCorrectAnswersSelected;
+            
+          if (isCorrect) {
             score++;
           }
         }
@@ -193,14 +222,6 @@ export async function updateCourseProgressAction(
                                                                                                                     // If fixed 5 questions: pass_threshold = 4. For now, let's be more flexible for grading part but stick to pass criteria
       const questionsToPass = 4; // Fixed as per plan for a 5-question quiz.
       const pass_fail_status = score >= questionsToPass ? 'passed' : 'failed';
-      
-      // if (total_questions_in_quiz !== 5) {
-      //   // Handle case where quiz doesn't have 5 questions, though plan implies it.
-      //   // For now, we grade based on actual questions, but pass/fail is rigid on 4 correct.
-      //   // This might need revisiting if quiz length isn't strictly 5.
-      //   console.warn(`Quiz for lesson ${lesson_quiz_submission.lessonId} has ${total_questions_in_quiz} questions, not 5 as per plan.`);
-      // }
-
 
       const attempts = progress_details.lesson_quiz_attempts || {};
       const lessonAttempts = attempts[lesson_quiz_submission.lessonId] || [];

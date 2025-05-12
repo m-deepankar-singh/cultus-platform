@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
 import { ClientSchema } from '@/lib/schemas/client'; // Import the Zod schema
 import { getUserSessionAndRole } from '@/lib/supabase/utils';
+import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
 /**
  * GET /api/admin/clients
  * 
  * Retrieves a list of all clients
  * Accessible only by users with 'Admin' or 'Staff' roles
+ * Supports pagination with page and pageSize parameters
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // 1. Authentication & Authorization
     const { user, profile, role, error: authError } = await getUserSessionAndRole();
@@ -23,22 +25,77 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 2. Get Supabase client
+    // 2. Get pagination and filter parameters
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
+    const search = searchParams.get('search') || '';
+    const statusFilter = searchParams.get('status');
+
+    // 3. Get Supabase client
     const supabase = await createClient();
 
-    // 3. Fetch all clients
-    const { data: clients, error: clientsError } = await supabase
+    // 4. Calculate range for pagination
+    const { from, to } = calculatePaginationRange(page, pageSize);
+
+    // 5. First get total count with filters
+    let countQuery = supabase
       .from('clients')
-      .select('id, name')
-      .order('name', { ascending: true });
+      .select('id', { count: 'exact', head: true });
+
+    // Apply search filter if provided
+    if (search) {
+      countQuery = countQuery.ilike('name', `%${search}%`);
+    }
+
+    // Apply status filter if provided
+    if (statusFilter) {
+      const isActive = statusFilter === 'active';
+      countQuery = countQuery.eq('is_active', isActive);
+    }
+
+    const { count, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error('Error counting clients:', countError);
+      return NextResponse.json({ error: "Failed to count clients" }, { status: 500 });
+    }
+
+    // 6. Fetch paginated clients
+    let query = supabase
+      .from('clients')
+      .select('id, name, is_active, created_at, logo_url');
+      
+    // Apply search filter if provided
+    if (search) {
+      query = query.ilike('name', `%${search}%`);
+    }
+    
+    // Apply status filter if provided
+    if (statusFilter) {
+      const isActive = statusFilter === 'active';
+      query = query.eq('is_active', isActive);
+    }
+
+    // Add ordering and pagination
+    const { data: clients, error: clientsError } = await query
+      .order('name', { ascending: true })
+      .range(from, to);
 
     if (clientsError) {
       console.error('Error fetching clients:', clientsError);
       return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
     }
 
-    // 4. Return client list
-    return NextResponse.json(clients || []);
+    // 7. Return paginated client list
+    const paginatedResponse = createPaginatedResponse(
+      clients || [],
+      count || 0,
+      page,
+      pageSize
+    );
+
+    return NextResponse.json(paginatedResponse);
     
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/clients:', error);

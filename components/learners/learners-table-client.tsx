@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
+import { MoreHorizontal, Search, SlidersHorizontal, Upload, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -32,6 +32,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { EditLearnerDialog } from "./edit-learner-dialog"
+import { DataPagination } from "@/components/ui/data-pagination"
+import { BulkUploadDialog } from "./bulk-upload-dialog"
+import { ExportLearnersButton } from "./export-learners-button"
 
 interface LearnersTableClientProps {
   initialLearners: Learner[]
@@ -43,12 +46,33 @@ interface Client {
   name: string
 }
 
+interface PaginatedResponse {
+  data: Learner[];
+  metadata: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
+}
+
+// Constants
+const ITEMS_PER_PAGE = 20;
+
 export function LearnersTableClient({ initialLearners, uniqueClients }: LearnersTableClientProps) {
+  // Search and filter state
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [clientFilter, setClientFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
-  const [learners, setLearners] = useState(initialLearners)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [learners, setLearners] = useState<Learner[]>(initialLearners)
+  const [loading, setLoading] = useState(false)
   
   // State for all clients - used for edit dialog
   const [allClients, setAllClients] = useState<Client[]>([])
@@ -65,6 +89,68 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
   
   const router = useRouter()
   const { toast } = useToast()
+
+  // Fetch learners with pagination and filters
+  const fetchLearners = async () => {
+    setLoading(true)
+    try {
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: ITEMS_PER_PAGE.toString(),
+      })
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm)
+      }
+      
+      if (clientFilter !== 'all') {
+        params.append('clientId', clientFilter)
+      }
+      
+      if (statusFilter !== 'all') {
+        params.append('isActive', statusFilter === 'Active' ? 'true' : 'false')
+      }
+      
+      // Fetch data from API
+      const response = await fetch(`/api/admin/learners?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching learners: ${response.status}`)
+      }
+      
+      const result: PaginatedResponse = await response.json()
+      
+      // Update state with paginated data
+      setLearners(result.data)
+      setTotalCount(result.metadata.totalCount)
+      setTotalPages(result.metadata.totalPages)
+    } catch (error) {
+      console.error("Failed to fetch learners:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load learners. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Fetch learners when page or filters change
+  useEffect(() => {
+    fetchLearners()
+  }, [currentPage, debouncedSearchTerm, clientFilter, statusFilter])
+  
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1) // Reset to first page when search changes
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   // Fetch all clients for the edit dialog
   useEffect(() => {
@@ -91,15 +177,11 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
     fetchAllClients()
   }, [toast])
 
-  // Effect to refresh data when the learnerAdded event is triggered
+  // Effect to listen for learnerAdded event
   useEffect(() => {
-    // Set initial data
-    setLearners(initialLearners)
-    
     // Set up event listener for learnerAdded event
     const handleLearnerAdded = () => {
-      // Refresh the page to get updated data
-      router.refresh()
+      fetchLearners() // Refresh the data when learners are added
       
       toast({
         title: "Learner added",
@@ -113,21 +195,17 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
     return () => {
       document.removeEventListener('learnerAdded', handleLearnerAdded)
     }
-  }, [initialLearners, router, toast])
+  }, [toast])
 
-  const filteredLearners = learners.filter((learner) => {
-    const matchesSearch =
-      learner.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (learner.email && learner.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (learner.phone_number && learner.phone_number.includes(searchTerm))
+  // Handle filter changes
+  const handleFiltersChange = () => {
+    setCurrentPage(1) // Reset to first page when filters change
+  }
 
-    const matchesClient = clientFilter === "all" || learner.client.name === clientFilter
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "Active" && learner.is_active) ||
-      (statusFilter === "Inactive" && !learner.is_active)
-
-    return matchesSearch && matchesClient && matchesStatus
-  })
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
   
   // Handle edit learner
   const handleEditLearner = (learner: Learner) => {
@@ -137,7 +215,7 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
   
   // Handle learner updated
   const handleLearnerUpdated = () => {
-    router.refresh()
+    fetchLearners() // Refresh the data
     toast({
       title: "Learner updated",
       description: "The learner has been updated successfully."
@@ -171,13 +249,7 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
         description: `${learnerToDelete.full_name} has been deleted successfully.`,
       })
       
-      // Remove from local state to avoid refresh
-      setLearners(prevLearners => 
-        prevLearners.filter(learner => learner.id !== learnerToDelete.id)
-      )
-      
-      // Also refresh to get updated data from server
-      router.refresh()
+      fetchLearners() // Refresh the data
     } catch (error) {
       toast({
         title: "Failed to delete learner",
@@ -189,6 +261,11 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
       setDeleteDialogOpen(false)
       setLearnerToDelete(null)
     }
+  }
+
+  // Handle bulk upload completion
+  const handleBulkUploadComplete = () => {
+    fetchLearners() // Refresh the data
   }
 
   return (
@@ -210,6 +287,8 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               Filters
             </Button>
+            <BulkUploadDialog onLearnersBulkUploaded={handleBulkUploadComplete} />
+            <ExportLearnersButton />
           </div>
         </div>
 
@@ -217,7 +296,13 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
           <div className="mt-4 flex flex-col gap-4 rounded-md border p-4 sm:flex-row dark:border-border">
             <div className="flex-1 space-y-2">
               <label className="text-sm font-medium">Client</label>
-              <Select value={clientFilter} onValueChange={setClientFilter}>
+              <Select
+                value={clientFilter}
+                onValueChange={(value) => {
+                  setClientFilter(value)
+                  handleFiltersChange()
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by client" />
                 </SelectTrigger>
@@ -231,7 +316,13 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
             </div>
             <div className="flex-1 space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value)
+                  handleFiltersChange()
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
@@ -261,14 +352,20 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredLearners.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  Loading learners...
+                </TableCell>
+              </TableRow>
+            ) : learners.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="h-24 text-center">
                   No learners found.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredLearners.map((learner) => {
+              learners.map((learner) => {
                 // Generate initials from the learner's full name
                 const initials = learner.full_name
                   .split(" ")
@@ -342,6 +439,19 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
           </TableBody>
         </Table>
       </div>
+      
+      {/* Pagination */}
+      {!loading && totalPages > 0 && (
+        <div className="p-4">
+          <DataPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
       
       {/* Edit Learner Dialog */}
       {currentLearner && (

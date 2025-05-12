@@ -23,6 +23,7 @@ import { Client, getClients, toggleClientStatus } from "@/app/actions/clientActi
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { DataPagination } from "@/components/ui/data-pagination"
 
 // Interface for products
 interface Product {
@@ -31,10 +32,13 @@ interface Product {
   description: string | null
 }
 
-// Extended client interface to include products
+// Extended client interface with products
 interface ClientWithProducts extends Client {
   products?: Product[]
 }
+
+// Constants
+const ITEMS_PER_PAGE = 10
 
 export function ClientsTable() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -44,17 +48,40 @@ export function ClientsTable() {
   const [loading, setLoading] = useState(true)
   const [editClient, setEditClient] = useState<Client | null>(null)
   const [showEditForm, setShowEditForm] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  
   const { toast } = useToast()
 
-  // Function to fetch clients
+  // Function to fetch clients with pagination
   const fetchClients = async () => {
     try {
       setLoading(true)
-      const clientsData = await getClients()
+      
+      // Build query parameters for pagination and filtering
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: ITEMS_PER_PAGE.toString(),
+      })
+      
+      if (searchTerm) params.append('search', searchTerm)
+      if (statusFilter !== 'all') params.append('status', statusFilter)
+      
+      // Fetch paginated clients from API
+      const response = await fetch(`/api/admin/clients?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching clients: ${response.status}`)
+      }
+      
+      const result = await response.json()
       
       // Create enhanced client objects with product data
       const enhancedClients = await Promise.all(
-        clientsData.map(async (client) => {
+        result.data.map(async (client: Client) => {
           try {
             const response = await fetch(`/api/staff/clients/${client.id}/products`)
             if (response.ok) {
@@ -68,7 +95,11 @@ export function ClientsTable() {
         })
       )
       
+      // Update state with the paginated data
       setClients(enhancedClients)
+      setTotalCount(result.metadata.totalCount)
+      setTotalPages(result.metadata.totalPages)
+      
     } catch (error) {
       console.error("Failed to fetch clients:", error)
       toast({
@@ -81,10 +112,21 @@ export function ClientsTable() {
     }
   }
 
-  // Load clients on component mount
+  // Load clients on component mount and when page or filters change
   useEffect(() => {
     fetchClients()
-  }, [])
+  }, [currentPage]) // Fetch when page changes, handle filters via search button
+
+  // Handle search and filter changes
+  const handleFiltersChange = () => {
+    setCurrentPage(1) // Reset to first page when filters change
+    fetchClients()
+  }
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   // Handle toggling a client's active status
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
@@ -116,20 +158,27 @@ export function ClientsTable() {
   }
 
   // Handle edit client action
-  const handleEditClient = (client: Client) => {
-    setEditClient(client)
-    setShowEditForm(true)
+  const handleEditClient = async (client: Client) => {
+    try {
+      // Fetch complete client details to ensure we have all fields
+      const response = await fetch(`/api/admin/clients/${client.id}`)
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching client details: ${response.status}`)
+      }
+      
+      const fullClientData = await response.json()
+      setEditClient(fullClientData)
+      setShowEditForm(true)
+    } catch (error) {
+      console.error("Error fetching client details:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load client details for editing.",
+        variant: "destructive",
+      })
+    }
   }
-
-  // Filter clients based on search and filter criteria
-  const filteredClients = clients.filter((client) => {
-    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "active" && client.is_active) || 
-      (statusFilter === "inactive" && !client.is_active)
-
-    return matchesSearch && matchesStatus
-  })
 
   return (
     <Card>
@@ -143,6 +192,9 @@ export function ClientsTable() {
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleFiltersChange()
+              }}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -153,6 +205,9 @@ export function ClientsTable() {
             >
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               Filters
+            </Button>
+            <Button onClick={handleFiltersChange} disabled={loading}>
+              {loading ? "Searching..." : "Search"}
             </Button>
             <AddClientDialog onClientAdded={fetchClients} />
           </div>
@@ -196,14 +251,14 @@ export function ClientsTable() {
                   Loading clients...
                 </TableCell>
               </TableRow>
-            ) : filteredClients.length === 0 ? (
+            ) : clients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
                   No clients found.
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredClients.map((client) => (
+            ) :
+              clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -225,38 +280,35 @@ export function ClientsTable() {
                   <TableCell>
                     {client.products && client.products.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
-                        <TooltipProvider>
-                          {client.products.slice(0, 3).map((product) => (
-                            <Tooltip key={product.id}>
+                        {client.products.length <= 3 ? (
+                          // Show all products if there are 3 or fewer
+                          client.products.map((product) => (
+                            <Badge key={product.id} variant="outline" className="flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              {product.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          // Show count with tooltip if more than 3
+                          <TooltipProvider>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <Badge variant="outline" className="flex items-center gap-1">
                                   <Package className="h-3 w-3" />
-                                  {product.name.length > 18 ? `${product.name.substring(0, 15)}...` : product.name}
+                                  {client.products.length} Products
                                 </Badge>
                               </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{product.name}</p>
-                                {product.description && <p className="text-xs text-muted-foreground">{product.description}</p>}
-                              </TooltipContent>
-                            </Tooltip>
-                          ))}
-                          {client.products.length > 3 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge variant="outline">
-                                  +{client.products.length - 3} more
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="max-w-xs space-y-1">
-                                  {client.products.slice(3).map((product) => (
-                                    <p key={product.id} className="text-sm">{product.name}</p>
+                              <TooltipContent className="max-w-xs">
+                                <div className="text-xs font-medium">Products:</div>
+                                <ul className="text-xs mt-1 list-disc pl-3 space-y-1">
+                                  {client.products.map((product) => (
+                                    <li key={product.id}>{product.name}</li>
                                   ))}
-                                </div>
+                                </ul>
                               </TooltipContent>
                             </Tooltip>
-                          )}
-                        </TooltipProvider>
+                          </TooltipProvider>
+                        )}
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-sm">No products assigned</span>
@@ -280,47 +332,51 @@ export function ClientsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/clients/${client.id}`}>
-                            View details
-                          </Link>
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditClient(client)}>
-                          Edit client
+                          Edit Client
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href={`/clients/${client.id}`}>
-                            Manage assigned products
-                          </Link>
-                        </DropdownMenuItem>
+                        <Link href={`/clients/${client.id}`} passHref>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            View Details
+                          </DropdownMenuItem>
+                        </Link>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => handleToggleStatus(client.id, client.is_active)}
-                          className={client.is_active ? "text-red-600" : "text-green-600"}
+                          className={client.is_active ? "text-destructive" : "text-green-600"}
                         >
-                          {client.is_active ? "Deactivate" : "Activate"}
+                          {client.is_active ? "Deactivate Client" : "Activate Client"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
-            )}
+            }
           </TableBody>
         </Table>
       </div>
-
-      {/* Edit client form dialog */}
-      {editClient && (
+      
+      {/* Pagination UI */}
+      {!loading && totalPages > 0 && (
+        <div className="p-4">
+          <DataPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+      
+      {/* Edit Client Dialog/Form */}
+      {showEditForm && editClient && (
         <ClientForm
           open={showEditForm}
           setOpen={setShowEditForm}
           client={editClient}
-          onSuccess={() => {
-            fetchClients()
-            setEditClient(null)
-          }}
+          onSuccess={fetchClients}
         />
       )}
     </Card>

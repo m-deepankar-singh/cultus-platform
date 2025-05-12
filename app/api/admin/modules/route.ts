@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { calculatePaginationRange, createPaginatedResponse } from "@/lib/pagination";
 
 // Module schema for validation - updated to match actual database schema
 const ModuleSchema = z.object({
@@ -15,10 +16,10 @@ const ModuleSchema = z.object({
 /**
  * GET /api/admin/modules
  * 
- * Retrieves all modules across all products.
+ * Retrieves all modules across all products with pagination support.
  * Requires admin authentication.
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // Create Supabase server client
     const supabase = await createClient();
@@ -56,19 +57,66 @@ export async function GET(request: Request) {
     }
 
     // Get query parameters
-    const url = new URL(request.url);
-    const productId = url.searchParams.get('productId');
+    const searchParams = request.nextUrl.searchParams;
+    const productId = searchParams.get('productId');
+    const search = searchParams.get('search') || '';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
+    const moduleType = searchParams.get('type');
     
-    // Build query
-    let query = supabase.from("modules").select("*, products(name)").order("created_at", { ascending: false });
+    // Calculate range for pagination
+    const { from, to } = calculatePaginationRange(page, pageSize);
     
-    // Filter by product if productId is provided
+    // First, get total count with filters
+    let countQuery = supabase
+      .from("modules")
+      .select('id', { count: 'exact', head: true });
+    
+    // Apply filters
     if (productId) {
-      query = query.eq("product_id", productId);
+      countQuery = countQuery.eq("product_id", productId);
     }
     
-    // Execute query
-    const { data: modules, error: modulesError } = await query;
+    if (search) {
+      countQuery = countQuery.ilike('name', `%${search}%`);
+    }
+    
+    if (moduleType) {
+      countQuery = countQuery.eq('type', moduleType);
+    }
+    
+    const { count, error: countError } = await countQuery;
+    
+    if (countError) {
+      console.error("Error counting modules:", countError);
+      return NextResponse.json(
+        { error: "Server Error", message: "Error counting modules" },
+        { status: 500 }
+      );
+    }
+    
+    // Build main data query
+    let dataQuery = supabase
+      .from("modules")
+      .select("*, products(id, name)");
+    
+    // Apply the same filters
+    if (productId) {
+      dataQuery = dataQuery.eq("product_id", productId);
+    }
+    
+    if (search) {
+      dataQuery = dataQuery.ilike('name', `%${search}%`);
+    }
+    
+    if (moduleType) {
+      dataQuery = dataQuery.eq('type', moduleType);
+    }
+    
+    // Execute query with pagination
+    const { data: modules, error: modulesError } = await dataQuery
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     // Handle database error
     if (modulesError) {
@@ -79,8 +127,30 @@ export async function GET(request: Request) {
       );
     }
 
-    // Return the list of modules
-    return NextResponse.json(modules);
+    // Format modules to have a consistent "products" array (needed for the ModulesTable component)
+    const formattedModules = modules?.map(module => {
+      // Transform products relation into an array
+      if (module.products) {
+        return {
+          ...module,
+          products: module.product_id ? [module.products] : [],
+        };
+      }
+      return {
+        ...module,
+        products: [],
+      };
+    });
+
+    // Return paginated response
+    const paginatedResponse = createPaginatedResponse(
+      formattedModules || [],
+      count || 0,
+      page,
+      pageSize
+    );
+
+    return NextResponse.json(paginatedResponse);
   } catch (error) {
     console.error("Unexpected error in GET modules:", error);
     return NextResponse.json(

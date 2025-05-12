@@ -41,8 +41,12 @@ export function ClientExportModal({ open, onOpenChange, onExport }: ClientExport
         if (!response.ok) {
           throw new Error("Failed to fetch clients")
         }
-        const data = await response.json()
-        setClients(data)
+        const result = await response.json()
+        
+        // Handle the new paginated response format
+        const clientsData = Array.isArray(result) ? result : result.data || [];
+        
+        setClients(clientsData)
       } catch (error) {
         console.error("Error fetching clients:", error)
         toast({

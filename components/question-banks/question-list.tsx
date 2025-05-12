@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DataPagination } from '@/components/ui/data-pagination';
+import { PaginatedResponse } from '@/lib/pagination';
 
 // Define the Question type based on your API response
 interface Question {
@@ -32,22 +34,75 @@ interface Question {
 }
 
 interface QuestionListProps {
-  questions: Question[];
+  questions?: Question[];
+  initialData?: PaginatedResponse<Question>;
 }
 
-export default function QuestionList({ questions }: QuestionListProps) {
+export default function QuestionList({ questions: initialQuestions, initialData }: QuestionListProps) {
+  // States for pagination
+  const [currentPage, setCurrentPage] = useState(initialData?.metadata.currentPage || 1);
+  const [pageSize, setPageSize] = useState(initialData?.metadata.pageSize || 10);
+  const [totalItems, setTotalItems] = useState(initialData?.metadata.totalCount || 0);
+  const [totalPages, setTotalPages] = useState(initialData?.metadata.totalPages || 1);
+  
+  // Data state
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions || initialData?.data || []);
+  const [loading, setLoading] = useState(false);
+  
+  // UI states
   const [searchTerm, setSearchTerm] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<string | null>(null);
 
-  // Filter questions based on search term
-  const filteredQuestions = questions.filter(question => 
-    question.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    question.topic?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    question.difficulty?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Debounce search input
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch questions whenever pagination parameters change
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      setLoading(true);
+      try {
+        // Construct URL with query parameters
+        const queryParams = new URLSearchParams({
+          page: currentPage.toString(),
+          pageSize: pageSize.toString(),
+        });
+
+        // Add search term if available
+        if (debouncedSearchTerm) {
+          queryParams.append('search', debouncedSearchTerm);
+        }
+
+        const response = await fetch(`/api/admin/question-banks?${queryParams.toString()}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch questions');
+        }
+        
+        const data: PaginatedResponse<Question> = await response.json();
+        
+        setQuestions(data.data);
+        setTotalItems(data.metadata.totalCount);
+        setTotalPages(data.metadata.totalPages);
+      } catch (error) {
+        console.error('Error fetching questions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [currentPage, pageSize, debouncedSearchTerm]);
 
   // Format the date for display
   const formatDate = (dateString: string) => {
@@ -98,18 +153,36 @@ export default function QuestionList({ questions }: QuestionListProps) {
         throw new Error('Failed to delete question');
       }
       
-      // Could refresh questions here or use optimistic updates
-      // For now, we'll just close the dialog
+      // Refresh the current page of questions
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: pageSize.toString(),
+      });
+      
+      if (debouncedSearchTerm) {
+        queryParams.append('search', debouncedSearchTerm);
+      }
+      
+      const response = await fetch(`/api/admin/question-banks?${queryParams.toString()}`);
+      const data: PaginatedResponse<Question> = await response.json();
+      
+      setQuestions(data.data);
+      setTotalItems(data.metadata.totalCount);
+      setTotalPages(data.metadata.totalPages);
+      
+      // Close delete dialog
       setDeleteDialogOpen(false);
       setQuestionToDelete(null);
-      
-      // In a real implementation, you would either redirect or refresh the questions
-      window.location.reload();
     } catch (error) {
       console.error('Error deleting question:', error);
       setDeleteDialogOpen(false);
       setQuestionToDelete(null);
     }
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -141,8 +214,14 @@ export default function QuestionList({ questions }: QuestionListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredQuestions.length > 0 ? (
-              filteredQuestions.map((question) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center h-24">
+                  Loading questions...
+                </TableCell>
+              </TableRow>
+            ) : questions.length > 0 ? (
+              questions.map((question) => (
                 <TableRow key={question.id}>
                   <TableCell className="font-medium max-w-xs truncate" title={question.question_text}>
                     {question.question_text}
@@ -191,7 +270,7 @@ export default function QuestionList({ questions }: QuestionListProps) {
             ) : (
               <TableRow>
                 <TableCell colSpan={8} className="text-center h-24">
-                  {searchTerm 
+                  {debouncedSearchTerm 
                     ? 'No questions found matching your search.' 
                     : 'No questions available. Add a new question to get started.'}
                 </TableCell>
@@ -199,6 +278,17 @@ export default function QuestionList({ questions }: QuestionListProps) {
             )}
           </TableBody>
         </Table>
+        
+        {/* Pagination */}
+        {!loading && totalItems > 0 && (
+          <DataPagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        )}
       </CardContent>
 
       {/* Edit Question Form */}

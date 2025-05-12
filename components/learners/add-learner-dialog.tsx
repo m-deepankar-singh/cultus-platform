@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -45,17 +45,86 @@ interface Client {
   name: string
 }
 
+interface PaginatedResponse<T> {
+  data: T[];
+  metadata: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
+}
+
 interface AddLearnerDialogProps {
   clients: Client[]
   onLearnerAdded: () => void
 }
 
-export function AddLearnerDialog({ clients, onLearnerAdded }: AddLearnerDialogProps) {
+export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: AddLearnerDialogProps) {
   const [open, setOpen] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [tempPassword, setTempPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [clients, setClients] = useState<Client[]>(initialClients)
+  const [isLoadingClients, setIsLoadingClients] = useState(false)
   const { toast } = useToast()
+  
+  // Add debugging log when clients prop changes
+  useEffect(() => {
+    console.log("AddLearnerDialog: Received clients prop:", { 
+      type: typeof initialClients,
+      isArray: Array.isArray(initialClients), 
+      length: initialClients?.length,
+      initialClients
+    })
+    
+    // Update internal state with the prop if it's valid
+    if (Array.isArray(initialClients) && initialClients.length > 0) {
+      setClients(initialClients)
+    }
+  }, [initialClients])
+  
+  // Fetch clients when dialog is opened
+  useEffect(() => {
+    if (open && (!Array.isArray(clients) || clients.length === 0)) {
+      fetchClients()
+    }
+  }, [open, clients])
+  
+  // Function to fetch clients directly in this component
+  const fetchClients = async () => {
+    setIsLoadingClients(true)
+    try {
+      console.log("AddLearnerDialog: Fetching clients directly")
+      const response = await fetch("/api/admin/clients?pageSize=100")
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch clients: ${response.status}`)
+      }
+      
+      const data = await response.json() as PaginatedResponse<Client>
+      console.log("AddLearnerDialog: Fetched clients:", data)
+      
+      if (Array.isArray(data.data) && data.data.length > 0) {
+        setClients(data.data)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Warning",
+          description: "No clients available. Please add a client before adding learners."
+        })
+      }
+    } catch (error) {
+      console.error("AddLearnerDialog: Error fetching clients:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load clients. Please try again."
+      })
+    } finally {
+      setIsLoadingClients(false)
+    }
+  }
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -116,7 +185,13 @@ export function AddLearnerDialog({ clients, onLearnerAdded }: AddLearnerDialogPr
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        setOpen(isOpen)
+        if (isOpen && (!Array.isArray(clients) || clients.length === 0)) {
+          // Force fetch clients when opening the dialog if we don't have them
+          fetchClients()
+        }
+      }}>
         <DialogTrigger asChild>
           <Button>
             <UserPlus className="mr-2 h-4 w-4" />
@@ -185,11 +260,21 @@ export function AddLearnerDialog({ clients, onLearnerAdded }: AddLearnerDialogPr
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
+                      {isLoadingClients ? (
+                        <SelectItem value="loading" disabled>
+                          Loading clients...
                         </SelectItem>
-                      ))}
+                      ) : Array.isArray(clients) && clients.length > 0 ? (
+                        clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-clients" disabled>
+                          No clients available
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />

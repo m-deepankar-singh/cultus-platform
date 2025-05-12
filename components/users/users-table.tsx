@@ -1,6 +1,9 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -14,12 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
-import { User } from "@supabase/supabase-js"
 import { UserActionsCell } from "./user-actions-cell"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InfoIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { DataPagination } from "@/components/ui/data-pagination"
 
 interface Profile {
   id: string
@@ -27,6 +29,10 @@ interface Profile {
   role: "Admin" | "Staff" | "Viewer" | "Client Staff"
   client_id: string | null
   status?: string
+  client?: {
+    id: string
+    name: string
+  }
 }
 
 interface Client {
@@ -41,9 +47,15 @@ interface UserProfile {
   last_sign_in_at?: string
   created_at?: string
   updated_at?: string
-  profile: Profile | null
-  client_name?: string
+  role?: string
+  full_name?: string
+  client_id?: string
+  client?: {
+    id: string
+    name: string
+  }
   banned_until?: string
+  status?: string
   user_metadata?: {
     status?: string
     [key: string]: any
@@ -56,7 +68,11 @@ interface UserProfile {
 
 interface UsersTableProps {
   clients: Client[]
+  initialCurrentUserRole?: string
 }
+
+// Constants
+const ITEMS_PER_PAGE = 10
 
 // Add a utility function to check user status
 function isUserActive(user: UserProfile): boolean {
@@ -65,77 +81,98 @@ function isUserActive(user: UserProfile): boolean {
     return false;
   }
   
-  // Check metadata status
-  if (user.user_metadata?.status === 'inactive' || user.app_metadata?.status === 'inactive') {
+  // Check explicit status field from profile
+  if (user.status === 'inactive') {
     return false;
   }
   
-  // Check profile status if exists
-  if (user.profile?.status === 'inactive') {
+  // Check metadata status
+  if (user.user_metadata?.status === 'inactive' || user.app_metadata?.status === 'inactive') {
     return false;
   }
   
   return true;
 }
 
-export async function UsersTable({ clients }: UsersTableProps) {
-  const supabaseAdmin = createAdminClient()
-  const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
-  const supabase = await createClient()
-
-  // Get the current user to determine their role
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
+export function UsersTable({ clients, initialCurrentUserRole }: UsersTableProps) {
+  const router = useRouter()
   
-  // Get current user's profile to determine their role
-  const { data: currentUserProfile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', currentUser?.id ?? '')
-    .single()
-  
-  const isStaffUser = currentUserProfile?.role === 'Staff'
+  // Pagination and filter state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (usersError) {
-    console.error("Error fetching users (Admin):", usersError)
-    return <div>Error loading users.</div>
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState("")
+  const [clientFilter, setClientFilter] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
+  
+  // Current user role (for permissions)
+  const [currentUserRole, setCurrentUserRole] = useState<string | undefined>(initialCurrentUserRole)
+  const isStaffUser = currentUserRole === 'Staff'
+
+  // Fetch users from the paginated API
+  const fetchUsers = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: ITEMS_PER_PAGE.toString(),
+      })
+      
+      if (searchTerm) params.append('search', searchTerm)
+      if (roleFilter) params.append('role', roleFilter)
+      if (clientFilter) params.append('clientId', clientFilter)
+  
+      // Fetch data from our paginated API
+      const response = await fetch(`/api/admin/users?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching users: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      
+      // Update state with the paginated data
+      setUsers(result.data)
+      setTotalCount(result.metadata.totalCount)
+      setTotalPages(result.metadata.totalPages)
+      
+    } catch (err: any) {
+      console.error('Error fetching users:', err)
+      setError(err.message || 'Failed to fetch users')
+    } finally {
+      setLoading(false)
   }
-
-  // Fetch profiles and clients
-  const profilePromise = supabaseAdmin.from("profiles").select("id, full_name, role, client_id")
-  const clientPromise = supabaseAdmin.from("clients").select("id, name")
-  
-  // Also fetch students to filter them out from the users list
-  const studentsPromise = supabaseAdmin.from("students").select("id")
-
-  const [
-    { data: profiles, error: profilesError }, 
-    { data: clientsData, error: clientsError },
-    { data: students, error: studentsError }
-  ] = await Promise.all([profilePromise, clientPromise, studentsPromise])
-
-  if (profilesError || clientsError || studentsError) {
-    console.error("Error fetching profiles, clients, or students:", 
-      profilesError || clientsError || studentsError)
   }
-
-  const profileMap = new Map(profiles?.map((p: Profile) => [p.id, p]))
-  const clientMap = new Map(clientsData?.map((c: Client) => [c.id, c]))
   
-  // Create a set of student IDs for faster lookup
-  const studentIds = new Set(students?.map((s: { id: string }) => s.id) || [])
-
-  // Filter out users that exist in the students table
-  const filteredUsers = usersData.users.filter((user: User) => !studentIds.has(user.id))
-
-  const combinedUsers: UserProfile[] = filteredUsers.map((user: User) => {
-    const profile = profileMap.get(user.id)
-    const clientName = profile?.client_id ? clientMap.get(profile.client_id)?.name : undefined
-    return {
-      ...user,
-      profile: profile || null,
-      client_name: clientName,
-    }
-  })
+  // Initial fetch and when pagination/filter changes
+  useEffect(() => {
+    fetchUsers()
+  }, [currentPage]) // We'll handle filter changes via the search button
+  
+  // Handle search & filter
+  const handleSearch = () => {
+    setCurrentPage(1) // Reset to first page when filtering/searching
+    fetchUsers()
+  }
+  
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+  
+  // Handle user actions that might change data
+  const handleUserUpdated = () => {
+    fetchUsers() // Refresh the data
+  }
 
   return (
     <Card>
@@ -147,11 +184,92 @@ export async function UsersTable({ clients }: UsersTableProps) {
           </AlertDescription>
         </Alert>
       )}
+      
+      <CardHeader>
+        <CardTitle>Users</CardTitle>
+        <CardDescription>Manage your system users and their access permissions.</CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        {/* Search and Filters */}
+        <div className="mb-4 flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search users..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                }}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              Filters
+            </Button>
+            <Button onClick={handleSearch} disabled={loading}>
+              {loading ? "Searching..." : "Search"}
+            </Button>
+          </div>
+          
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Roles</SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Staff">Staff</SelectItem>
+                    <SelectItem value="Viewer">Viewer</SelectItem>
+                    <SelectItem value="Client Staff">Client Staff</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Clients</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Error message if any */}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {/* Users Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Client</TableHead>
@@ -160,56 +278,60 @@ export async function UsersTable({ clients }: UsersTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {combinedUsers.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    Loading users...
+                  </TableCell>
+                </TableRow>
+              ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                   No users found.
                 </TableCell>
               </TableRow>
             ) : (
-              combinedUsers.map((user) => (
+                users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback>
-                          {user.profile?.full_name?.charAt(0) ||
+                            {user.full_name?.charAt(0) ||
                             user.email?.charAt(0)?.toUpperCase() || "?"}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
                         <div className="font-medium">
-                          {user.profile?.full_name || "(No Name)"}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {user.email}
+                          {user.full_name || "(No Name)"}
                         </div>
                       </div>
-                    </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.email}
                   </TableCell>
                   <TableCell>
-                    {user.profile?.role ? (
+                      {user.role ? (
                       <Badge
                         variant={
-                          user.profile.role === "Admin"
+                            user.role === "Admin"
                             ? "outline"
-                            : user.profile.role === "Staff"
+                              : user.role === "Staff"
                               ? "info"
-                              : user.profile.role === "Viewer"
+                                : user.role === "Viewer"
                                 ? "outline"
                                 : "warning"
                         }
                         className={
-                          user.profile.role === "Admin"
+                            user.role === "Admin"
                             ? "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800/50 dark:bg-purple-950/50 dark:text-purple-300"
-                            : user.profile.role === "Staff"
+                              : user.role === "Staff"
                               ? ""
-                              : user.profile.role === "Viewer"
+                                : user.role === "Viewer"
                                 ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/50 dark:text-green-300"
                                 : ""
                         }
                       >
-                        {user.profile.role}
+                          {user.role}
                       </Badge>
                     ) : (
                       "-"
@@ -220,14 +342,18 @@ export async function UsersTable({ clients }: UsersTableProps) {
                       {isUserActive(user) ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{user.client_name || "-"}</TableCell>
+                    <TableCell>{user.client?.name || "-"}</TableCell>
                   <TableCell>
                     {user.last_sign_in_at
                       ? new Date(user.last_sign_in_at).toLocaleDateString()
                       : "Never"}
                   </TableCell>
                   <TableCell>
-                    <UserActionsCell user={user} clients={clients} />
+                      <UserActionsCell 
+                        user={user} 
+                        clients={clients} 
+                        onUserUpdated={handleUserUpdated}
+                      />
                   </TableCell>
                 </TableRow>
               ))
@@ -235,6 +361,18 @@ export async function UsersTable({ clients }: UsersTableProps) {
           </TableBody>
         </Table>
       </div>
+        
+        {/* Pagination */}
+        {!loading && totalPages > 0 && (
+          <DataPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        )}
+      </CardContent>
     </Card>
   )
 }

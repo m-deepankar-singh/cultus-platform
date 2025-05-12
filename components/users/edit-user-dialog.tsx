@@ -18,25 +18,32 @@ interface Client { id: string; name: string; }
 interface UserProfile {
     id: string;
     email?: string;
-    profile: {
-        full_name: string | null;
-        role: "Admin" | "Staff" | "Viewer" | "Client Staff";
-        client_id: string | null;
-    } | null;
-    client_name?: string;
+    // Updated to match the new structure from paginated API
+    full_name?: string | null;
+    role?: string;
+    client_id?: string | null;
+    client?: {
+        id: string;
+        name: string;
+    };
 }
 
 interface EditUserDialogProps {
     user: UserProfile;
     clients: Client[];
     children: React.ReactNode; // To use as the trigger
+    onUserUpdated?: () => void; // Callback when user is updated
 }
 
-export function EditUserDialog({ user, clients, children }: EditUserDialogProps) {
+export function EditUserDialog({ user, clients, children, onUserUpdated }: EditUserDialogProps) {
     const [open, setOpen] = React.useState(false);
 
     const handleFormSubmit = () => {
         setOpen(false); // Close dialog on successful submit
+        // Call the callback if provided
+        if (onUserUpdated) {
+            onUserUpdated();
+        }
     };
 
     return (
@@ -45,7 +52,7 @@ export function EditUserDialog({ user, clients, children }: EditUserDialogProps)
             <DialogTrigger asChild>{children}</DialogTrigger> 
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Edit User: {user.profile?.full_name || user.email}</DialogTitle>
+                    <DialogTitle>Edit User: {user.full_name || user.email}</DialogTitle>
                     <DialogDescription>
                         Update the user's profile details below.
                     </DialogDescription>

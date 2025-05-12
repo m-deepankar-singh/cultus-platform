@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
+import { DataPagination } from "@/components/ui/data-pagination"
 
 interface Module {
   id: string
@@ -18,6 +19,16 @@ interface Module {
   product_id: string | null
   configuration: Record<string, unknown>
   products?: { name: string } | null
+}
+
+interface PaginatedResponse {
+  data: Module[];
+  metadata: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
 }
 
 interface AssignModuleModalProps {
@@ -33,21 +44,40 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [selectedModules, setSelectedModules] = useState<string[]>([])
   const [assigning, setAssigning] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
 
-  // Fetch all modules on open
+  // Fetch modules on open, page change, or search change
   useEffect(() => {
     if (open) {
       fetchModules()
     }
-  }, [open])
+  }, [open, currentPage, debouncedSearchQuery])
+  
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+      setCurrentPage(1) // Reset to first page when search changes
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Reset state when modal closes
   useEffect(() => {
     if (!open) {
       setSearchQuery("")
+      setDebouncedSearchQuery("")
       setSelectedModules([])
+      setCurrentPage(1)
     }
   }, [open])
 
@@ -56,14 +86,27 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
     setError(null)
     
     try {
-      const response = await fetch("/api/admin/modules")
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: pageSize.toString(),
+      })
       
-      if (!response.ok) {
-        throw new Error("Failed to fetch modules")
+      if (debouncedSearchQuery) {
+        params.append('search', debouncedSearchQuery)
       }
       
-      const data = await response.json()
-      setModules(data)
+      const response = await fetch(`/api/admin/modules?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch modules: ${response.status}`)
+      }
+      
+      const paginatedData: PaginatedResponse = await response.json()
+      
+      setModules(paginatedData.data)
+      setTotalCount(paginatedData.metadata.totalCount)
+      setTotalPages(paginatedData.metadata.totalPages)
     } catch (err) {
       console.error("Error fetching modules:", err)
       setError("Failed to load modules. Please try again.")
@@ -118,13 +161,14 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
     }
   }
 
-  // Filter modules based on search query and exclude ones already assigned to this product
-  const filteredModules = modules
-    .filter(module => 
-      (module.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-       module.type.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      module.product_id !== productId
-    )
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Filter modules to exclude ones already assigned to this product
+  // No need to filter by search, the API already does that
+  const filteredModules = modules.filter(module => module.product_id !== productId)
 
   const toggleModuleSelection = (moduleId: string) => {
     setSelectedModules(prev => 
@@ -168,37 +212,52 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
             </div>
           ) : filteredModules.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {searchQuery
+              {debouncedSearchQuery
                 ? "No matching modules found"
                 : "No available modules to assign"}
             </div>
           ) : (
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-2">
-                {filteredModules.map((module) => (
-                  <div
-                    key={module.id}
-                    className={`flex items-center space-x-3 rounded-md border p-3 cursor-pointer transition-colors ${
-                      selectedModules.includes(module.id) ? "bg-primary/5 border-primary/30" : "hover:bg-muted"
-                    }`}
-                    onClick={() => toggleModuleSelection(module.id)}
-                  >
-                    <div className={`flex-shrink-0 flex h-6 w-6 items-center justify-center rounded-full border ${
-                      selectedModules.includes(module.id) ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground"
-                    }`}>
-                      {selectedModules.includes(module.id) && <Check className="h-4 w-4" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{module.name}</div>
-                      <div className="text-sm text-muted-foreground truncate">
-                        {module.products?.name ? `Currently in: ${module.products.name}` : "Not assigned"}
+            <>
+              <ScrollArea className="h-[300px] pr-4">
+                <div className="space-y-2">
+                  {filteredModules.map((module) => (
+                    <div
+                      key={module.id}
+                      className={`flex items-center space-x-3 rounded-md border p-3 cursor-pointer transition-colors ${
+                        selectedModules.includes(module.id) ? "bg-primary/5 border-primary/30" : "hover:bg-muted"
+                      }`}
+                      onClick={() => toggleModuleSelection(module.id)}
+                    >
+                      <div className={`flex-shrink-0 flex h-6 w-6 items-center justify-center rounded-full border ${
+                        selectedModules.includes(module.id) ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground"
+                      }`}>
+                        {selectedModules.includes(module.id) && <Check className="h-4 w-4" />}
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{module.name}</div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {module.products?.name ? `Currently in: ${module.products.name}` : "Not assigned"}
+                        </div>
+                      </div>
+                      <Badge>{module.type}</Badge>
                     </div>
-                    <Badge>{module.type}</Badge>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  ))}
+                </div>
+              </ScrollArea>
+              
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div>
+                  <DataPagination 
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalCount}
+                    pageSize={pageSize}
+                    onPageChange={handlePageChange}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
         

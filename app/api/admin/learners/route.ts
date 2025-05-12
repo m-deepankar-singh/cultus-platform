@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server'; // Import the service client
 import { getUserSessionAndRole } from '@/lib/supabase/utils'; // Correct path
 import { LearnerListQuerySchema } from '@/lib/schemas/learner';
 import { UserRole } from '@/lib/schemas/user';
 import { z } from "zod"
 import { sendLearnerWelcomeEmail } from '@/lib/email/service'; // Import our email service
+import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
 /**
  * GET /api/admin/learners
@@ -12,8 +13,9 @@ import { sendLearnerWelcomeEmail } from '@/lib/email/service'; // Import our ema
  * Retrieves a list of learners (users with the 'Student' role).
  * Accessible by users with the 'Admin' or 'Staff' role.
  * Supports filtering by search term, client ID, and active status.
+ * Supports pagination with page and pageSize parameters.
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // 1. Authentication & Authorization (using the utility)
     const { user, profile, role, error: sessionError } = await getUserSessionAndRole();
@@ -37,6 +39,10 @@ export async function GET(request: Request) {
     // 2. Parse & Validate Query Parameters
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams.entries());
+    
+    // Add pagination parameters
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
 
     const validationResult = LearnerListQuerySchema.safeParse(queryParams);
 
@@ -55,7 +61,37 @@ export async function GET(request: Request) {
     // Get Supabase client *after* auth check
     const supabase = await createClient();
 
-    // 3. Build Supabase Query
+    // Calculate pagination range for Supabase
+    const { from, to } = calculatePaginationRange(page, pageSize);
+
+    // 3. First get total count with filters
+    let countQuery = supabase
+      .from('students')
+      .select('id', { count: 'exact', head: true });
+      
+    // Apply search filter (case-insensitive on full_name and email)
+    if (search) {
+      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    // Apply client filter
+    if (clientId) {
+      countQuery = countQuery.eq('client_id', clientId);
+    }
+
+    // Apply active filter
+    if (isActive !== undefined) { // Check if the parameter was provided
+      countQuery = countQuery.eq('is_active', isActive === 'true');
+    }
+    
+    const { count, error: countError } = await countQuery;
+    
+    if (countError) {
+      console.error('Error counting learners:', countError);
+      return NextResponse.json({ error: 'Failed to count learners' }, { status: 500 });
+    }
+
+    // 4. Build Supabase Query for paginated data
     let query = supabase
       .from('students')
       .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, temporary_password, client:clients(id, name)');
@@ -75,10 +111,11 @@ export async function GET(request: Request) {
       query = query.eq('is_active', isActive === 'true');
     }
 
-    // Add ordering
-    query = query.order('full_name', { ascending: true });
+    // Add ordering and pagination
+    query = query.order('full_name', { ascending: true })
+                 .range(from, to);
 
-    // 4. Execute Query & Handle Response
+    // Execute Query & Handle Response
     const { data: learners, error: dbError } = await query;
 
     if (dbError) {
@@ -89,7 +126,15 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json(learners || []);
+    // Create standardized paginated response
+    const paginatedResponse = createPaginatedResponse(
+      learners || [],
+      count || 0,
+      page,
+      pageSize
+    );
+
+    return NextResponse.json(paginatedResponse);
 
   } catch (error) {
     console.error('API Error:', error);

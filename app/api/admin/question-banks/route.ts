@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 // import { getUserSessionAndRole } from '@/lib/auth/utils'; // Removed incorrect assumption
 import { QuestionBankQuerySchema, QuestionApiSchema } from '@/lib/schemas/question';
+import { createPaginatedResponse, calculatePaginationRange } from '@/lib/pagination';
 
 export async function GET(request: Request) {
     try {
@@ -51,33 +52,72 @@ export async function GET(request: Request) {
             );
         }
 
-        const { type, search, tag } = validationResult.data;
+        const { type, search, tag, page = '1', pageSize = '10' } = validationResult.data;
+
+        // Convert pagination params to numbers
+        const pageNum = parseInt(page as string);
+        const pageSizeNum = parseInt(pageSize as string);
+        
+        // Calculate range for pagination
+        const { from, to } = calculatePaginationRange(pageNum, pageSizeNum);
 
         // Always use assessment_questions table since course_questions doesn't exist
         const tableName = 'assessment_questions';
 
-        // Build Supabase Query
-        let query = supabase.from(tableName).select('*');
+        // Build Supabase Query for count
+        let countQuery = supabase.from(tableName).select('id', { count: 'exact' });
 
         if (search) {
-            query = query.ilike('question_text', `%${search}%`);
+            countQuery = countQuery.ilike('question_text', `%${search}%`);
         }
 
         if (tag) {
-            query = query.contains('tags', [tag]);
+            countQuery = countQuery.contains('tags', [tag]);
         }
 
-        query = query.order('created_at', { ascending: false });
+        // Execute count query
+        const { count, error: countError } = await countQuery;
+
+        if (countError) {
+            console.error(`GET /api/admin/question-banks: DB Error counting ${tableName}`, countError);
+            return NextResponse.json({ error: 'Database error while counting questions.', details: countError.message }, { status: 500 });
+        }
+
+        // Build Supabase Query for data
+        let dataQuery = supabase.from(tableName).select('*');
+
+        if (search) {
+            dataQuery = dataQuery.ilike('question_text', `%${search}%`);
+        }
+
+        if (tag) {
+            dataQuery = dataQuery.contains('tags', [tag]);
+        }
+
+        dataQuery = dataQuery
+            .order('created_at', { ascending: false })
+            .range(from, to);
 
         // Execute Query & Handle Response
-        const { data: questions, error: dbError } = await query;
+        const { data: questions, error: dbError } = await dataQuery;
 
         if (dbError) {
             console.error(`GET /api/admin/question-banks: DB Error fetching from ${tableName}`, dbError);
             return NextResponse.json({ error: 'Database error while fetching questions.', details: dbError.message }, { status: 500 });
         }
 
-        return NextResponse.json(questions || [], { status: 200 });
+        // Format all questions with bankType property
+        const formattedQuestions = (questions || []).map(q => ({ ...q, bankType: 'assessment' }));
+
+        // Create paginated response
+        const paginatedResponse = createPaginatedResponse(
+            formattedQuestions,
+            count || 0,
+            pageNum,
+            pageSizeNum
+        );
+
+        return NextResponse.json(paginatedResponse, { status: 200 });
 
     } catch (error) {
         console.error('GET /api/admin/question-banks: Unexpected Error', error);

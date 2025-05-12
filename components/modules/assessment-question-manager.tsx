@@ -131,11 +131,14 @@ export function AssessmentQuestionManager({
         throw new Error(`Error fetching questions: ${response.status}`)
       }
       
-      const data = await response.json()
+      const result = await response.json()
+      
+      // Handle the new paginated response format
+      const questionData = Array.isArray(result) ? result : result.data || [];
       
       // Filter out questions that are already selected
       const selectedIds = new Set(selectedQuestions.map(q => q.id))
-      const available = data.filter((q: Question) => !selectedIds.has(q.id))
+      const available = questionData.filter((q: Question) => !selectedIds.has(q.id))
       
       setAvailableQuestions(available)
       setFilteredQuestions(available)

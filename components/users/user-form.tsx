@@ -63,13 +63,15 @@ interface Client { id: string; name: string; }
 
 interface UserProfile {
     id: string;
-    email?: string; // From auth user
-    profile: {
-        full_name: string | null;
-        role: "Admin" | "Staff" | "Viewer" | "Client Staff";
-        client_id: string | null;
-    } | null;
-    client_name?: string;
+    email?: string;
+    // Updated to match the structure from paginated API
+    full_name?: string | null;
+    role?: string;
+    client_id?: string | null;
+    client?: {
+        id: string;
+        name: string;
+    };
 }
 
 interface UserFormProps {
@@ -100,11 +102,11 @@ export function UserForm({
     const form = useForm<UserFormValues>({
         resolver: zodResolver(UserFormSchema),
         defaultValues: {
-            fullName: initialData?.profile?.full_name || '',
+            fullName: initialData?.full_name || '',
             email: initialData?.email || '',
             password: '',
-            role: initialData?.profile?.role || undefined,
-            clientId: initialData?.profile?.client_id || undefined,
+            role: initialData?.role as any || undefined,
+            clientId: initialData?.client_id || undefined,
         },
     });
 

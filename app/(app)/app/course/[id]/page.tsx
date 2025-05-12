@@ -34,6 +34,7 @@ interface Lesson {
   video_url?: string;
   sequence: number;
   quiz_questions?: QuizQuestion[] | null;
+  has_quiz?: boolean;
 }
 
 interface CourseDetails {
@@ -171,6 +172,30 @@ export default function CoursePlayerPage() {
     // If no quiz, only video watch status matters (already checked)
     return true;
   }, [coursePageData?.progress]);
+
+  // Add a function to check if the current lesson quiz has been passed
+  const hasPassedCurrentQuiz = useCallback(() => {
+    if (!coursePageData?.progress?.lesson_quiz_attempts || !currentLesson) return false;
+    
+    const attempts = coursePageData.progress.lesson_quiz_attempts[currentLesson.id];
+    if (!attempts || attempts.length === 0) return false;
+    
+    // Check if any attempt has a 'passed' status
+    return attempts.some(attempt => attempt.pass_fail_status === 'passed');
+  }, [coursePageData?.progress?.lesson_quiz_attempts, currentLesson]);
+
+  // Get the latest quiz attempt for the current lesson
+  const getLatestQuizAttempt = useCallback(() => {
+    if (!coursePageData?.progress?.lesson_quiz_attempts || !currentLesson) return null;
+    
+    const attempts = coursePageData.progress.lesson_quiz_attempts[currentLesson.id];
+    if (!attempts || attempts.length === 0) return null;
+    
+    // Sort by submitted_at in descending order and return the first (most recent)
+    return [...attempts].sort((a, b) => 
+      new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+    )[0];
+  }, [coursePageData?.progress?.lesson_quiz_attempts, currentLesson]);
 
   // Fetch course content and progress
   useEffect(() => {
@@ -425,7 +450,19 @@ export default function CoursePlayerPage() {
   }, [isQuizActive, quizTimeLeft]);
 
   const startQuiz = () => {
-    if (!currentLesson || !currentLesson.quiz_questions || !isCurrentVideoWatched()) return;
+    if (!currentLesson) return;
+    
+    // Check if the student has already passed this quiz
+    if (hasPassedCurrentQuiz()) {
+      setSaveMessage("You've already passed this quiz. No need to retake it.");
+      setTimeout(() => setSaveMessage(null), 3000);
+      return;
+    }
+    
+    // Check both has_quiz flag and quiz_questions to determine if a quiz should be shown
+    const hasQuiz = currentLesson.has_quiz || (currentLesson.quiz_questions && currentLesson.quiz_questions.length > 0);
+    if (!hasQuiz || !isCurrentVideoWatched()) return;
+    
     setIsQuizActive(true);
     setCurrentQuizAnswers({}); // Reset answers for new attempt
     setQuizTimeLeft(120); // 2 minutes in seconds
@@ -721,7 +758,156 @@ export default function CoursePlayerPage() {
                   />
                 )}
 
-                {/* Quiz section would go here */}
+                {/* Quiz section */}
+                {currentLesson && (
+                  <div className="mt-6">
+                    {/* Quiz activation/status area */}
+                    {(currentLesson.has_quiz || (currentLesson.quiz_questions && currentLesson.quiz_questions.length > 0)) && (
+                      <div className="mt-6 border rounded-lg p-4 bg-neutral-50 dark:bg-neutral-900/50">
+                        <h3 className="text-lg font-semibold mb-2">Lesson Quiz</h3>
+                        
+                        {/* Show "Already Passed" or "Start Quiz" button */}
+                        {!isQuizActive && isCurrentVideoWatched() && (
+                          <div>
+                            {hasPassedCurrentQuiz() ? (
+                              // Already passed quiz message
+                              <div className="p-4 border rounded bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+                                <div className="flex items-center">
+                                  <CheckCircle className="h-5 w-5 mr-2 text-green-500" />
+                                  <p>You've successfully passed this quiz!</p>
+                                </div>
+                                {getLatestQuizAttempt() && (
+                                  <div className="mt-2 text-sm">
+                                    <p>Last score: {getLatestQuizAttempt()?.score}/{getLatestQuizAttempt()?.total_questions_in_quiz}</p>
+                                    <p>Completed on: {new Date(getLatestQuizAttempt()?.submitted_at || '').toLocaleDateString()}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              // Normal quiz start
+                              <>
+                                <p className="mb-4 text-neutral-600 dark:text-neutral-400">
+                                  Complete this quiz to test your understanding of the lesson.
+                                </p>
+                                <Button onClick={startQuiz} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                  {getLatestQuizAttempt()?.pass_fail_status === 'failed' ? 'Retry Quiz' : 'Start Quiz'}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Show active quiz */}
+                        {isQuizActive && currentLesson.quiz_questions && currentLesson.quiz_questions.length > 0 && (
+                          <div className="space-y-6">
+                            {/* Timer */}
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="font-medium">Time Remaining:</span>
+                              <div className="flex items-center">
+                                <Clock className="h-4 w-4 mr-1 text-amber-600 dark:text-amber-400" />
+                                <span className={`font-mono ${quizTimeLeft && quizTimeLeft < 30 ? 'text-red-600 dark:text-red-400 animate-pulse' : ''}`}>
+                                  {quizTimeLeft !== null ? `${Math.floor(quizTimeLeft / 60)}:${(quizTimeLeft % 60).toString().padStart(2, '0')}` : '--:--'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Questions */}
+                            <div className="space-y-8">
+                              {currentLesson.quiz_questions.map((question, qIndex) => (
+                                <Card key={question.id} className="p-4">
+                                  <div className="font-semibold mb-3">{qIndex + 1}. {question.text}</div>
+                                  <div className="space-y-2">
+                                    {question.options.map(option => {
+                                      // Check if this option is selected (handling both single and multi-select)
+                                      const optionIsSelected = 
+                                        Array.isArray(currentQuizAnswers[question.id]) 
+                                          ? (currentQuizAnswers[question.id] as string[]).includes(option.id)
+                                          : currentQuizAnswers[question.id] === option.id;
+                                      
+                                      return (
+                                        <div 
+                                          key={option.id}
+                                          className={`p-3 border rounded cursor-pointer transition ${
+                                            optionIsSelected 
+                                              ? 'border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/30' 
+                                              : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-700 dark:hover:border-neutral-600'
+                                          }`}
+                                          onClick={() => handleQuizAnswerChange(
+                                            question.id, 
+                                            option.id, 
+                                            question.type === 'MSQ'
+                                          )}
+                                        >
+                                          {option.text}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </Card>
+                              ))}
+                            </div>
+                            
+                            {/* Submit Button */}
+                            <div className="flex justify-center mt-4">
+                              <Button 
+                                onClick={handleQuizSubmit}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                disabled={isSaving}
+                              >
+                                {isSaving ? 'Submitting...' : 'Submit Quiz'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Show message if quiz is active but no questions found */}
+                        {isQuizActive && (!currentLesson.quiz_questions || currentLesson.quiz_questions.length === 0) && (
+                          <div className="text-center p-4">
+                            <p className="text-amber-600 dark:text-amber-400">
+                              This quiz has no questions yet. Please contact your instructor.
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Message for when video hasn't been watched but quiz exists */}
+                        {!isQuizActive && !isCurrentVideoWatched() && (
+                          <p className="text-neutral-600 dark:text-neutral-400">
+                            You need to complete watching the video before taking the quiz.
+                          </p>
+                        )}
+                        
+                        {/* Quiz result/summary */}
+                        {showQuizSummary && lastQuizAttemptData && (
+                          <div className="mt-4 p-4 border rounded bg-white dark:bg-neutral-800/50">
+                            <h4 className="font-semibold mb-2">Quiz Results</h4>
+                            <p className={`text-lg font-medium ${
+                              lastQuizAttemptData.pass_fail_status === 'passed' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {lastQuizAttemptData.pass_fail_status === 'passed' ? 'Passed!' : 'Failed'}
+                            </p>
+                            <p>Score: {lastQuizAttemptData.score}/{lastQuizAttemptData.total_questions_in_quiz}</p>
+                            <p>Time taken: {Math.floor(lastQuizAttemptData.timeTakenSeconds! / 60)}:{(lastQuizAttemptData.timeTakenSeconds! % 60).toString().padStart(2, '0')}</p>
+                            <div className="mt-4">
+                              <Button 
+                                onClick={() => {
+                                  setShowQuizSummary(false);
+                                  if (lastQuizAttemptData.pass_fail_status === 'passed' && currentLessonIndex < coursePageData.course.lessons.length - 1) {
+                                    // Auto-advance to next lesson on pass if not the last lesson
+                                    setCurrentLessonIndex(prev => prev + 1);
+                                  }
+                                }}
+                                variant="outline"
+                                className="w-full"
+                              >
+                                {lastQuizAttemptData.pass_fail_status === 'passed' ? 'Continue' : 'Try Again'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 <div className="flex justify-between mt-6">
                   <Button

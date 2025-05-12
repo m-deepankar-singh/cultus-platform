@@ -21,14 +21,16 @@ interface Client { id: string; name: string; }
 interface UserProfile {
     id: string;
     email?: string;
-    profile: {
-        full_name: string | null;
-        role: "Admin" | "Staff" | "Viewer" | "Client Staff";
-        client_id: string | null;
-        status?: string;
-    } | null;
-    client_name?: string;
+    // Fields directly on user object now (no nested profile)
+    full_name?: string | null;
+    role?: string;
+    client_id?: string | null;
+    client?: {
+        id: string;
+        name: string;
+    };
     banned_until?: string | null;
+    status?: string;
     user_metadata?: {
         status?: string;
     };
@@ -40,21 +42,35 @@ interface UserProfile {
 interface UserActionsCellProps {
     user: UserProfile;
     clients: Client[];
+    onUserUpdated?: () => void;
 }
 
-export function UserActionsCell({ user, clients }: UserActionsCellProps) {
+export function UserActionsCell({ user, clients, onUserUpdated }: UserActionsCellProps) {
     const [isLoading, setIsLoading] = React.useState(false);
     const { currentUser } = useCurrentUser();
     
-    // Check if user is active based on banned_until or metadata
-    const isUserActive = 
-        !user.banned_until || 
-        new Date(user.banned_until) <= new Date() ||
-        user.user_metadata?.status === 'active' ||
-        user.app_metadata?.status === 'active';
+    // Check if user is active based on banned_until, status field or metadata
+    const isUserActive = (): boolean => {
+        // Check if user is banned
+        if (user.banned_until && new Date(user.banned_until) > new Date()) {
+            return false;
+        }
+        
+        // Check explicit status field from profile
+        if (user.status === 'inactive') {
+            return false;
+        }
+        
+        // Check metadata status
+        if (user.user_metadata?.status === 'inactive' || user.app_metadata?.status === 'inactive') {
+            return false;
+        }
+        
+        return true;
+    };
 
     // Check if current user is a Staff member
-    const isStaffUser = currentUser?.profile?.role === 'Staff';
+    const isStaffUser = currentUser?.role === 'Staff';
     
     // Staff users should not be able to edit or deactivate users
     const canEditUsers = !isStaffUser;
@@ -72,13 +88,18 @@ export function UserActionsCell({ user, clients }: UserActionsCellProps) {
         
         try {
             setIsLoading(true);
-            const result = await toggleUserStatus(user.id, !isUserActive);
+            const result = await toggleUserStatus(user.id, !isUserActive());
             
             if (result.success) {
                 toast({
                     title: 'Success',
                     description: result.message,
                 });
+                
+                // Trigger refresh of user data if provided
+                if (onUserUpdated) {
+                    onUserUpdated();
+                }
             } else {
                 toast({
                     variant: 'destructive',
@@ -90,7 +111,7 @@ export function UserActionsCell({ user, clients }: UserActionsCellProps) {
             toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: `Failed to ${isUserActive ? 'deactivate' : 'activate'} user: ${error instanceof Error ? error.message : String(error)}`
+                description: `Failed to ${isUserActive() ? 'deactivate' : 'activate'} user: ${error instanceof Error ? error.message : String(error)}`
             });
         } finally {
             setIsLoading(false);
@@ -108,7 +129,7 @@ export function UserActionsCell({ user, clients }: UserActionsCellProps) {
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 {canEditUsers ? (
-                    <EditUserDialog user={user} clients={clients}>
+                    <EditUserDialog user={user} clients={clients} onUserUpdated={onUserUpdated}>
                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                             Edit Profile
                         </DropdownMenuItem>
@@ -122,10 +143,10 @@ export function UserActionsCell({ user, clients }: UserActionsCellProps) {
                 {canDeactivateUsers && (
                     <DropdownMenuItem 
                         onClick={handleToggleStatus} 
-                        className={isUserActive ? "text-destructive" : "text-green-600"}
+                        className={isUserActive() ? "text-destructive" : "text-green-600"}
                         disabled={isLoading}
                     >
-                        {isUserActive ? 'Deactivate User' : 'Activate User'}
+                        {isUserActive() ? 'Deactivate User' : 'Activate User'}
                     </DropdownMenuItem>
                 )}
             </DropdownMenuContent>

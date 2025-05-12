@@ -96,9 +96,13 @@ export function QuizSelector({
         throw new Error(`Error fetching questions: ${response.status}`)
       }
       
-      const data = await response.json()
-      setQuestions(data)
-      setFilteredQuestions(data)
+      const result = await response.json()
+      
+      // Handle the new paginated response format
+      const questionData = Array.isArray(result) ? result : result.data || [];
+      
+      setQuestions(questionData)
+      setFilteredQuestions(questionData)
     } catch (error) {
       console.error("Error fetching questions:", error)
       toast({

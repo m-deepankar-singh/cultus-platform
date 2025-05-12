@@ -91,4 +91,7 @@ export const QuestionBankQuerySchema = z.object({
     // Add other query params like search, tag etc. as optional strings
     search: z.string().optional(),
     tag: z.string().optional(),
+    // Add pagination parameters
+    page: z.string().optional(),
+    pageSize: z.string().optional(),
 }); 

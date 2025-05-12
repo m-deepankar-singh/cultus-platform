@@ -416,6 +416,9 @@ export async function submitAssessmentAction(
     }
     
     // START --- MODIFICATION TO ADD RECORD TO assessment_submissions ---
+    // Make submissionTime unique for assessment_submissions by appending random ms
+    const uniqueSubmissionTime = new Date(new Date(submissionTime).getTime() + Math.floor(Math.random() * 1000)).toISOString();
+    
     const { error: newSubmissionError } = await supabase
       .from('assessment_submissions')
       .insert({
@@ -425,7 +428,7 @@ export async function submitAssessmentAction(
         passed: passed,
         total_questions: totalQuestions,
         correct_answers: correctAnswers,
-        submitted_at: submissionTime,
+        submitted_at: uniqueSubmissionTime, // Use unique timestamp
       });
 
     if (newSubmissionError) {
@@ -449,7 +452,7 @@ export async function submitAssessmentAction(
             passed: passed,
             total_questions: totalQuestions,
             correct_answers: correctAnswers,
-            submitted_at: submissionTime,
+            submitted_at: uniqueSubmissionTime, // Use unique timestamp
           });
           
         console.log('Successfully inserted assessment submission using admin client');

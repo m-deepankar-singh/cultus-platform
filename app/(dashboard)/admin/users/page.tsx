@@ -10,6 +10,23 @@ interface Client { id: string; name: string; }
 export default async function UsersPage() {
 	// Fetch clients server-side
 	const supabase = await createClient();
+	
+	// Get current user role for permissions
+	const { data: { user } } = await supabase.auth.getUser();
+	let currentUserRole = undefined;
+	
+	if (user) {
+		// Fetch current user's role
+		const { data: currentUserProfile } = await supabase
+			.from('profiles')
+			.select('role')
+			.eq('id', user.id)
+			.single();
+		
+		currentUserRole = currentUserProfile?.role;
+	}
+	
+	// Fetch clients for dropdown
 	const { data: clients, error: clientsError } = await supabase
 		.from('clients')
 		.select('id, name')
@@ -30,11 +47,11 @@ export default async function UsersPage() {
 		<div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
 			{/* Pass fetched clients to the header */}
 			<UsersHeader clients={safeClients} />
-			{/* Add Suspense for data fetching in UsersTable */}
-			<Suspense fallback={<UsersTableSkeleton />}>
-				{/* Pass clients down to the table */}
-				<UsersTable clients={safeClients}/>
-			</Suspense>
+			{/* The UsersTable is now a client component with pagination */}
+			<UsersTable 
+				clients={safeClients} 
+				initialCurrentUserRole={currentUserRole}
+			/>
 		</div>
 	);
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Adjust path if needed
 import { ProductSchema } from '@/lib/schemas/product'; // Import ProductSchema
+import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
 export async function GET(request: Request) {
   try {
@@ -38,28 +39,57 @@ export async function GET(request: Request) {
     // 2. Parse Query Parameters
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get('search');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '10', 10);
 
-    // 3. Build Supabase Query
-    let query = supabase
+    // 3. Build Supabase Query for Count
+    let countQuery = supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true });
+
+    // Apply search filter to count query
+    if (searchQuery) {
+      countQuery = countQuery.ilike('name', `%${searchQuery}%`);
+    }
+
+    // Execute count query
+    const { count, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error('Database error counting products:', countError);
+      return NextResponse.json({ error: 'Failed to count products', details: countError.message }, { status: 500 });
+    }
+
+    // If no products found, return empty response
+    if (count === 0) {
+      return NextResponse.json(createPaginatedResponse([], 0, page, pageSize), { status: 200 });
+    }
+
+    // 4. Build Supabase Query for Data
+    let dataQuery = supabase
       .from('products')
       .select('*');
 
-    // Apply filters
+    // Apply search filter to data query
     if (searchQuery) {
-      query = query.ilike('name', `%${searchQuery}%`);
+      dataQuery = dataQuery.ilike('name', `%${searchQuery}%`);
     }
 
-    query = query.order('name', { ascending: true });
+    // Calculate pagination range
+    const { from, to } = calculatePaginationRange(page, pageSize);
 
-    // 4. Execute Query & Handle Response
-    const { data: products, error: dbError } = await query;
+    // Execute data query with pagination
+    const { data: products, error: dataError } = await dataQuery
+      .order('name', { ascending: true })
+      .range(from, to);
 
-    if (dbError) {
-      console.error('Database error fetching products:', dbError);
-      return NextResponse.json({ error: 'Failed to fetch products', details: dbError.message }, { status: 500 });
+    if (dataError) {
+      console.error('Database error fetching products:', dataError);
+      return NextResponse.json({ error: 'Failed to fetch products', details: dataError.message }, { status: 500 });
     }
 
-    return NextResponse.json(products || [], { status: 200 });
+    // 5. Return paginated response
+    return NextResponse.json(createPaginatedResponse(products || [], count || 0, page, pageSize), { status: 200 });
 
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/products:', error);

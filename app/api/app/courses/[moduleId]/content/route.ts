@@ -16,6 +16,7 @@ interface LessonOutput {
   description?: string | null;
   video_url?: string | null;
   sequence: number;
+  has_quiz?: boolean;
   quiz_questions?: QuizQuestion[] | null; // Use the refined QuizQuestion type
 }
 
@@ -88,7 +89,7 @@ export async function GET(
     // 2. Fetch Lessons for the Module
     const { data: lessonsData, error: lessonsError } = await supabase
       .from('lessons')
-      .select('id, title, description, video_url, sequence, quiz_questions') // Ensure quiz_questions is selected
+      .select('id, title, description, video_url, sequence, has_quiz, quiz_questions') // Added has_quiz to the select
       .eq('module_id', moduleId)
       .order('sequence', { ascending: true });
 
@@ -107,20 +108,27 @@ export async function GET(
       // Process quiz questions to remove correct answers and unnecessary fields
       let processedQuizQuestions: QuizQuestion[] | null = null;
       
-      if (lesson.quiz_questions && Array.isArray(lesson.quiz_questions)) {
-        processedQuizQuestions = lesson.quiz_questions.map(question => {
-          // Convert database field names to frontend expected field names
-          return {
-            id: question.id,
-            // Map question_text to text (what frontend expects)
-            text: question.question_text,
-            // Map question_type to type (what frontend expects) 
-            type: question.question_type,
-            // Keep options as is, but ensure it's an array
-            options: Array.isArray(question.options) ? question.options : [],
-            // Deliberately omit the correct_answer field for security
-          };
-        });
+      // Check if the lesson has a quiz (using both has_quiz flag and quiz_questions)
+      if (lesson.has_quiz === true || (lesson.quiz_questions && Array.isArray(lesson.quiz_questions) && lesson.quiz_questions.length > 0)) {
+        // If has_quiz is true but quiz_questions is empty or null, return an empty array
+        if (!lesson.quiz_questions || !Array.isArray(lesson.quiz_questions) || lesson.quiz_questions.length === 0) {
+          processedQuizQuestions = [];
+        } else {
+          // Process existing quiz questions
+          processedQuizQuestions = lesson.quiz_questions.map(question => {
+            // Convert database field names to frontend expected field names
+            return {
+              id: question.id,
+              // Map question_text to text (what frontend expects)
+              text: question.question_text,
+              // Map question_type to type (what frontend expects) 
+              type: question.question_type,
+              // Keep options as is, but ensure it's an array
+              options: Array.isArray(question.options) ? question.options : [],
+              // Deliberately omit the correct_answer field for security
+            };
+          });
+        }
       }
 
       return {
@@ -129,6 +137,7 @@ export async function GET(
         description: lesson.description,
         video_url: lesson.video_url,
         sequence: lesson.sequence,
+        has_quiz: !!lesson.has_quiz, // Ensure boolean type with double negation
         quiz_questions: processedQuizQuestions,
       };
     });

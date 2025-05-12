@@ -38,11 +38,11 @@ export interface Learner {
   }
 }
 
-// Server Component to fetch learners data
+// Server Component to fetch uniqueClients data
 async function LearnersTableServer() {
   const supabase = await createClient()
   
-  // First, fetch all clients to ensure we have them available
+  // Fetch all clients to use for filters
   const { data: clientsData, error: clientsError } = await supabase
     .from('clients')
     .select('id, name')
@@ -52,49 +52,12 @@ async function LearnersTableServer() {
     throw new Error(`Failed to fetch clients: ${clientsError.message}`)
   }
   
-  // Create a map of client IDs to client objects for quick lookup
-  const clientsMap = (clientsData || []).reduce((map, client) => {
-    map[client.id] = client
-    return map
-  }, {} as Record<string, { id: string, name: string }>)
-  
-  // Query the students table directly using Supabase client
-  const { data, error } = await supabase
-    .from('students')
-    .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, temporary_password')
-  
-  if (error) {
-    console.error('Error fetching learners:', error)
-    throw new Error(`Failed to fetch learners: ${error.message}`)
-  }
-  
-  // Transform the data to match our Learner type and include client info
-  const learners: Learner[] = (data || []).map(item => {
-    const client = clientsMap[item.client_id] || { id: '', name: 'Unknown' }
-    
-    return {
-      id: item.id,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      client_id: item.client_id,
-      is_active: item.is_active,
-      full_name: item.full_name,
-      email: item.email,
-      phone_number: item.phone_number,
-      star_rating: item.star_rating,
-      last_login_at: item.last_login_at,
-      temporary_password: item.temporary_password,
-      client: {
-        id: client.id,
-        name: client.name
-      }
-    }
-  })
-  
   // Get unique client names for filter dropdown
-  const uniqueClients = Array.from(new Set(Object.values(clientsMap).map(c => c.name)))
+  const uniqueClients = Array.from(new Set((clientsData || []).map(c => c.name)))
   
-  return { learners, uniqueClients }
+  // Return empty initial learners array (will be fetched client-side with pagination)
+  // and the uniqueClients list for filters
+  return { learners: [], uniqueClients }
 }
 
 // Main component using Suspense for data loading
