@@ -16,7 +16,12 @@ const AssessmentQuestionsSchema = z.object({
         z.object({ answers: z.array(z.string()) })
       ]).optional()
     })
-  )
+  ),
+  configuration: z.object({
+    passing_threshold: z.number().min(0).max(100).optional(),
+    time_limit_minutes: z.number().min(1).optional(),
+    instructions: z.string().optional()
+  }).optional()
 });
 
 /**
@@ -71,7 +76,7 @@ export async function GET(
     // Check if the module exists and is an assessment
     const { data: module, error: moduleError } = await supabase
       .from('modules')
-      .select('id, type')
+      .select('id, type, configuration')
       .eq('id', moduleId)
       .single();
 
@@ -129,7 +134,10 @@ export async function GET(
       ...(q.assessment_questions || {}),
     }));
 
-    return NextResponse.json(formattedQuestions);
+    return NextResponse.json({
+      questions: formattedQuestions,
+      configuration: module?.configuration || {}
+    });
   } catch (error) {
     console.error('Error in GET assessment questions:', error);
     return NextResponse.json(
@@ -232,6 +240,24 @@ export async function PUT(
     // Skip RPC and use direct approach
     const useDirectApproach = true;
     let updateSuccess = false;
+
+    // If configuration was provided, update the module configuration
+    if (validationResult.data.configuration) {
+      const { error: configError } = await supabase
+        .from('modules')
+        .update({
+          configuration: validationResult.data.configuration
+        })
+        .eq('id', moduleId);
+        
+      if (configError) {
+        console.error('Error updating module configuration:', configError);
+        return NextResponse.json(
+          { error: 'Failed to update module configuration', details: configError.message },
+          { status: 500 }
+        );
+      }
+    }
 
     if (!useDirectApproach) {
       // Start a transaction to update the assessment questions
