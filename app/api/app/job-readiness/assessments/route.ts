@@ -3,14 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * GET /api/app/job-readiness/assessments
- * Get assessments for the Job Readiness product
- * These are the initial tier-determining assessments that unlock Star 1
+ * Get assessments for the Job Readiness product using the module-based system
+ * These are tier-determining assessments that work with the module system
  */
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
     const url = new URL(req.url);
     const productId = url.searchParams.get('productId');
+    const assessmentType = url.searchParams.get('assessmentType'); // Optional filter: initial_tier, skill_specific, promotion
 
     if (!productId) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
@@ -32,7 +33,8 @@ export async function GET(req: NextRequest) {
         id,
         client_id,
         job_readiness_star_level,
-        job_readiness_tier
+        job_readiness_tier,
+        is_active
       `)
       .eq('id', user.id)
       .single();
@@ -42,7 +44,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // Verify the product is assigned to the student's client
+    if (!student.is_active) {
+      return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
+    }
+
+    // Verify the product is a Job Readiness product assigned to the student's client
+    const { data: productData, error: productDataError } = await supabase
+      .from('products')
+      .select('id, name, type')
+      .eq('id', productId)
+      .eq('type', 'JOB_READINESS')
+      .single();
+
+    if (productDataError || !productData) {
+      return NextResponse.json({ error: 'Job Readiness product not found' }, { status: 404 });
+    }
+
     const { data: clientProduct, error: clientProductError } = await supabase
       .from('client_product_assignments')
       .select('client_id, product_id')
@@ -56,10 +73,10 @@ export async function GET(req: NextRequest) {
     }
 
     if (!clientProduct) {
-      return NextResponse.json({ error: 'This product is not available for your client' }, { status: 403 });
+      return NextResponse.json({ error: 'This Job Readiness product is not available for your client' }, { status: 403 });
     }
 
-    // Get assessment modules for this product
+    // Get assessment modules for this Job Readiness product
     const { data: assessments, error: assessmentsError } = await supabase
       .from('modules')
       .select(`
@@ -68,7 +85,6 @@ export async function GET(req: NextRequest) {
         type,
         configuration,
         sequence,
-        context,
         student_module_progress (
           student_id,
           module_id,
@@ -78,16 +94,14 @@ export async function GET(req: NextRequest) {
           completed_at,
           last_updated
         ),
-        assessment_questions (
-          id,
-          question_text,
-          options,
-          correct_answer
+        assessment_module_questions (
+          module_id,
+          question_id,
+          sequence
         )
       `)
       .eq('product_id', productId)
       .eq('type', 'Assessment')
-      .eq('context', 'job_readiness')
       .eq('student_module_progress.student_id', student.id)
       .order('sequence', { ascending: true });
 
@@ -96,7 +110,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch assessments' }, { status: 500 });
     }
 
-    // Get product configuration for tier determination
+    // Get Job Readiness product configuration for tier determination
     const { data: productConfig, error: productConfigError } = await supabase
       .from('job_readiness_products')
       .select('*')
@@ -121,10 +135,16 @@ export async function GET(req: NextRequest) {
     // Use productConfig if available, otherwise use default values
     const tierConfig = productConfig || defaultConfig;
 
-    // Enhance assessments with progress data and lock/unlock status
+    // Enhance assessments with progress data and Job Readiness specific information
     const enhancedAssessments = assessments?.map(assessment => {
-      // Assessments are always unlocked by default in Job Readiness
-      const isUnlocked = true;
+      const progress = assessment.student_module_progress?.[0] || null;
+      const isCompleted = progress?.status === 'Completed';
+      const isUnlocked = true; // Job Readiness assessments are always unlocked
+      
+      // Extract Job Readiness specific configuration
+      const config = assessment.configuration || {};
+      const isTierDetermining = config.isTierDeterminingAssessment !== false; // Default to true
+      const assessmentTypeFromConfig = config.assessmentType || 'initial_tier';
       
       return {
         id: assessment.id,
@@ -133,9 +153,21 @@ export async function GET(req: NextRequest) {
         configuration: assessment.configuration,
         sequence: assessment.sequence,
         is_unlocked: isUnlocked,
-        progress: assessment.student_module_progress?.[0] || null,
-        questions_count: assessment.assessment_questions?.length || 0
+        is_completed: isCompleted,
+        is_tier_determining: isTierDetermining,
+        assessment_type: assessmentTypeFromConfig,
+        progress: progress,
+        questions_count: assessment.assessment_module_questions?.length || 0,
+        // Add score and tier information if completed
+        last_score: progress?.progress_percentage || null,
+        tier_achieved: progress?.progress_details?.tier_achieved || null,
       };
+    }).filter(assessment => {
+      // Apply assessment type filter if provided
+      if (assessmentType && assessment.assessment_type !== assessmentType) {
+        return false;
+      }
+      return true;
     });
 
     // Get the count of completed assessments out of total for this product
@@ -149,7 +181,6 @@ export async function GET(req: NextRequest) {
       `)
       .eq('product_id', productId)
       .eq('type', 'Assessment')
-      .eq('context', 'job_readiness')
       .eq('student_module_progress.student_id', user.id)
       .eq('student_module_progress.status', 'Completed');
 
@@ -158,8 +189,7 @@ export async function GET(req: NextRequest) {
       .from('modules')
       .select('id', { count: 'exact' })
       .eq('product_id', productId)
-      .eq('type', 'Assessment')
-      .eq('context', 'job_readiness');
+      .eq('type', 'Assessment');
 
     return NextResponse.json({
       assessments: enhancedAssessments,
@@ -180,7 +210,12 @@ export async function GET(req: NextRequest) {
       current_tier: student.job_readiness_tier,
       current_star_level: student.job_readiness_star_level,
       completed_assessments_count: moduleCounts?.length || 0,
-      total_assessments_count: totalCount || 0
+      total_assessments_count: totalCount || 0,
+      product: {
+        id: productData.id,
+        name: productData.name,
+        type: productData.type
+      }
     });
   } catch (error) {
     console.error('Unexpected error in job-readiness assessments GET:', error);
@@ -188,94 +223,4 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/**
- * POST /api/app/job-readiness/assessments/save-progress
- * Save assessment progress for a Job Readiness assessment
- */
-export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const body = await req.json();
-
-    // Verify assessment_id and progress data
-    const { module_id, progress_data } = body;
-    if (!module_id || !progress_data) {
-      return NextResponse.json({ 
-        error: 'Module ID and progress data are required' 
-      }, { status: 400 });
-    }
-
-    // Verify authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if there's existing progress to update or we need to create new
-    const { data: existingProgress, error: progressError } = await supabase
-      .from('student_module_progress')
-      .select('student_id, module_id')
-      .eq('student_id', user.id)
-      .eq('module_id', module_id)
-      .maybeSingle();
-
-    if (progressError) {
-      console.error('Error checking existing progress:', progressError);
-      return NextResponse.json({ error: 'Failed to check existing progress' }, { status: 500 });
-    }
-
-    let progressResult;
-    
-    if (existingProgress) {
-      // Update existing progress
-      const { data, error } = await supabase
-        .from('student_module_progress')
-        .update({
-          progress_percentage: progress_data.progress_percentage || 0,
-          progress_details: progress_data.progress_details || {},
-          status: progress_data.status || 'InProgress',
-          last_updated: new Date().toISOString()
-        })
-        .eq('student_id', user.id)
-        .eq('module_id', module_id)
-        .select()
-        .single();
-        
-      if (error) {
-        console.error('Error updating progress:', error);
-        return NextResponse.json({ error: 'Failed to update progress' }, { status: 500 });
-      }
-      
-      progressResult = data;
-    } else {
-      // Create new progress
-      const { data, error } = await supabase
-        .from('student_module_progress')
-        .insert({
-          student_id: user.id,
-          module_id,
-          progress_percentage: progress_data.progress_percentage || 0,
-          progress_details: progress_data.progress_details || {},
-          status: progress_data.status || 'InProgress',
-          last_updated: new Date().toISOString()
-        })
-        .select()
-        .single();
-        
-      if (error) {
-        console.error('Error creating progress:', error);
-        return NextResponse.json({ error: 'Failed to create progress' }, { status: 500 });
-      }
-      
-      progressResult = data;
-    }
-
-    return NextResponse.json({ progress: progressResult });
-  } catch (error) {
-    console.error('Unexpected error in job-readiness assessments POST:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-} 
+ 

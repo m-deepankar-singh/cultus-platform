@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -22,25 +22,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Verify admin role
-    const { data: userRoles, error: rolesError } = await supabase
-      .from('user_roles')
+    // Check if user has admin role - use case insensitive comparison
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('role')
-      .eq('user_id', user.id);
-      
-    if (rolesError) {
-      console.error('Error fetching user roles:', rolesError);
-      return NextResponse.json({ error: 'Failed to verify authorization' }, { status: 500 });
+      .eq('id', user.id)
+      .single();
+
+    // Modified to be case insensitive - check for "admin" or "Admin"
+    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
+      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
     
-    const isAdmin = userRoles && userRoles.some(ur => ur.role.toLowerCase() === 'admin');
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
-    
-    // Get the student ID from the route parameters
-    const { studentId } = params;
+    // Get the student ID from the route parameters (await params for Next.js 15)
+    const { studentId } = await params;
     
     if (!studentId) {
       return NextResponse.json({ error: 'Student ID is required' }, { status: 400 });
@@ -50,7 +46,7 @@ export async function PATCH(
     const body = await req.json();
     const { job_readiness_star_level, job_readiness_tier, override_reason } = body;
     
-    if (!job_readiness_star_level && !job_readiness_tier) {
+    if (job_readiness_star_level === undefined && !job_readiness_tier) {
       return NextResponse.json({ 
         error: 'At least one of job_readiness_star_level or job_readiness_tier must be provided' 
       }, { status: 400 });
@@ -63,11 +59,11 @@ export async function PATCH(
     }
     
     // Validate star level if provided
-    if (job_readiness_star_level) {
+    if (job_readiness_star_level !== undefined && job_readiness_star_level !== null) {
       const validStarLevels = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'];
       if (!validStarLevels.includes(job_readiness_star_level)) {
         return NextResponse.json({ 
-          error: `Invalid star level. Must be one of: ${validStarLevels.join(', ')}` 
+          error: `Invalid star level. Must be one of: ${validStarLevels.join(', ')} or null` 
         }, { status: 400 });
       }
     }
@@ -82,32 +78,14 @@ export async function PATCH(
       }
     }
     
-    // Set the override reason as a database session variable so the trigger can access it
-    try {
-      const { data: configResult, error: configError } = await supabase.rpc('set_config', { 
-        parameter: 'app.override_reason', 
-        value: override_reason,
-        is_local: true
-      });
-      
-      if (configError) {
-        console.error('Error setting configuration parameter:', configError);
-        // Continue execution, as this is not blocking - the trigger will handle missing reason gracefully
-      }
-    } catch (configErr) {
-      console.error('Unexpected error setting config:', configErr);
-      // Continue execution, as this is not blocking
-    }
-    
-    // Update student progress with the admin override flag
-    // This flag tells the database trigger that this update is from an admin
-    // and should bypass normal sequential progression checks
+    // Update student progress
+    // Note: We're directly updating the student record without special flags
+    // since the database schema doesn't have admin override tracking columns
     const updateData: any = {
-      job_readiness_admin_override: true,
       job_readiness_last_updated: new Date().toISOString()
     };
     
-    if (job_readiness_star_level) {
+    if (job_readiness_star_level !== undefined) {
       updateData.job_readiness_star_level = job_readiness_star_level;
     }
     
@@ -121,8 +99,7 @@ export async function PATCH(
       .eq('id', studentId)
       .select(`
         id, 
-        first_name, 
-        last_name, 
+        full_name, 
         email,
         job_readiness_star_level,
         job_readiness_tier,
@@ -138,21 +115,27 @@ export async function PATCH(
     if (!updatedStudent) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
-    
-    // Get the latest override record for additional context
-    const { data: latestOverride, error: overrideError } = await supabase
-      .from('job_readiness_admin_overrides')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('timestamp', { ascending: false })
-      .limit(1)
-      .single();
 
-    // For Postman testing - return clear information about the action taken
+    // Log the override action for audit purposes
+    console.log('Admin progress override completed:', {
+      admin_user_id: user.id,
+      student_id: studentId,
+      previous_values: {
+        star_level: updatedStudent.job_readiness_star_level,
+        tier: updatedStudent.job_readiness_tier
+      },
+      new_values: {
+        job_readiness_star_level: job_readiness_star_level || updatedStudent.job_readiness_star_level,
+        job_readiness_tier: job_readiness_tier || updatedStudent.job_readiness_tier
+      },
+      override_reason: override_reason,
+      timestamp: new Date().toISOString()
+    });
+
+    // Return clear information about the action taken
     return NextResponse.json({
       message: 'Student progress updated successfully',
       student: updatedStudent,
-      override_details: latestOverride || null,
       note: 'The student\'s progress has been updated. Any client app should refresh their current state after this operation. Changes will be reflected in subsequent API calls.',
       updated_values: {
         job_readiness_star_level: job_readiness_star_level || updatedStudent.job_readiness_star_level,

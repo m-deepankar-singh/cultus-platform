@@ -41,29 +41,63 @@ export async function GET(req: NextRequest) {
     }
 
     // Get Job Readiness products assigned to the student's client
-    const { data: clientProducts, error: clientProductsError } = await supabase
+    // First get the product assignments
+    const { data: assignments, error: assignmentsError } = await supabase
       .from('client_product_assignments')
-      .select(`
-        product_id,
-        products (
-          id,
-          name,
-          description,
-          type,
-          job_readiness_products (
-            *
-          )
-        )
-      `)
-      .eq('client_id', student.client_id)
-      .eq('products.type', 'JOB_READINESS');
+      .select('product_id')
+      .eq('client_id', student.client_id);
 
-    if (clientProductsError) {
-      console.error('Error fetching client product assignments:', clientProductsError);
+    if (assignmentsError) {
+      console.error('Error fetching client product assignments:', assignmentsError);
       return NextResponse.json({ error: 'Failed to fetch client product assignments' }, { status: 500 });
     }
 
-    // Define the type for the product data
+    if (!assignments || assignments.length === 0) {
+      console.log('No product assignments found for client:', student.client_id);
+      return NextResponse.json({
+        student: {
+          id: student.id,
+          name: student.full_name,
+          email: student.email,
+          job_readiness_star_level: student.job_readiness_star_level,
+          job_readiness_tier: student.job_readiness_tier,
+          job_readiness_background_type: student.job_readiness_background_type,
+          job_readiness_promotion_eligible: student.job_readiness_promotion_eligible
+        },
+        products: []
+      });
+    }
+
+    // Get the actual products with job readiness configurations
+    const productIds = assignments.map(a => a.product_id);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select(`
+        id,
+        name,
+        description,
+        type,
+        job_readiness_products (*)
+      `)
+      .in('id', productIds)
+      .eq('type', 'JOB_READINESS');
+
+    if (productsError) {
+      console.error('Error fetching products:', productsError);
+      return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    }
+
+    // Enforce business rule: only one Job Readiness product per client
+    if (products && products.length > 1) {
+      console.warn(`Client ${student.client_id} has ${products.length} Job Readiness products. Expected only 1.`);
+    }
+
+    const clientProducts = products?.map(product => ({
+      product_id: product.id,
+      products: product
+    })) || [];
+
+    // Define the type for the product data  
     type ProductData = {
       id: string;
       name: string;
@@ -75,8 +109,8 @@ export async function GET(req: NextRequest) {
     // Get modules for each product with progress
     const productsWithModules = await Promise.all(
       clientProducts.map(async (assignment) => {
-        // Safely access the products field
-        const productData = assignment.products as unknown as ProductData;
+        // Access the products field
+        const productData = assignment.products as ProductData;
 
         const { data: modules, error: modulesError } = await supabase
           .from('modules')
@@ -124,8 +158,8 @@ export async function GET(req: NextRequest) {
               isUnlocked = ['TWO', 'THREE', 'FOUR', 'FIVE'].includes(starLevel);
               break;
             case 'expert_session':
-              // Expert sessions unlock after star level TWO (after completing courses)
-              isUnlocked = ['THREE', 'FOUR', 'FIVE'].includes(starLevel);
+              // Expert sessions unlock at star level TWO (after completing courses)
+              isUnlocked = ['TWO', 'THREE', 'FOUR', 'FIVE'].includes(starLevel);
               break;
             case 'project':
               // Projects unlock after star level THREE (after completing expert sessions)
@@ -164,14 +198,14 @@ export async function GET(req: NextRequest) {
         job_readiness_promotion_eligible: student.job_readiness_promotion_eligible
       },
       products: productsWithModules.map((assignment) => {
-        // Safely access the products field
-        const productData = assignment.products as unknown as ProductData;
+        // Access the products field
+        const productData = assignment.products as ProductData;
         
         return {
-          id: productData?.id,
-          name: productData?.name,
-          description: productData?.description,
-          configuration: productData?.job_readiness_products?.[0],
+          id: productData.id,
+          name: productData.name,
+          description: productData.description,
+          configuration: productData.job_readiness_products?.[0],
           modules: assignment.modules
         };
       })

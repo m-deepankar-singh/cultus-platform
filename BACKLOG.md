@@ -31,6 +31,34 @@ This file tracks identified issues, bugs, and future tasks for the Upskilling Pl
 
 ## Future Tasks
 
+- [ ] **Job Readiness Submissions Review Feature (HIGH PRIORITY)**
+    - **Feature:** Job Readiness Admin Panel - Submissions Management
+    - **Description:** Complete submission review workflow for admins to review student project and interview submissions
+    - **API Issues to Fix:**
+        - Fix Next.js 15 async params issue in `/api/admin/job-readiness/interviews/[submissionId]/manual-review/route.ts`
+        - Create missing GET endpoint for listing submissions: `/api/admin/job-readiness/submissions`
+        - Add filtering and pagination to submissions API
+    - **Frontend Components to Create:**
+        - `lib/api/job-readiness/submissions.ts` - API client functions for submissions
+        - `components/job-readiness/admin/jr-submissions-table.tsx` - Table for listing submissions
+        - `components/job-readiness/admin/jr-interview-review-modal.tsx` - Modal for manual interview review
+        - `components/job-readiness/admin/jr-submission-details.tsx` - Component to view submission details
+    - **UI Features:**
+        - List all project and interview submissions with filtering
+        - Search by student name, submission type, status
+        - Filter by product, date range, submission status
+        - Manual review workflow for interview submissions
+        - View submission details (project content, interview recordings)
+        - Approve/reject submissions with admin feedback
+        - Export submissions data
+    - **Database Tables:**
+        - `job_readiness_ai_interview_submissions` - Interview submission data
+        - `job_readiness_ai_project_submissions` - Project submission data
+    - **Relevant Files:**
+        - `app/(dashboard)/admin/job-readiness/submissions/page.tsx` - Main submissions page (placeholder exists)
+        - `app/api/admin/job-readiness/interviews/[submissionId]/manual-review/route.ts` - Manual review API (needs async fix)
+        - `app/api/admin/job-readiness/submissions/route.ts` - New endpoint for listing submissions
+
 - [ ] Implement User Edit Form/Modal (Step 2.1)
 - [ ] Implement User Deactivate/Activate functionality (Step 2.1)
 - [ ] Implement Client-side filtering for Users Table (Step 2.1)

@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation"
 import {
   BarChart3,
   BookOpen,
+  Briefcase,
   Building2,
   ChevronDown,
   FileQuestion,
@@ -78,6 +79,68 @@ const navItems: NavItem[] = [
     role: ["admin", "staff"],
   },
   {
+    title: "Job Readiness",
+    href: "/admin/job-readiness",
+    icon: Briefcase,
+    role: ["admin"],
+    submenu: [
+      {
+        title: "Products",
+        href: "/admin/job-readiness/products",
+        icon: Package,
+        role: ["admin"],
+      },
+      {
+        title: "Backgrounds",
+        href: "/admin/job-readiness/backgrounds",
+        icon: Users,
+        role: ["admin"],
+      },
+      {
+        title: "Assessments",
+        href: "/admin/job-readiness/assessments",
+        icon: FileQuestion,
+        role: ["admin"],
+      },
+      {
+        title: "Courses",
+        href: "/admin/job-readiness/courses",
+        icon: BookOpen,
+        role: ["admin"],
+      },
+      {
+        title: "Expert Sessions",
+        href: "/admin/job-readiness/expert-sessions",
+        icon: GraduationCap,
+        role: ["admin"],
+      },
+      {
+        title: "Projects",
+        href: "/admin/job-readiness/projects",
+        icon: Layers,
+        role: ["admin"],
+      },
+      {
+        title: "Submissions Review",
+        href: "/admin/job-readiness/submissions",
+        icon: FileQuestion,
+        role: ["admin"],
+      },
+      {
+        title: "Student Progress",
+        href: "/admin/job-readiness/progress",
+        icon: BarChart3,
+        role: ["admin"],
+      },
+      {
+        title: "Promotion Exams",
+        href: "/admin/job-readiness/promotion-exams",
+        icon: GraduationCap,
+        role: ["admin"],
+      },
+    ],
+  },
+  {
     title: "Analytics",
     href: "/analytics",
     icon: BarChart3,
@@ -119,7 +182,7 @@ export function DashboardSidebar() {
         </Button>
       </div>
       {/* Wrap main nav in flex-1 container */}
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         <ScrollArea className="h-full py-2">
           <nav className="grid gap-1 px-2">
             {/* Filter out the settings item from the main list */}

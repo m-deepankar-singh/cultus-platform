@@ -26,91 +26,167 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has admin role
+    // Check if user has admin role - use case insensitive comparison
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profileError || profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
+      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    // Start building the query
-    let query = supabase
+    // Use a simpler approach: query students with their clients and join with products
+    let baseQuery = supabase
       .from('students')
       .select(`
         id,
-        first_name,
-        last_name,
+        full_name,
         email,
         job_readiness_star_level,
         job_readiness_tier,
         job_readiness_background_type,
         job_readiness_last_updated,
         job_readiness_promotion_eligible,
+        client_id,
         clients!inner (
           id,
           name
-        ),
-        student_product_assignments!inner (
-          id,
-          product_id,
-          products (
-            id,
-            name,
-            type
-          )
         )
-      `)
-      .eq('student_product_assignments.products.type', 'JOB_READINESS');
+      `);
 
-    // Apply filters
-    if (productId) {
-      query = query.eq('student_product_assignments.product_id', productId);
-    }
-    
+    // Apply filters first
     if (clientId) {
-      query = query.eq('clients.id', clientId);
+      baseQuery = baseQuery.eq('client_id', clientId);
     }
     
     if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+      baseQuery = baseQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
     }
-    
-    // Calculate pagination
+
+    // Get all students first
+    const { data: allStudents, error: studentsError } = await baseQuery;
+
+    if (studentsError) {
+      console.error('Error fetching students:', studentsError);
+      return NextResponse.json({ error: 'Failed to fetch students' }, { status: 500 });
+    }
+
+    if (!allStudents || allStudents.length === 0) {
+      return NextResponse.json({ 
+        students: [], 
+        pagination: { page, pageSize, totalCount: 0, totalPages: 0 }
+      });
+    }
+
+    // Get client IDs for the products query
+    const clientIds = [...new Set(allStudents.map(s => s.client_id))];
+
+    // Get client product assignments for job readiness products
+    let productQuery = supabase
+      .from('client_product_assignments')
+      .select(`
+        client_id,
+        product_id,
+        products!inner (
+          id,
+          name,
+          type
+        )
+      `)
+      .eq('products.type', 'JOB_READINESS')
+      .in('client_id', clientIds);
+
+    if (productId) {
+      productQuery = productQuery.eq('product_id', productId);
+    }
+
+    const { data: clientProducts, error: productsError } = await productQuery;
+
+    if (productsError) {
+      console.error('Error fetching client products:', productsError);
+      return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    }
+
+    // Filter students to only those whose clients have job readiness products
+    const clientsWithProducts = new Set(clientProducts?.map(cp => cp.client_id) || []);
+    const studentsWithAccess = allStudents.filter(student => 
+      clientsWithProducts.has(student.client_id)
+    );
+
+    // Create a map of client products for easy lookup
+    const clientProductMap = new Map();
+    clientProducts?.forEach(cp => {
+      if (!clientProductMap.has(cp.client_id)) {
+        clientProductMap.set(cp.client_id, []);
+      }
+      clientProductMap.get(cp.client_id).push(cp.products);
+    });
+
+    // Transform students to match frontend expectations
+    const transformedStudents = studentsWithAccess.map(student => {
+      const products = clientProductMap.get(student.client_id) || [];
+      const primaryProduct = products[0]; // Use first product, or handle multiple products differently
+      
+      // Split full_name into first_name and last_name for compatibility
+      const nameParts = student.full_name?.split(' ') || ['Unknown'];
+      const first_name = nameParts[0] || 'Unknown';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        id: student.id,
+        student_id: student.id,
+        product_id: primaryProduct?.id || '',
+        job_readiness_star_level: student.job_readiness_star_level,
+        job_readiness_tier: student.job_readiness_tier || 'BRONZE',
+        job_readiness_background_type: student.job_readiness_background_type,
+        job_readiness_last_updated: student.job_readiness_last_updated,
+        job_readiness_promotion_eligible: student.job_readiness_promotion_eligible,
+        created_at: null,
+        updated_at: student.job_readiness_last_updated,
+        // Student information in expected format
+        student: {
+          id: student.id,
+          first_name,
+          last_name,
+          email: student.email || '',
+        },
+        // Product information in expected format
+        product: primaryProduct ? {
+          id: primaryProduct.id,
+          name: primaryProduct.name,
+          description: primaryProduct.description || '',
+        } : {
+          id: '',
+          name: 'No Product Assigned',
+          description: '',
+        },
+        // Module progress placeholder - you can enhance this later
+        module_progress: {
+          total_modules: 0,
+          completed_modules: 0,
+          completion_percentage: 0,
+        },
+        // Keep client information for reference
+        client: student.clients,
+      };
+    });
+
+    // Apply pagination
+    const finalTotalCount = transformedStudents.length;
     const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    
-    // Execute query with pagination
-    const { data: students, error, count } = await query
-      .range(from, to)
-      .order('last_name', { ascending: true })
-      .order('first_name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching student progress:', error);
-      return NextResponse.json({ error: 'Failed to fetch student progress' }, { status: 500 });
-    }
-
-    // Get total count for pagination
-    const { count: totalCount, error: countError } = await supabase
-      .from('students')
-      .select('id', { count: 'exact', head: true })
-      .eq('student_product_assignments.products.type', 'JOB_READINESS');
-
-    if (countError) {
-      console.error('Error getting count:', countError);
-    }
+    const to = from + pageSize;
+    const paginatedStudents = transformedStudents.slice(from, to);
 
     return NextResponse.json({ 
-      students, 
+      students: paginatedStudents, 
       pagination: {
         page,
         pageSize,
-        totalCount: totalCount || 0,
-        totalPages: Math.ceil((totalCount || 0) / pageSize)
+        totalCount: finalTotalCount,
+        totalPages: Math.ceil(finalTotalCount / pageSize)
       }
     });
   } catch (error) {

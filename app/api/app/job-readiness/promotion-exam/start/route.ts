@@ -50,18 +50,25 @@ export async function POST(req: NextRequest) {
     
     // Check eligibility (same checks as in the eligibility endpoint)
     // Check if promotion exams are enabled for this product
-    const { data: examConfig, error: configError } = await supabase
+    const { data: examConfigs, error: configError } = await supabase
       .from('job_readiness_promotion_exam_config')
       .select('*')
-      .eq('product_id', product_id)
-      .single();
+      .eq('product_id', product_id);
       
     if (configError) {
       console.error('Error fetching promotion exam config:', configError);
       return NextResponse.json({ 
+        error: 'Failed to fetch promotion exam configuration'
+      }, { status: 500 });
+    }
+
+    if (!examConfigs || examConfigs.length === 0) {
+      return NextResponse.json({ 
         error: 'Promotion exams are not configured for this product'
       }, { status: 400 });
     }
+
+    const examConfig = examConfigs[0];
     
     if (!examConfig.is_enabled) {
       return NextResponse.json({ 
@@ -202,38 +209,20 @@ export async function POST(req: NextRequest) {
       });
     }
     
-    // Create a new exam attempt in the database
-    const attemptData = {
-      student_id: user.id,
-      product_id,
-      star_level: starLevel,
-      current_tier: currentTier,
-      target_tier: targetTier,
-      timestamp_start: new Date().toISOString(),
-      questions: questions,
-      status: 'IN_PROGRESS'
-    };
-    
-    const { data: examAttempt, error: insertError } = await supabase
-      .from('job_readiness_promotion_exam_attempts')
-      .insert(attemptData)
-      .select()
-      .single();
-      
-    if (insertError) {
-      console.error('Error creating exam attempt:', insertError);
-      return NextResponse.json({ error: 'Failed to create exam attempt' }, { status: 500 });
-    }
+    // Generate a unique session ID for this exam attempt (questions will be stored on submission)
+    const examSessionId = `exam_${user.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Return the exam details and questions
+    // Return the exam details and questions (no database storage until submission)
     return NextResponse.json({
       message: "Promotion exam started successfully",
-      exam_id: examAttempt.id,
+      exam_session_id: examSessionId,
       questions: questions,
       time_limit_minutes: examConfig.time_limit_minutes,
       pass_threshold: examConfig.pass_threshold,
       current_tier: currentTier,
-      target_tier: targetTier
+      target_tier: targetTier,
+      product_id: product_id,
+      star_level: starLevel
     });
   } catch (error) {
     console.error('Unexpected error in job-readiness promotion-exam start POST:', error);

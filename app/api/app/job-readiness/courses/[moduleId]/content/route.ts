@@ -105,26 +105,79 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the student tier for this user
+    // Get student information including tier and authentication details
     const { data: studentData, error: studentError } = await supabase
       .from('students')
-      .select('job_readiness_tier')
-      .eq('user_id', user.id)
-      .maybeSingle();
+      .select('id, client_id, job_readiness_tier, job_readiness_star_level, is_active')
+      .eq('id', user.id)
+      .single();
 
-    let studentTier = 'beginner'; // Default tier
-    if (!studentError && studentData && studentData.job_readiness_tier) {
-      studentTier = studentData.job_readiness_tier;
+    if (studentError || !studentData) {
+      console.error('Error fetching student:', studentError);
+      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // Fetch student's existing progress first, so we can check for completed quizzes
+    if (!studentData.is_active) {
+      return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
+    }
+
+    const studentTier = studentData.job_readiness_tier || 'BRONZE';
+
+    // Fetch Course Module Details with Job Readiness verification
+    const { data: moduleData, error: moduleError } = await supabase
+      .from('modules')
+      .select('id, name, configuration, product_id')
+      .eq('id', moduleId)
+      .eq('type', 'Course')
+      .single();
+
+    if (moduleError) {
+      console.error(`Error fetching module ${moduleId}:`, moduleError);
+      if (moduleError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Course module not found' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Failed to fetch course module details' }, { status: 500 });
+    }
+
+    if (!moduleData) {
+        return NextResponse.json({ error: 'Course module not found' }, { status: 404 });
+    }
+
+    // Verify this is a Job Readiness product
+    const { data: productData, error: productError } = await supabase
+      .from('products')
+      .select('id, name, type')
+      .eq('id', moduleData.product_id)
+      .eq('type', 'JOB_READINESS')
+      .single();
+
+    if (productError || !productData) {
+      return NextResponse.json({ error: 'This course is not part of a Job Readiness product' }, { status: 404 });
+    }
+
+    // Verify enrollment
+    const { count, error: assignmentError } = await supabase
+      .from('client_product_assignments')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', studentData.client_id)
+      .eq('product_id', productData.id);
+
+    if (assignmentError) {
+      console.error('Error checking client enrollment:', assignmentError);
+      return NextResponse.json({ error: 'Failed to verify enrollment' }, { status: 500 });
+    }
+
+    if (count === 0) {
+      return NextResponse.json({ error: 'Not enrolled in this Job Readiness course' }, { status: 403 });
+    }
+
+    // Fetch student's existing progress
     let studentProgress: StudentModuleProgressOutput = {
       video_playback_positions: {},
       fully_watched_video_ids: [],
       lesson_quiz_results: {},
     };
 
-    // Use the standard student_module_progress table
     const { data: progressData, error: progressError } = await supabase
       .from('student_module_progress')
       .select('progress_details')
@@ -147,39 +200,7 @@ export async function GET(
       };
     }
 
-    // 1. Fetch Course Module Details (Job Readiness specific)
-    const { data: moduleData, error: moduleError } = await supabase
-      .from('modules')
-      .select('id, name, configuration, product_id')
-      .eq('id', moduleId)
-      .eq('type', 'Course') // Ensure it is a course type module
-      .single();
-
-    if (moduleError) {
-      console.error(`Error fetching module ${moduleId}:`, moduleError);
-      if (moduleError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Course module not found' }, { status: 404 });
-      }
-      return NextResponse.json({ error: 'Failed to fetch course module details' }, { status: 500 });
-    }
-
-    if (!moduleData) {
-        return NextResponse.json({ error: 'Course module not found' }, { status: 404 });
-    }
-
     const moduleConfig = moduleData.configuration as any || {};
-
-    // Verify this is a Job Readiness product
-    const { data: jrProduct, error: jrProductError } = await supabase
-      .from('job_readiness_products')
-      .select('id')
-      .eq('product_id', moduleData.product_id)
-      .maybeSingle();
-
-    if (jrProductError && jrProductError.code !== 'PGRST116') {
-      console.error('Error checking if product is job readiness:', jrProductError);
-      // We'll continue anyway, just log the error
-    }
 
     // 2. Fetch Lessons for the Module
     const { data: lessonsData, error: lessonsError } = await supabase

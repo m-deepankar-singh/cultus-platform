@@ -147,72 +147,105 @@ This service will grade submitted projects.
 - **3.5. Logging:**
   - [x] Log grading attempts, scores, feedback.
 
-## 4. Interview Question Generator (`lib/ai/interview-question-generator.js`)
-Generates interview questions based on student background and tier.
+## 4. Interview Question Generator (`lib/ai/interview-question-generator.ts`)
+Generates interview questions based on student background and tier (star color).
 
 - **Relevant Files/Tables:**
-  - Service File: `lib/ai/interview-question-generator.js` (new)
-  - Calling API Route: `app/api/app/job-readiness/interviews/questions/route.ts` (new)
-  - Config Tables: `students` (for background, tier), `job_readiness_background_interview_types` (for prompts, question quantity)
-  - Fallback Table: `job_readiness_fallback_interview_questions` (new)
+  - Service File: `lib/ai/interview-question-generator.ts` (completed)
+  - Calling API Route: `app/api/app/job-readiness/interviews/questions/route.ts` (completed)
+  - Config Tables: `students` (for `job_readiness_background_type`, `job_readiness_tier`), `job_readiness_background_interview_types` (for prompts, question quantity based on background and tier)
+  - Fallback Table: `job_readiness_fallback_interview_questions` (migration completed)
+  - UI Components: `components/job-readiness/interview-recorder.tsx` (new - for displaying questions)
 
 - **4.1. Setup & Configuration:**
-  - [ ] Create `lib/ai/interview-question-generator.js`.
-- **4.2. Core Function `generateInterviewQuestions(studentId, productId)`:**
-  - [ ] **Input:** `studentId`, `productId`.
-  - [ ] **Step 1: Fetch Student and Configuration:**
-    - [ ] Get `student.job_readiness_background_type`, `student.job_readiness_tier`. (from `students` table)
-    - [ ] Query `job_readiness_background_interview_types` for prompts and `question_quantity` based on background/tier.
-  - [ ] **Step 2: Call Gemini API:**
-    - [ ] Use fetched prompts. Desired output: JSON array of question strings.
-  - [ ] **Step 3: Process and Validate Response:**
-    - [ ] Parse/validate. If error, log, prepare fallback.
-  - [ ] **Step 4: Return Questions:**
-    - [ ] Return array of questions.
+  - [x] Create `lib/ai/interview-question-generator.ts`.
+- **4.2. Core Function `generateInterviewQuestions(studentId)`:**
+  - [x] **Input:** `studentId`.
+  - [x] **Step 1: Fetch Student and Configuration:**
+    - [x] Get `student.job_readiness_background_type`, `student.job_readiness_tier` (maps to star color: e.g., Bronze, Silver, Gold) from `students` table.
+    - [x] Query `job_readiness_background_interview_types` for prompts and `question_quantity` based on `background_type` and `tier`.
+  - [x] **Step 2: Call Gemini API:**
+    - [x] Use fetched prompts. Format output as JSON array of question objects.
+  - [x] **Step 3: Process and Validate Response:**
+    - [x] Parse/validate. If error, log, use fallback mechanism.
+  - [x] **Step 4: Return Questions:**
+    - [x] Return array of validated questions.
 - **4.3. Integration with Interview Questions Endpoint:**
-  - [ ] `app/api/app/job-readiness/interviews/questions/route.ts` calls this service.
-  - [ ] **Caching:** Similar to projects, once interview questions are generated for a session, they should ideally be cached for that student's active attempt/viewing session to avoid confusion. Fresh on every single refresh of this specific page might be okay, but not between seeing questions and starting the recording.
+  - [x] `app/api/app/job-readiness/interviews/questions/route.ts` calls this service.
+  - [x] **Caching:** Implemented caching of generated questions in `job_readiness_active_interview_sessions` table to ensure consistent questions during an interview session.
 - **4.4. Fallback Mechanism:**
-  - [ ] **Step 1: Design Fallback Storage:**
-    - [ ] New table `job_readiness_fallback_interview_questions` (`background_type`, `tier`, `question_text`).
-  - [ ] **Step 2: Implement Fallback Logic:**
-    - [ ] If AI fails, fetch from fallback table.
-- **4.5. Logging:**
-  - [ ] Log generation attempts, prompts used.
+  - [x] **Step 1: Design Fallback Storage:**
+    - [x] Created table schema for `job_readiness_fallback_interview_questions` with structure for `background_type`, `tier`, `question_text`.
+  - [x] **Step 2: Implement Fallback Logic:**
+    - [x] If AI fails, automatically generate generic fallback questions based on background type.
+    - [x] Added comprehensive fallback questions for all major background types.
+- **4.5. Security & Authentication:**
+  - [x] Implemented secure authentication using Supabase auth.getUser() instead of getSession().
+  - [x] Set up proper RLS policies for all related tables.
+- **4.6. Logging:**
+  - [x] Added logging for generation attempts, AI prompts, and errors.
 
-## 5. Video Analyzer (`lib/ai/video-analyzer.js`)
-Analyzes recorded interview videos.
+## 5. Video Analyzer (`lib/ai/video-analyzer.ts`)
+Handles student interview recording, submission, and AI-powered analysis.
 
 - **Relevant Files/Tables:**
-  - Service File: `lib/ai/video-analyzer.js` (new)
-  - Calling API Route: `app/api/app/job-readiness/interviews/submit/route.ts` 
-  - Data Tables: `job_readiness_ai_interview_submissions` (read video path, write analysis), `students` (for background), `job_readiness_background_interview_types` (for grading criteria)
+  - Service File: `lib/ai/video-analyzer.ts` (new, for analysis)
+  - Recording & Submission API Route: `app/api/app/job-readiness/interviews/submit/route.ts` (handles recording upload and triggers analysis)
+  - Analysis Results API Route: `app/api/app/job-readiness/interviews/analysis/[submissionId]/route.ts` (fetches analysis outcome)
+  - Data Tables: `job_readiness_ai_interview_submissions` (stores video path, submission details, analysis result), `students` (for background/tier), `job_readiness_background_interview_types` (for grading criteria)
+  - UI Components: `components/job-readiness/interview-recorder.tsx` (new - for webcam recording, timer, and submission - detailed plan moved to `job-readiness-implementation-plan.md`)
+  - Supabase Storage Bucket: `interview_recordings` (new)
 
-- **5.1. Setup & Configuration:**
-  - [ ] Create `lib/ai/video-analyzer.js`.
-  - [ ] **Research:** Google AI service for video analysis (Gemini 1.5 Pro or Google Cloud Video Intelligence API).
-- **5.2. Core Function `analyzeInterviewVideo(submissionId)`:**
-  - [ ] **Input:** `submissionId`.
-  - [ ] **Step 1: Fetch Submission and Context:**
-    - [ ] Get `video_storage_path` from `job_readiness_ai_interview_submissions`.
-    - [ ] Get interview questions (should be stored/retrievable alongside the submission or linked).
-    - [ ] Get `student.job_readiness_background_type` (from `students`) and `grading_criteria` (from `job_readiness_background_interview_types`).
-  - [ ] **Step 2: Video Processing (if needed):**
-    - [ ] Ensure `video_storage_path` is compatible with AI service.
-    - [ ] **Transcription:** Transcribe audio. Crucial step.
-  - [ ] **Step 3: Construct Analysis Prompt for AI:**
-    - [ ] Provide AI: interview questions, transcribed responses, grading criteria.
-    - [ ] Desired output: JSON with `overall_score`, `feedback_per_question`, `overall_feedback`, `passed`.
-  - [ ] **Step 4: Call AI Service and Process Response:**
-    - [ ] Parse/validate. Handle errors.
-  - [ ] **Step 5: Update Submission Record:**
-    - [ ] Store results in `job_readiness_ai_interview_submissions`.
-- **5.3. Integration with Interview Submission Endpoint:**
-  - [ ] `app/api/app/job-readiness/interviews/submit/route.ts` triggers this asynchronously after video is uploaded and submission entry is created.
-- **5.4. Robustness:**
-  - [ ] Implement retries, error logging, connection health checks.
+- **5.1. Backend: Recording Submission & Storage (`app/api/app/job-readiness/interviews/submit/route.ts`)**
+  - [x] **Step 1: Receive Video Upload:**
+    - [x] Accept `multipart/form-data` containing the WebM video.
+  - [x] **Step 2: Validate Video:**
+    - [x] Check file type (must be WebM).
+    - [x] Check file size (must be < 20MB). If larger, return an error.
+    - [x] Optionally, check video duration using server-side tools if reliable.
+  - [x] **Step 3: Store Video in Supabase Storage:**
+    - [x] Upload the validated WebM video to a designated Supabase Storage bucket (e.g., `interview_recordings`).
+    - [x] File naming convention: `studentId_submissionId.webm`.
+  - [x] **Step 4: Create Submission Record:**
+    - [x] Create an entry in `job_readiness_ai_interview_submissions`.
+    - [x] Store: `student_id`, `interview_questions_id` (linking to the cached questions for this attempt), `video_storage_path`, `status` (e.g., 'pending_analysis'), `tier_when_submitted`, `background_when_submitted`.
+  - [x] **Step 5: Trigger Asynchronous Analysis:**
+    - [x] Invoke `lib/ai/video-analyzer.ts#analyzeInterviewVideo`, passing the `submissionId`. This should be an asynchronous operation (e.g., using a Supabase Edge Function or a background worker if platform allows, or simply not awaiting the promise in the API route if short-lived).
+  - [x] **Step 6: Respond to Client:**
+    - [x] Return a success message to the client with the `submissionId`.
+
+- **5.2. Backend: AI Video Analysis (`lib/ai/video-analyzer.ts`)**
+  - [x] **Core Function `analyzeInterviewVideo(submissionId)`:**
+    - [x] **Input:** `submissionId`.
+    - [x] **Step 1: Fetch Submission and Context:**
+      - [x] Get `video_storage_path` from `job_readiness_ai_interview_submissions`.
+      - [x] Generate a signed URL for the video in Supabase Storage to provide temporary access to the Gemini API.
+      - [x] Retrieve the interview questions associated with this submission (e.g., from the cached questions linked via `interview_questions_id` or stored with the submission).
+      - [x] Get `student.job_readiness_background_type`, `student.job_readiness_tier` (from `students` or the submission record) and relevant `grading_criteria` (from `job_readiness_background_interview_types` based on background/tier).
+    - [x] **Step 2: Call Gemini API for Video Analysis:**
+      - [x] Use Gemini 2.5 Flash (or newer model with video understanding).
+      - [x] Provide: video URL (signed), interview questions, grading criteria.
+      - [x] Request structured output: `overall_feedback` (text), `status` ('Approved'/'Rejected'), `reasoning` (text explaining status). The AI determines "Approved/Rejected" based on its assessment.
+    - [x] **Step 3: Process AI Response:**
+      - [x] Parse and validate the structured JSON response.
+      - [x] If AI call fails or response is invalid, update submission status to 'analysis_failed', log error, and potentially queue for retry or manual review.
+    - [x] **Step 4: Update Submission Record:**
+      - [x] Store AI analysis results (`overall_feedback`, `status`, `reasoning`) in `job_readiness_ai_interview_submissions`. Update `status` to 'completed' or 'analysis_failed'.
+      - [x] If 'Approved', consider triggering next steps (e.g., tier promotion if applicable).
+
+- **5.3. Backend: Retrieve Analysis Results (`app/api/app/job-readiness/interviews/analysis/[submissionId]/route.ts`)**
+  - [x] **Input:** `submissionId`.
+  - [x] **Logic:** Fetch the submission record from `job_readiness_ai_interview_submissions`.
+  - [x] **Output:** Return the analysis status (`pending_analysis`, `completed`, `analysis_failed`), and if 'completed', the `overall_feedback`, AI `status` ('Approved'/'Rejected'), and `reasoning`.
+
+- **5.4. Robustness & Error Handling:**
+  - [x] Implement retries for Gemini API calls within `analyzeInterviewVideo`.
+  - [x] Detailed logging for all stages: upload, storage, AI call, result processing.
+  - [x] Fallback: If AI analysis fails persistently, the submission status remains 'analysis_failed'. Manual review process might be needed.
+  - [x] Clear error messages to the client for upload failures (size, type) or if analysis cannot be initiated.
 - **5.5. Logging:**
-  - [ ] Log analysis attempts, results.
+  - [x] Log video upload attempts (success/failure, size).
+  - [x] Log AI analysis initiation, success, failure, and outcome ('Approved'/'Rejected').
 
 ## 6. Exam Generator (`lib/ai/exam-generator.js`)
 Generates Promotion Exam questions.
@@ -273,3 +306,31 @@ These principles apply to all AI service modules above.
   - [x] Enhanced validation to support both MCQ and MSQ question types.
 
 This detailed plan provides a solid roadmap for implementing the AI service integrations. The Quiz Generator and Project Generator services are fully implemented with improved structured output handling and proper caching strategies. The Project Grader now provides comprehensive feedback with strengths, weaknesses, and improvement suggestions using structured outputs from the Gemini API. 
+
+## Implementation Summary
+
+### Video Analyzer (Completed)
+
+The Video Analyzer service has been successfully implemented with the following features:
+
+1. **Core Service Implementation:**
+   - Created `lib/ai/video-analyzer.ts` with the `analyzeInterviewVideo` function
+   - Implemented structured output schema for consistent feedback format
+   - Added fallback analysis for when AI processing fails
+   - Integrated with Gemini 2.5 Flash's advanced video understanding capabilities
+
+2. **API Integration:**
+   - Updated `app/api/app/job-readiness/interviews/submit/route.ts` to trigger async analysis
+   - Created `app/api/app/job-readiness/interviews/analysis/[submissionId]/route.ts` for retrieving results
+   - Implemented status tracking for in-progress, completed, and error states
+
+3. **Database Changes:**
+   - Created migration `20250530120000_video_analyzer_tables.sql` to ensure required fields exist
+   - Added proper RLS policies for security
+   - Added indexes for performance optimization
+
+4. **Testing & Documentation:**
+   - Added test script `scripts/test-video-analyzer.ts` for development and debugging
+   - Created comprehensive documentation in `docs/ai/video-analyzer.md`
+
+The Video Analyzer leverages Gemini 2.5 Flash's native video understanding capabilities, which eliminated the need for a separate transcription step. This simplifies the architecture and improves reliability. The service performs asynchronous analysis to ensure good user experience, with appropriate error handling and fallbacks for robustness in production. 

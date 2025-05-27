@@ -24,15 +24,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has admin role
+    // Check if user has admin role - use case insensitive comparison
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profileError || profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
+      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Build the query to get all student data for export (no pagination)

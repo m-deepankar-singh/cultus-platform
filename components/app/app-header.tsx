@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, GraduationCap, Award, Settings, Menu, LucideIcon } from "lucide-react"
+import { Home, BookOpen, GraduationCap, Award, Settings, Menu, LucideIcon, Briefcase } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -48,7 +48,18 @@ export function AppHeader() {
   }, [theme])
 
   const routes: RouteItem[] = [
-    // Removed "My Learning", "Courses", "Assessments", and "My Profile" links
+    {
+      href: "/app/dashboard",
+      label: "My Learning",
+      icon: Home,
+      active: pathname === "/app/dashboard",
+    },
+    {
+      href: "/app/job-readiness",
+      label: "Job Readiness",
+      icon: Briefcase,
+      active: pathname.startsWith("/app/job-readiness"),
+    },
   ]
 
   return (

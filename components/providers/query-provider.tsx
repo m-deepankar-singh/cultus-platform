@@ -11,7 +11,11 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
 		queries: {
 				staleTime: 1000 * 60 * 5, // Data is considered fresh for 5 minutes
 				refetchOnWindowFocus: false, // Disable refetch on window focus globally
-				// Consider other defaults like refetchOnMount or refetchOnReconnect if needed
+				refetchOnReconnect: false, // Disable refetch on reconnect
+				refetchOnMount: true, // Only refetch on mount if stale
+				refetchInterval: false, // Disable automatic background refetching
+				retry: 2, // Reduce retry attempts
+				retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
 		},
 	},
 	}));

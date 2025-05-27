@@ -55,7 +55,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const body = await req.json();
+    
+    // Parse JSON with better error handling
+    let body;
+    try {
+      body = await req.json();
+    } catch (jsonError) {
+      console.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json({ error: 'Invalid JSON format in request body' }, { status: 400 });
+    }
 
     // Verify admin role
     const {
@@ -133,7 +141,15 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const body = await req.json();
+    
+    // Parse JSON with better error handling
+    let body;
+    try {
+      body = await req.json();
+    } catch (jsonError) {
+      console.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json({ error: 'Invalid JSON format in request body' }, { status: 400 });
+    }
 
     // Verify admin role
     const {

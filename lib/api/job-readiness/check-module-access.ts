@@ -30,8 +30,9 @@ export const MODULE_TYPE_TO_REQUIRED_STAR_MAP: Record<JobReadinessModuleType, Jo
 
 /**
  * Maps star levels to the module type that unlocks them
+ * Note: ZERO is not included as it represents no completed modules
  */
-export const STAR_LEVEL_TO_COMPLETED_MODULE_MAP: Record<JobReadinessStarLevel, JobReadinessModuleType> = {
+export const STAR_LEVEL_TO_COMPLETED_MODULE_MAP: Record<Exclude<JobReadinessStarLevel, 'ZERO'>, JobReadinessModuleType> = {
   'ONE': 'assessment',
   'TWO': 'course',
   'THREE': 'expert_session',

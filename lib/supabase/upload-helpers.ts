@@ -127,4 +127,97 @@ export async function removeFileByUrl(publicUrl: string): Promise<boolean> {
     console.error('Error removing file:', error)
     return false
   }
+}
+
+/**
+ * Uploads an expert session video to the expert_session_videos bucket
+ * @param file The video file to upload
+ * @param productId The ID of the product for organization
+ * @returns Object with upload path and public URL
+ */
+export async function uploadExpertSessionVideo(file: File, productId: string): Promise<{path: string, publicUrl: string}> {
+  try {
+    const supabase = await createClient();
+    
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      throw new Error('File must be a video');
+    }
+
+    // Check file size (limit to 500MB for expert session videos)
+    const maxSizeInMB = 500;
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+      throw new Error(`File size must be less than ${maxSizeInMB}MB`);
+    }
+
+    // Generate unique file path
+    const fileExtension = file.name.split('.').pop() || 'mp4';
+    const uniqueFileName = `${crypto.randomUUID()}.${fileExtension}`;
+    const filePath = `products/${productId}/expert-sessions/${uniqueFileName}`;
+    
+    console.log(`Uploading expert session video to path: ${filePath}`);
+    
+    // Upload video to public bucket
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('expert-session-videos-public')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Video upload error:', uploadError);
+      throw new Error(`Failed to upload video: ${uploadError.message}`);
+    }
+
+    if (!uploadData || !uploadData.path) {
+      throw new Error('Failed to upload video: No path returned');
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('expert-session-videos-public')
+      .getPublicUrl(uploadData.path);
+
+    if (!urlData || !urlData.publicUrl) {
+      throw new Error('Failed to get public URL for uploaded video');
+    }
+
+    console.log('Expert session video uploaded successfully');
+    
+    return {
+      path: uploadData.path,
+      publicUrl: urlData.publicUrl
+    };
+  } catch (error) {
+    console.error('Error in uploadExpertSessionVideo:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gets video duration from a video file (client-side implementation)
+ * Note: This is a placeholder - in a real implementation, you might need to use
+ * a video processing library or extract metadata
+ * @param file The video file
+ * @returns Promise<number> Duration in seconds
+ */
+export async function getVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
+      resolve(Math.floor(video.duration));
+    };
+    
+    video.onerror = () => {
+      window.URL.revokeObjectURL(video.src);
+      reject(new Error('Failed to load video metadata'));
+    };
+    
+    video.src = URL.createObjectURL(file);
+  });
 } 

@@ -61,19 +61,27 @@ export async function GET(req: NextRequest) {
     }
     
     // Check if promotion exams are enabled for this product
-    const { data: examConfig, error: configError } = await supabase
+    const { data: examConfigs, error: configError } = await supabase
       .from('job_readiness_promotion_exam_config')
       .select('*')
-      .eq('product_id', productId)
-      .single();
+      .eq('product_id', productId);
       
     if (configError) {
       console.error('Error fetching promotion exam config:', configError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch promotion exam configuration',
+        is_eligible: false
+      }, { status: 500 });
+    }
+
+    if (!examConfigs || examConfigs.length === 0) {
       return NextResponse.json({ 
         error: 'Promotion exams are not configured for this product',
         is_eligible: false
       }, { status: 400 });
     }
+
+    const examConfig = examConfigs[0];
     
     if (!examConfig.is_enabled) {
       return NextResponse.json({ 

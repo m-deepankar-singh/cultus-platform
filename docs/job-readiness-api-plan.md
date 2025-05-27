@@ -15,7 +15,12 @@ This document outlines the detailed step-by-step plan for implementing the API s
     - If `enable_ai_quiz` is true, specify a "quiz generation prompt/topic" (text) for that lesson. This prompt will be used with Gemini 2.0 Flash to generate 5 questions. Passing criteria (4/5) is fixed.
 - [x] Implement `/api/admin/job-readiness/backgrounds`: Manage student background types and project mappings.
 - [x] Implement `/api/admin/job-readiness/promotion-exams`: Configure Promotion Exam settings.
-- [x] Implement `/api/admin/job-readiness/expert-sessions`: Placeholder for Expert Session configuration.
+- [ ] Implement `/api/admin/job-readiness/expert-sessions`: CRUD for Expert Session video management.
+  - [ ] GET: List all expert sessions with upload/management interface
+  - [ ] POST: Upload new expert session video with title and description (approx. 45min-1hr long)
+  - [ ] PUT/PATCH: Update expert session details (title, description, activate/deactivate)
+  - [ ] DELETE: Remove expert session (soft delete)
+  - [ ] Include video upload to Supabase Storage and duration validation
 - [x] Implement `/api/admin/job-readiness/progress`: View student progress across Job Readiness products.
 - [x] Implement `/api/admin/job-readiness/progress/export`: Export detailed progress data.
 - [x] Implement `/api/admin/job-readiness/students/{studentId}/override-progress`: PATCH endpoint to allow admins to manually update a student's `job_readiness_star_level` and `job_readiness_tier`.
@@ -50,7 +55,17 @@ This document outlines the detailed step-by-step plan for implementing the API s
 - [x] Implement `POST /api/app/job-readiness/courses/{courseModuleId}/save-progress`: Save student's general progress within a course module.
   - [x] Request body: `{ "last_viewed_lesson_sequence": 1, "video_playback_positions": {"lessonId1": 120}, "fully_watched_video_ids": ["lessonId1"] }`.
   - [x] Updates `student_module_progress.progress_details`.
-- [x] Implement `/api/app/job-readiness/expert-sessions`: Track expert session completion (unlocks Star 3, Projects module, and optionally Promotion Exam).
+- [ ] Implement `/api/app/job-readiness/expert-sessions`: Get available expert sessions and track completion progress.
+  - [ ] GET `/api/app/job-readiness/expert-sessions?productId=XYZ`: List all available Expert Session videos with student's progress for each
+    - [ ] Response includes: session details (id, title, description, video_url, video_duration)
+    - [ ] Student progress: watch_time_seconds, completion_percentage, is_completed for each session
+    - [ ] Overall progress: completed_sessions_count towards required 5 sessions for 3rd star
+  - [ ] POST `/api/app/job-readiness/expert-sessions/{sessionId}/watch-progress`: Update student's watch progress for a specific expert session video
+    - [ ] Request body: `{ "current_time_seconds": 1800, "total_duration_seconds": 3600 }`
+    - [ ] Calculates completion_percentage and automatically marks session as complete when 95% watch threshold is reached
+    - [ ] Updates job_readiness_expert_session_progress table
+    - [ ] Returns updated progress and completion status
+  - [ ] Unlocks Star 3, Projects module, and optionally Promotion Exam when 5 sessions are completed
 - [x] Implement `/api/app/job-readiness/projects/generate`: Get AI-generated project based on background and tier.
 - [x] Implement `/api/app/job-readiness/projects/submit`: Submit completed project (unlocks Star 4, Interview module, and optionally Promotion Exam).
 - [x] Implement `/api/app/job-readiness/interviews/questions`: Get AI-generated interview questions.
