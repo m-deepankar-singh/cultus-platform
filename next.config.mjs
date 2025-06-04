@@ -33,6 +33,9 @@ const nextConfig = {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
+    serverActions: {
+      bodySizeLimit: '100mb', // Allow larger uploads for video files
+    },
   },
 }
 

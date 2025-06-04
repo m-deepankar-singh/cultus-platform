@@ -21,6 +21,14 @@ interface JobReadinessProduct {
   modules: JobReadinessModule[]
 }
 
+interface InterviewStatus {
+  hasAttempted: boolean
+  isPassed: boolean
+  isCompleted: boolean
+  lastAttemptDate: string | null
+  submissionId: string | null
+}
+
 interface JobReadinessProgressResponse {
   student: {
     id: string
@@ -32,6 +40,7 @@ interface JobReadinessProgressResponse {
     job_readiness_promotion_eligible: boolean
   }
   products: JobReadinessProduct[]
+  interviewStatus: InterviewStatus
 }
 
 interface ModuleGroup {
@@ -60,6 +69,7 @@ export interface JobReadinessModuleGroups {
   }
   moduleGroups: ModuleGroup[]
   primaryProduct: JobReadinessProduct | null
+  interviewStatus: InterviewStatus
 }
 
 export function useJobReadinessModuleGroups() {
@@ -72,44 +82,15 @@ export function useJobReadinessModuleGroups() {
       }
       const data: JobReadinessProgressResponse = await response.json()
       
-      // Get the single Job Readiness product (enforced by database constraint)
+      // Get the primary product (first one with modules)
       const primaryProduct = data.products?.[0] || null
       const allModules = primaryProduct?.modules || []
       
-      // If no Job Readiness product found, return empty state
-      if (!primaryProduct || !primaryProduct.id) {
-        console.warn('No Job Readiness product found for student')
-        return {
-          student: {
-            id: data.student.id,
-            name: data.student.name,
-            email: data.student.email,
-            currentStars: 0,
-            currentTier: data.student.job_readiness_tier || 'BRONZE',
-            backgroundType: data.student.job_readiness_background_type,
-            promotionEligible: data.student.job_readiness_promotion_eligible
-          },
-          moduleGroups: [],
-          primaryProduct: null
-        }
-      }
-      
-      // Group modules by type (handle both lowercase and uppercase)
-      const assessmentModules = allModules.filter(m => 
-        m.type === 'Assessment' || m.type === 'assessment'
-      )
-      const courseModules = allModules.filter(m => 
-        m.type === 'Course' || m.type === 'course'
-      )
-      const expertSessionModules = allModules.filter(m => 
-        m.type === 'Expert_Session' || m.type === 'expert_session'
-      )
-      const projectModules = allModules.filter(m => 
-        m.type === 'Project' || m.type === 'project'
-      )
-      const interviewModules = allModules.filter(m => 
-        m.type === 'Interview' || m.type === 'interview'
-      )
+      // Group modules by type
+      const assessmentModules = allModules.filter(m => m.type === 'Assessment')
+      const courseModules = allModules.filter(m => m.type === 'Course')
+      const expertSessionModules = allModules.filter(m => m.type === 'Expert_Session')
+      const projectModules = allModules.filter(m => m.type === 'Project')
       
       // Calculate star level (convert string to number)
       const starLevelMap: { [key: string]: number } = {
@@ -131,6 +112,16 @@ export function useJobReadinessModuleGroups() {
         return { completedCount, totalCount, isUnlocked, isCompleted }
       }
       
+      // Helper function for interview status
+      const calculateInterviewStatus = () => {
+        const isUnlocked = currentStars >= 4 // Unlocked after projects (star 4)
+        const isCompleted = data.interviewStatus.isCompleted
+        const completedCount = data.interviewStatus.hasAttempted ? 1 : 0
+        const totalCount = 1
+        
+        return { completedCount, totalCount, isUnlocked, isCompleted }
+      }
+      
       // Create module groups
       const moduleGroups: ModuleGroup[] = [
         {
@@ -140,9 +131,7 @@ export function useJobReadinessModuleGroups() {
           icon: 'FileText',
           requiredStars: 0,
           modules: assessmentModules,
-          href: primaryProduct?.id 
-            ? `/app/job-readiness/assessments?productId=${primaryProduct.id}`
-            : `/app/job-readiness/assessments`,
+          href: `/app/job-readiness/assessments?productId=${primaryProduct?.id}`,
           ...calculateGroupStatus(assessmentModules, 0)
         },
         {
@@ -152,9 +141,7 @@ export function useJobReadinessModuleGroups() {
           icon: 'BookOpen',
           requiredStars: 1,
           modules: courseModules,
-          href: primaryProduct?.id 
-            ? `/app/job-readiness/courses?productId=${primaryProduct.id}`
-            : `/app/job-readiness/courses`,
+          href: `/app/job-readiness/courses?productId=${primaryProduct?.id}`,
           ...calculateGroupStatus(courseModules, 1)
         },
         {
@@ -164,9 +151,7 @@ export function useJobReadinessModuleGroups() {
           icon: 'GraduationCap',
           requiredStars: 2,
           modules: expertSessionModules,
-          href: primaryProduct?.id 
-            ? `/app/job-readiness/expert-sessions?productId=${primaryProduct.id}`
-            : `/app/job-readiness/expert-sessions`,
+          href: `/app/job-readiness/expert-sessions?productId=${primaryProduct?.id}`,
           ...calculateGroupStatus(expertSessionModules, 2)
         },
         {
@@ -176,22 +161,18 @@ export function useJobReadinessModuleGroups() {
           icon: 'Briefcase',
           requiredStars: 3,
           modules: projectModules,
-          href: primaryProduct?.id 
-            ? `/app/job-readiness/projects?productId=${primaryProduct.id}`
-            : `/app/job-readiness/projects`,
+          href: `/app/job-readiness/projects?productId=${primaryProduct?.id}`,
           ...calculateGroupStatus(projectModules, 3)
         },
         {
           type: 'interviews',
-          title: 'Interview Simulation',
-          description: 'Record and submit video responses to AI-generated interview questions',
+          title: 'Simulated Interviews',
+          description: 'Complete AI-powered mock interviews to demonstrate your skills',
           icon: 'Video',
           requiredStars: 4,
-          modules: interviewModules,
-          href: primaryProduct?.id 
-            ? `/app/job-readiness/interviews?productId=${primaryProduct.id}`
-            : `/app/job-readiness/interviews`,
-          ...calculateGroupStatus(interviewModules, 4)
+          modules: [], // Interviews don't use the traditional module system
+          href: `/app/job-readiness/interviews`,
+          ...calculateInterviewStatus()
         }
       ]
       
@@ -206,10 +187,12 @@ export function useJobReadinessModuleGroups() {
           promotionEligible: data.student.job_readiness_promotion_eligible
         },
         moduleGroups,
-        primaryProduct
+        primaryProduct,
+        interviewStatus: data.interviewStatus
       }
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
   })
 } 
+ 

@@ -50,38 +50,38 @@ export async function GET(req: NextRequest) {
         .select(`
           id,
           student_id,
-          interview_questions_id,
+          product_id,
           video_storage_path,
           status,
-          tier_when_submitted,
-          background_when_submitted,
+          score,
+          passed,
+          feedback,
           analysis_result,
           created_at,
           analyzed_at,
           students!inner(
             id,
-            first_name,
-            last_name,
+            full_name,
             email,
-            client_id,
-            products!inner(
-              id,
-              name,
-              description
-            )
+            client_id
+          ),
+          products!inner(
+            id,
+            name,
+            description
           )
         `)
         .order('created_at', { ascending: false });
 
       // Apply filters
       if (productId) {
-        interviewQuery.eq('students.products.id', productId);
+        interviewQuery.eq('product_id', productId);
       }
       if (clientId) {
         interviewQuery.eq('students.client_id', clientId);
       }
       if (search) {
-        interviewQuery.or(`students.first_name.ilike.%${search}%,students.last_name.ilike.%${search}%,students.email.ilike.%${search}%`);
+        interviewQuery.or(`students.full_name.ilike.%${search}%,students.email.ilike.%${search}%`);
       }
       if (reviewStatus) {
         // Map review status to actual submission status
@@ -125,8 +125,7 @@ export async function GET(req: NextRequest) {
           created_at,
           students!inner(
             id,
-            first_name,
-            last_name,
+            full_name,
             email,
             client_id
           ),
@@ -146,7 +145,7 @@ export async function GET(req: NextRequest) {
         projectQuery.eq('students.client_id', clientId);
       }
       if (search) {
-        projectQuery.or(`students.first_name.ilike.%${search}%,students.last_name.ilike.%${search}%,students.email.ilike.%${search}%`);
+        projectQuery.or(`students.full_name.ilike.%${search}%,students.email.ilike.%${search}%`);
       }
       // Projects don't have manual review status, they're auto-graded
 
@@ -171,40 +170,51 @@ export async function GET(req: NextRequest) {
         ? (analysisResult.status === 'Approved' ? 'approved' : 'rejected')
         : (submission.status === 'pending_analysis' ? 'pending' : 'not_required');
 
+      // Split full_name into first_name and last_name for frontend compatibility
+      const nameParts = (submission.students?.full_name || '').split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       transformedSubmissions.push({
         id: submission.id,
         student_id: submission.student_id,
-        product_id: submission.students?.products?.id || null,
+        product_id: submission.product_id,
         submission_type: 'interview',
         submission_date: submission.created_at,
-        score: analysisResult.confidence_score || undefined,
+        score: analysisResult.confidence_score || submission.score || undefined,
         ai_grade_status: submission.status === 'completed' ? 'completed' : 
                         submission.status === 'pending_analysis' ? 'pending' : 'failed',
         manual_review_status: manualReviewStatus,
         reviewer_id: analysisResult.admin_id || undefined,
-        admin_feedback: analysisResult.overall_feedback || undefined,
+        admin_feedback: analysisResult.overall_feedback || submission.feedback || undefined,
         review_date: analysisResult.admin_review_time || submission.analyzed_at || undefined,
         student: {
           id: submission.students?.id,
-          first_name: submission.students?.first_name,
-          last_name: submission.students?.last_name,
+          first_name: firstName,
+          last_name: lastName,
+          full_name: submission.students?.full_name,
           email: submission.students?.email,
         },
         product: {
-          id: submission.students?.products?.id,
-          name: submission.students?.products?.name,
-          description: submission.students?.products?.description,
+          id: submission.products?.id,
+          name: submission.products?.name,
+          description: submission.products?.description,
         },
         interview_submission: {
           video_storage_path: submission.video_storage_path,
-          passed: analysisResult.status === 'Approved',
-          feedback: analysisResult.overall_feedback,
+          passed: analysisResult.status === 'Approved' || submission.passed,
+          feedback: analysisResult.overall_feedback || submission.feedback,
         }
       });
     });
 
     // Transform project submissions
     projectSubmissions.forEach((submission: any) => {
+      // Split full_name into first_name and last_name for frontend compatibility
+      const nameParts = (submission.students?.full_name || '').split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       transformedSubmissions.push({
         id: submission.id,
         student_id: submission.student_id,
@@ -219,8 +229,9 @@ export async function GET(req: NextRequest) {
         review_date: undefined,
         student: {
           id: submission.students?.id,
-          first_name: submission.students?.first_name,
-          last_name: submission.students?.last_name,
+          first_name: firstName,
+          last_name: lastName,
+          full_name: submission.students?.full_name,
           email: submission.students?.email,
         },
         product: {

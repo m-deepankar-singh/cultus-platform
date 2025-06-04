@@ -53,17 +53,19 @@ export async function GET(request: NextRequest) {
     
     const studentId = student.id;
     
-    // First, check if the student has already submitted a project for this product
+    // First, check if the student has already submitted a SUCCESSFUL project for this product
     const { data: existingSubmission, error: submissionError } = await supabase
       .from('job_readiness_ai_project_submissions')
       .select('*')
       .eq('student_id', studentId)
       .eq('product_id', productId)
       .not('submission_content', 'is', null) // Only check for actual submissions
-      .single();
+      .order('created_at', { ascending: false }) // Get the most recent submission
+      .limit(1)
+      .maybeSingle();
     
-    // If there's already a submitted project, return it
-    if (!submissionError && existingSubmission) {
+    // If there's already a successful submitted project, return it
+    if (!submissionError && existingSubmission && existingSubmission.passed) {
       return NextResponse.json({
         success: true,
         project: {
@@ -72,19 +74,23 @@ export async function GET(request: NextRequest) {
           description: existingSubmission.project_description,
           tasks: existingSubmission.tasks || [],
           deliverables: existingSubmission.deliverables || [],
-          submission_type: existingSubmission.submission_type || 'text_input',
+          submission_type: existingSubmission.submission_type,
           status: 'submitted',
-          submission_content: existingSubmission.submission_content,
-          submission_url: existingSubmission.submission_url,
           score: existingSubmission.score,
           passed: existingSubmission.passed,
-          feedback: existingSubmission.feedback
+          feedback: existingSubmission.feedback ? JSON.parse(existingSubmission.feedback) : null,
+          content_optimized: existingSubmission.content_truncated || false,
+          storage_info: existingSubmission.content_truncated ? {
+            optimized: true,
+            message: "This was a large code submission that was optimized for storage efficiency.",
+            original_length: existingSubmission.original_content_length || 0
+          } : null
         },
-        message: "You have already submitted a project. No new projects will be generated."
-      });
+        message: "You have already successfully completed this project."
+      }, { status: 200 });
     }
     
-    // If no submitted project exists, generate a new one
+    // For failed submissions or no submissions, generate a new project
     const projectDetails = await generateProject(studentId, productId);
     
     if (!projectDetails) {

@@ -40,6 +40,36 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    // Get interview submission status for the student
+    const { data: interviewSubmission, error: interviewError } = await supabase
+      .from('job_readiness_ai_interview_submissions')
+      .select(`
+        id,
+        status,
+        passed,
+        created_at,
+        updated_at
+      `)
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (interviewError) {
+      console.error('Error fetching interview submission:', interviewError);
+    }
+
+    // Get the latest interview submission (if any)
+    const latestInterview = interviewSubmission?.[0] || null;
+    
+    // Determine interview status
+    const interviewStatus = {
+      hasAttempted: !!latestInterview,
+      isPassed: latestInterview?.passed === true,
+      isCompleted: latestInterview?.status === 'analyzed' && latestInterview?.passed === true,
+      lastAttemptDate: latestInterview?.created_at || null,
+      submissionId: latestInterview?.id || null
+    };
+
     // Get Job Readiness products assigned to the student's client
     // First get the product assignments
     const { data: assignments, error: assignmentsError } = await supabase
@@ -64,7 +94,8 @@ export async function GET(req: NextRequest) {
           job_readiness_background_type: student.job_readiness_background_type,
           job_readiness_promotion_eligible: student.job_readiness_promotion_eligible
         },
-        products: []
+        products: [],
+        interviewStatus
       });
     }
 
@@ -149,25 +180,25 @@ export async function GET(req: NextRequest) {
           
           // Logic for determining if a module is unlocked based on star level
           switch (module.type) {
+            case 'Assessment':
             case 'assessment':
               // Assessment is always unlocked by default
               isUnlocked = true;
               break;
+            case 'Course':
             case 'course':
               // Courses unlock after star level ONE (after completing assessments)
-              isUnlocked = ['TWO', 'THREE', 'FOUR', 'FIVE'].includes(starLevel);
+              isUnlocked = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'].includes(starLevel);
               break;
+            case 'Expert_Session':
             case 'expert_session':
-              // Expert sessions unlock at star level TWO (after completing courses)
+              // Expert sessions unlock after star level TWO (after completing courses)
               isUnlocked = ['TWO', 'THREE', 'FOUR', 'FIVE'].includes(starLevel);
               break;
+            case 'Project':
             case 'project':
               // Projects unlock after star level THREE (after completing expert sessions)
-              isUnlocked = ['FOUR', 'FIVE'].includes(starLevel);
-              break;
-            case 'interview':
-              // Interviews unlock after star level FOUR (after completing projects)
-              isUnlocked = ['FIVE'].includes(starLevel);
+              isUnlocked = ['THREE', 'FOUR', 'FIVE'].includes(starLevel);
               break;
             default:
               isUnlocked = false;
@@ -208,7 +239,8 @@ export async function GET(req: NextRequest) {
           configuration: productData.job_readiness_products?.[0],
           modules: assignment.modules
         };
-      })
+      }),
+      interviewStatus
     });
   } catch (error) {
     console.error('Unexpected error in job-readiness products GET:', error);

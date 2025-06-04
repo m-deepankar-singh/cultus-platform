@@ -1,139 +1,139 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getUser } from '@/lib/supabase/auth';
-import { analyzeInterviewVideo } from '@/lib/ai/video-analyzer';
-import { randomUUID } from 'crypto';
 
-// Maximum file size (20MB)
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const user = await getUser();
-    if (!user) {
+    // Get authenticated user
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get formData with the video file
-    const formData = await req.formData();
+    const studentId = user.id;
+
+    // Parse form data
+    const formData = await request.formData();
     const videoFile = formData.get('video') as File;
-    const interviewQuestionsId = formData.get('interviewQuestionsId') as string;
+    const questionsJson = formData.get('questions') as string;
+    const backgroundId = formData.get('backgroundId') as string; // Keep this for backward compatibility
 
-    if (!videoFile) {
+    if (!videoFile || !questionsJson) {
       return NextResponse.json(
-        { error: 'No video file provided' },
+        { error: 'Missing required fields: video or questions' },
         { status: 400 }
       );
     }
 
-    if (!interviewQuestionsId) {
-      return NextResponse.json(
-        { error: 'No interview questions ID provided' },
-        { status: 400 }
-      );
-    }
+    // Parse questions
+    const questions = JSON.parse(questionsJson);
 
-    // Validate file type
-    if (!videoFile.type.startsWith('video/webm')) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only WebM videos are supported.' },
-        { status: 400 }
-      );
-    }
+    // Use a default product ID since we don't have a specific product for interviews yet
+    const DEFAULT_PRODUCT_ID = '820b2dc4-e503-42f1-ab2a-fe47c331b335'; // "Unassigned Product"
 
-    // Validate file size
-    if (videoFile.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: 'File size exceeds the maximum limit of 20MB.' },
-        { status: 400 }
-      );
-    }
+    // Create submission record first to get the ID
+    const submissionId = crypto.randomUUID();
+    
+    // Generate storage path for video
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const videoPath = `interviews/${studentId}/${submissionId}/${timestamp}.webm`;
 
-    // Convert file to arrayBuffer
-    const arrayBuffer = await videoFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const supabase = await createClient();
-
-    // Get student details
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('job_readiness_background_type, job_readiness_tier')
-      .eq('user_id', user.id)
-      .single();
-
-    if (studentError || !student) {
-      return NextResponse.json(
-        { error: 'Failed to fetch student details' },
-        { status: 500 }
-      );
-    }
-
-    // Generate unique filename
-    const submissionId = randomUUID();
-    const filename = `${user.id}_${submissionId}.webm`;
-    const storagePath = `interviews/${filename}`;
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
+    // Upload video to Supabase Storage
+    console.log('Uploading video to Supabase Storage...');
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('interview_recordings')
-      .upload(storagePath, buffer, {
-        contentType: 'video/webm',
-        cacheControl: '3600'
+      .upload(videoPath, videoFile, {
+        cacheControl: '3600',
+        upsert: false
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
+      console.error('Failed to upload video:', uploadError);
       return NextResponse.json(
-        { error: 'Failed to upload video' },
+        { error: 'Failed to upload video to storage' },
         { status: 500 }
       );
     }
 
-    // Create submission record
-    const { data: submission, error: submissionError } = await supabase
+    console.log('Video uploaded successfully:', uploadData.path);
+
+    // Get the public URL for the video
+    const { data: { publicUrl } } = supabase.storage
+      .from('interview_recordings')
+      .getPublicUrl(uploadData.path);
+
+    // Get current student data for tier and background tracking
+    const { data: studentData } = await supabase
+      .from('students')
+      .select('job_readiness_tier, job_readiness_background_type')
+      .eq('id', studentId)
+      .single();
+
+    // Save submission to database using correct table
+    const { data: submission, error: insertError } = await supabase
       .from('job_readiness_ai_interview_submissions')
       .insert({
         id: submissionId,
-        student_id: user.id,
-        interview_questions_id: interviewQuestionsId,
-        video_storage_path: storagePath,
-        status: 'pending_analysis',
-        tier_when_submitted: student.job_readiness_tier,
-        background_when_submitted: student.job_readiness_background_type
+        student_id: studentId,
+        product_id: DEFAULT_PRODUCT_ID,
+        video_storage_path: uploadData.path,
+        video_url: publicUrl,
+        questions_used: questions,
+        status: 'submitted',
+        tier_when_submitted: studentData?.job_readiness_tier || 'BRONZE',
+        background_when_submitted: studentData?.job_readiness_background_type || 'COMPUTER_SCIENCE',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
 
-    if (submissionError) {
-      console.error('Submission error:', submissionError);
-      // Clean up the uploaded file if submission record creation fails
-      await supabase.storage
-        .from('interview_recordings')
-        .remove([storagePath]);
-
+    if (insertError) {
+      console.error('Failed to save submission:', insertError);
+      
+      // Try to clean up uploaded video if database insert failed
+      try {
+        await supabase.storage
+          .from('interview_recordings')
+          .remove([uploadData.path]);
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup uploaded video:', cleanupError);
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to create submission record' },
+        { error: 'Failed to save submission to database' },
         { status: 500 }
       );
     }
 
-    // Trigger asynchronous analysis (don't await)
-    analyzeInterviewVideo(submissionId).catch(error => {
-      console.error('Error initiating video analysis:', error);
-    });
+    console.log('Interview submission saved successfully:', submission.id);
+
+    // Trigger async video analysis directly (no HTTP call needed)
+    try {
+      // Import the analysis function and call it directly
+      const { analyzeInterview } = await import('../analyze/analyze-function');
+      
+      // Don't await this - let it run in background
+      analyzeInterview(submission.id, user.id).catch(error => {
+        console.error('Failed to trigger video analysis:', error);
+      });
+      
+      console.log('Video analysis triggered for submission:', submission.id);
+    } catch (triggerError) {
+      console.warn('Failed to trigger video analysis:', triggerError);
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Interview submission received and queued for analysis',
-      submissionId
+      submissionId: submission.id,
+      message: 'Interview submitted successfully. Analysis will begin shortly.'
     });
 
   } catch (error) {
-    console.error('Interview submission error:', error);
+    console.error('Error in interview submission:', error);
     return NextResponse.json(
-      { error: 'Failed to process interview submission' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

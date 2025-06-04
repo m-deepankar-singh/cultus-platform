@@ -65,13 +65,13 @@ export function AppHeader() {
   return (
     <header className={cn(
       "sticky top-0 z-50 w-full border-b backdrop-blur supports-[backdrop-filter]:bg-background/60",
-      theme === "dark" && mounted && "bg-black/20 border-primary/10 dark-glow"
+      mounted && theme === "dark" && "bg-black/20 border-primary/10 dark-glow"
     )}>
       <div className="container flex h-14 items-center header-content">
         <div className="md:hidden mr-2">
           <Sheet>
             <SheetTrigger asChild>
-              {theme === "dark" && mounted ? (
+              {mounted && theme === "dark" ? (
                 <AnimatedButton variant="ghost" size="icon">
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle menu</span>
@@ -85,7 +85,7 @@ export function AppHeader() {
             </SheetTrigger>
             <SheetContent side="left" className={cn(
               "w-[240px] sm:w-[300px]",
-              theme === "dark" && "glass-effect"
+              mounted && theme === "dark" && "glass-effect"
             )}>
               <nav className="flex flex-col gap-4 mt-8">
                 {routes.map((route) => (
@@ -97,7 +97,7 @@ export function AppHeader() {
                       route.active
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                      theme === "dark" && route.active && "dark-glow"
+                      mounted && theme === "dark" && route.active && "dark-glow"
                     )}
                   >
                     <route.icon className="h-4 w-4" />
@@ -111,7 +111,7 @@ export function AppHeader() {
         <Link href="/app/dashboard" className="flex items-center gap-2 mr-6 header-content">
           <span className={cn(
             "font-bold text-xl",
-            theme === "dark" && mounted && "gradient-text"
+            mounted && theme === "dark" && "gradient-text"
           )}>EduLearn</span>
         </Link>
         <nav className="hidden md:flex items-center gap-6 text-sm header-content">
@@ -122,7 +122,7 @@ export function AppHeader() {
               className={cn(
                 "flex items-center gap-1 font-medium transition-colors hover:text-foreground",
                 route.active ? "text-foreground" : "text-muted-foreground",
-                theme === "dark" && route.active && "animate-pulse-glow px-3 py-1 rounded-md"
+                mounted && theme === "dark" && route.active && "animate-pulse-glow px-3 py-1 rounded-md"
               )}
             >
               <route.icon className="h-4 w-4" />
@@ -134,7 +134,7 @@ export function AppHeader() {
           <ModeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {theme === "dark" && mounted ? (
+              {mounted && theme === "dark" ? (
                 <AnimatedButton variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="/placeholder.svg" alt="User" />
@@ -150,7 +150,7 @@ export function AppHeader() {
                 </Button>
               )}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className={theme === "dark" && mounted ? "glass-effect" : ""}>
+            <DropdownMenuContent align="end" className={mounted && theme === "dark" ? "glass-effect" : ""}>
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

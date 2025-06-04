@@ -7,7 +7,7 @@ interface ProjectDetails {
   description: string;
   tasks: string[];
   deliverables: string[];
-  submission_type: 'text_input' | 'github_url';
+  submission_type: 'text_input';
 }
 
 interface StudentData {
@@ -132,7 +132,7 @@ export async function generateProject(
         },
         submission_type: { 
           type: 'string', 
-          enum: ['text_input', 'github_url'] 
+          enum: ['text_input'] 
         }
       },
       required: ['title', 'description', 'tasks', 'deliverables', 'submission_type']
@@ -198,7 +198,7 @@ Your response must be a JSON object with these exact fields:
 - description: A detailed description of the project (200-300 words)
 - tasks: An array of 3-5 specific tasks the student must complete
 - deliverables: An array of specific items the student must submit
-- submission_type: Either "text_input" (for written submissions) or "github_url" (for code repositories)
+- submission_type: Always "text_input" (for code projects, students use GitIngest to extract code and paste as text)
 
 Format your response as valid JSON only, no other text.
 `;
@@ -223,7 +223,7 @@ function validateProjectDetails(project: ProjectDetails): boolean {
   }
   
   // Validate submission type
-  if (project.submission_type !== 'text_input' && project.submission_type !== 'github_url') {
+  if (project.submission_type !== 'text_input') {
     return false;
   }
   
@@ -268,7 +268,7 @@ async function getFallbackProject(
           "Complete portfolio document or website URL",
           "Brief explanation of how you approached the project"
         ],
-        submission_type: "text_input"
+        submission_type: 'text_input'
       };
     }
     
@@ -277,7 +277,7 @@ async function getFallbackProject(
       description: fallbackProject.project_description,
       tasks: fallbackProject.tasks || [],
       deliverables: fallbackProject.deliverables || [],
-      submission_type: fallbackProject.submission_type || 'text_input'
+      submission_type: 'text_input'
     };
   } catch (error) {
     console.error('Error in getFallbackProject:', error);

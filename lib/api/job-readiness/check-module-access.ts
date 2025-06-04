@@ -5,8 +5,7 @@ export const JOB_READINESS_MODULE_ORDER = [
   'assessment',     // Star 0 -> unlocks automatically for enrolled students
   'course',         // Star 1 -> unlocked after assessments
   'expert_session', // Star 2 -> unlocked after courses
-  'project',        // Star 3 -> unlocked after expert sessions
-  'interview'       // Star 4 -> unlocked after projects
+  'project'         // Star 3 -> unlocked after expert sessions
 ];
 
 export type JobReadinessModuleType = typeof JOB_READINESS_MODULE_ORDER[number];
@@ -16,6 +15,31 @@ export type JobReadinessStarLevel = typeof JOB_READINESS_STAR_LEVELS[number];
 
 export const JOB_READINESS_TIERS = ['BRONZE', 'SILVER', 'GOLD'] as const;
 export type JobReadinessTier = typeof JOB_READINESS_TIERS[number];
+
+export const MODULE_ACCESS_REQUIREMENTS = [
+  'assessment',     // Star 0 -> always unlocked
+  'course',         // Star 1
+  'expert_session', // Star 2
+  'project'         // Star 3
+] as const
+
+export type ModuleType = typeof MODULE_ACCESS_REQUIREMENTS[number]
+
+export const STAR_REQUIREMENTS: Record<ModuleType, JobReadinessStarLevel> = {
+  'assessment': 'ONE',
+  'course': 'ONE', 
+  'expert_session': 'TWO',
+  'project': 'THREE'
+}
+
+// Reverse mapping: star level to modules unlocked
+export const STAR_TO_MODULES: Record<JobReadinessStarLevel, ModuleType> = {
+  'ONE': 'assessment',
+  'TWO': 'course', 
+  'THREE': 'expert_session',
+  'FOUR': 'project',
+  'FIVE': 'project'  // Star 5 still uses projects as the highest module type
+}
 
 /**
  * Maps module types to the star level required to unlock them

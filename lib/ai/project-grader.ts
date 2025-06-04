@@ -7,7 +7,7 @@ interface ProjectSubmission {
   projectDescription: string;
   tasks: string[];
   deliverables: string[];
-  submissionType: 'text_input' | 'github_url';
+  submissionType: 'text_input';
   submissionContent?: string;
   submissionUrl?: string;
   studentBackground: string;

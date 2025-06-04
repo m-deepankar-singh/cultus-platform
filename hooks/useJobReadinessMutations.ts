@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query"
 
 // Submit lesson quiz
 export function useSubmitQuiz() {
@@ -68,8 +68,14 @@ export function useSubmitProject() {
   
   return useMutation({
     mutationFn: async (submissionData: {
-      submission_content?: string
-      submission_url?: string
+      product_id: string
+      project_title: string
+      project_description: string
+      tasks: string[]
+      deliverables: string[]
+      submission_type: string
+      submission_content?: string | null
+      submission_url?: string | null
     }) => {
       const response = await fetch('/api/app/job-readiness/projects/submit', {
         method: 'POST',
@@ -78,7 +84,8 @@ export function useSubmitProject() {
       })
       
       if (!response.ok) {
-        throw new Error('Failed to submit project')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to submit project')
       }
       
       return response.json()
@@ -86,33 +93,7 @@ export function useSubmitProject() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job-readiness', 'progress'] })
       queryClient.invalidateQueries({ queryKey: ['job-readiness', 'projects'] })
-    }
-  })
-}
-
-// Submit interview
-export function useSubmitInterview() {
-  const queryClient = useQueryClient()
-  
-  return useMutation({
-    mutationFn: async (videoBlob: Blob) => {
-      const formData = new FormData()
-      formData.append('video', videoBlob, 'interview.webm')
-      
-      const response = await fetch('/api/app/job-readiness/interviews/submit', {
-        method: 'POST',
-        body: formData
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to submit interview')
-      }
-      
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'progress'] })
-      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'interviews'] })
+      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'project'] })
     }
   })
 }

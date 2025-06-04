@@ -4,9 +4,12 @@ interface JobReadinessModule {
   id: string
   name: string
   type: string
-  unlocked: boolean
-  completed: boolean
-  locked_reason?: string
+  is_unlocked: boolean
+  progress: {
+    status: string
+    progress_percentage: number
+    completed_at?: string
+  } | null
 }
 
 interface JobReadinessProduct {
@@ -40,9 +43,8 @@ interface JobReadinessProgress {
   modules: {
     assessments: { unlocked: boolean; completed: boolean }
     courses: { unlocked: boolean; completed: boolean }
-    expertSessions: { unlocked: boolean; completed: boolean }
+    expert_sessions: { unlocked: boolean; completed: boolean }
     projects: { unlocked: boolean; completed: boolean }
-    interviews: { unlocked: boolean; completed: boolean }
   }
 }
 
@@ -60,30 +62,30 @@ export function useJobReadinessProgress() {
       const modules = {
         assessments: { unlocked: false, completed: false },
         courses: { unlocked: false, completed: false },
-        expertSessions: { unlocked: false, completed: false },
-        projects: { unlocked: false, completed: false },
-        interviews: { unlocked: false, completed: false }
+        expert_sessions: { unlocked: false, completed: false },
+        projects: { unlocked: false, completed: false }
       }
       
       // Process modules from all products to determine unlock/complete status
       data.products.forEach(product => {
         product.modules.forEach(module => {
           const moduleType = module.type.toLowerCase()
+          // Map API fields correctly: is_unlocked -> unlocked, progress.status === 'Completed' -> completed
+          const isUnlocked = module.is_unlocked || false
+          const isCompleted = module.progress?.status === 'Completed' || false
+          
           if (moduleType.includes('assessment')) {
-            modules.assessments.unlocked = modules.assessments.unlocked || module.unlocked
-            modules.assessments.completed = modules.assessments.completed || module.completed
+            modules.assessments.unlocked = modules.assessments.unlocked || isUnlocked
+            modules.assessments.completed = modules.assessments.completed || isCompleted
           } else if (moduleType.includes('course')) {
-            modules.courses.unlocked = modules.courses.unlocked || module.unlocked
-            modules.courses.completed = modules.courses.completed || module.completed
+            modules.courses.unlocked = modules.courses.unlocked || isUnlocked
+            modules.courses.completed = modules.courses.completed || isCompleted
           } else if (moduleType.includes('expert')) {
-            modules.expertSessions.unlocked = modules.expertSessions.unlocked || module.unlocked
-            modules.expertSessions.completed = modules.expertSessions.completed || module.completed
+            modules.expert_sessions.unlocked = modules.expert_sessions.unlocked || isUnlocked
+            modules.expert_sessions.completed = modules.expert_sessions.completed || isCompleted
           } else if (moduleType.includes('project')) {
-            modules.projects.unlocked = modules.projects.unlocked || module.unlocked
-            modules.projects.completed = modules.projects.completed || module.completed
-          } else if (moduleType.includes('interview')) {
-            modules.interviews.unlocked = modules.interviews.unlocked || module.unlocked
-            modules.interviews.completed = modules.interviews.completed || module.completed
+            modules.projects.unlocked = modules.projects.unlocked || isUnlocked
+            modules.projects.completed = modules.projects.completed || isCompleted
           }
         })
       })

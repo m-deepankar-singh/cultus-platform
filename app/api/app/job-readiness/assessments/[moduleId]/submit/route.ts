@@ -226,33 +226,32 @@ export async function POST(
 
       const questionId = questionItem.question_id;
       const userAnswer = answers[questionId];
-      const correctAnswer = (question as any).correct_answer;
+      
+      // Handle the correct answer structure based on question type
+      let correctAnswerIds: string[] = [];
+      if ((question as any).question_type === 'MSQ') {
+        // For MSQ, correct_answer is { answers: ["opt_a", "opt_b"] }
+        const correctAnswerData = (question as any).correct_answer;
+        correctAnswerIds = correctAnswerData?.answers || [];
+      } else {
+        // For MCQ and TF, correct_answer is just a string
+        const correctAnswerData = (question as any).correct_answer;
+        correctAnswerIds = correctAnswerData ? [correctAnswerData] : [];
+      }
 
-      if (!userAnswer || !correctAnswer) continue;
+      if (!userAnswer || correctAnswerIds.length === 0) continue;
 
-      // Handle different question types based on correct_answer format
+      // Handle different question types
       if ((question as any).question_type === 'MCQ' || (question as any).question_type === 'TF') {
-        // Single correct answer - could be string or { answer: "value" }
-        const correctValue = typeof correctAnswer === 'string' 
-          ? correctAnswer 
-          : correctAnswer.answer || correctAnswer;
-        
-        if (userAnswer === correctValue) {
+        // Single correct answer
+        if (typeof userAnswer === 'string' && correctAnswerIds.includes(userAnswer)) {
           correctAnswers++;
         }
       } else if ((question as any).question_type === 'MSQ') {
-        // Multiple correct answers - could be array or { answers: [...] }
-        let correctAnswersArray: string[] = [];
-        
-        if (Array.isArray(correctAnswer)) {
-          correctAnswersArray = correctAnswer;
-        } else if (correctAnswer.answers && Array.isArray(correctAnswer.answers)) {
-          correctAnswersArray = correctAnswer.answers;
-        }
-        
-        if (Array.isArray(userAnswer) && correctAnswersArray.length > 0) {
+        // Multiple correct answers - must match exactly
+        if (Array.isArray(userAnswer)) {
           const sortedUserAnswers = [...userAnswer].sort();
-          const sortedCorrectAnswers = [...correctAnswersArray].sort();
+          const sortedCorrectAnswers = [...correctAnswerIds].sort();
           if (JSON.stringify(sortedUserAnswers) === JSON.stringify(sortedCorrectAnswers)) {
             correctAnswers++;
           }
@@ -408,7 +407,7 @@ export async function POST(
       feedback,
       correct_answers: correctAnswers,
       total_questions: totalQuestions,
-      submission_id: `${submissionRecord.student_id}-${submissionRecord.module_id}`,
+      submission_id: submissionRecord.student_id + '-' + submissionRecord.module_id,
     };
 
     return NextResponse.json(response);

@@ -3,43 +3,32 @@
 export interface JrSubmission {
   id: string
   student_id: string
-  product_id: string
-  submission_type: "project" | "interview"
-  submission_date: string
+  submission_type: "project"
+  project_title?: string
+  submission_content?: string
+  submission_url?: string
   score?: number
-  ai_grade_status: "pending" | "completed" | "failed"
-  manual_review_status: "pending" | "approved" | "rejected" | "not_required"
-  reviewer_id?: string
-  admin_feedback?: string
-  review_date?: string
-  // Student info from join
-  student?: {
-    id: string
-    first_name: string
-    last_name: string
-    email: string
-  }
-  // Product info from join
-  product?: {
-    id: string
-    name: string
-    description?: string
-  }
-  // Submission-specific data
+  passed?: boolean
+  created_at: string
+  updated_at: string
+  
   project_submission?: {
-    background_type: string
-    project_type: string
-    submission_content?: string
-    submission_url?: string
-    passed?: boolean
-    feedback?: string
-  }
-  interview_submission?: {
-    video_storage_path: string
-    passed?: boolean
-    feedback?: string
+    project_title: string
+    project_description: string
+    tasks: string[]
+    deliverables: string[]
   }
 }
+
+export interface SubmissionFilters {
+  submissionType?: "project" | "all"
+  passed?: boolean
+  studentId?: string
+  limit?: number
+  offset?: number
+}
+
+export const SUBMISSION_TYPES = ["project"] as const
 
 export interface JrSubmissionsFilters {
   productId?: string
@@ -67,11 +56,9 @@ export interface ManualReviewRequest {
 }
 
 // Submission type and status enums
-export const SUBMISSION_TYPES = ["project", "interview"] as const
 export const AI_GRADE_STATUSES = ["pending", "completed", "failed"] as const
 export const MANUAL_REVIEW_STATUSES = ["pending", "approved", "rejected", "not_required"] as const
 
-export type SubmissionType = typeof SUBMISSION_TYPES[number]
 export type AiGradeStatus = typeof AI_GRADE_STATUSES[number]
 export type ManualReviewStatus = typeof MANUAL_REVIEW_STATUSES[number]
 
@@ -136,24 +123,24 @@ export async function getJrSubmissions(filters: JrSubmissionsFilters = {}): Prom
 }
 
 // Submit manual review for interview submission
-export async function submitManualReview(
-  submissionId: string,
-  reviewData: ManualReviewRequest
-): Promise<void> {
-  try {
-    const response = await fetch(`/api/admin/job-readiness/interviews/${encodeURIComponent(submissionId)}/manual-review`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(reviewData),
+export async function submitManualReview(submissionId: string, approved: boolean, feedback?: string) {
+  const response = await fetch(`/api/admin/job-readiness/submissions/${encodeURIComponent(submissionId)}/manual-review`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      approved,
+      feedback
     })
-    
-    await handleApiResponse<void>(response)
-  } catch (error) {
-    console.error("Failed to submit manual review:", error)
-    throw error
+  })
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(errorData.error || 'Failed to submit manual review')
   }
+  
+  return response.json()
 }
 
 // Get submission details by ID
@@ -173,74 +160,39 @@ export async function getSubmissionDetails(submissionId: string): Promise<JrSubm
   }
 }
 
-// Utility functions
-export function getSubmissionTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    project: "📂 Project",
-    interview: "🎥 Interview"
-  }
-  return labels[type] || type
+// Helper functions for UI display
+export const SUBMISSION_TYPE_LABELS: Record<string, string> = {
+  project: "📁 Project"
 }
 
-export function getAiGradeStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: "⏳ Pending",
-    completed: "✅ Completed",
-    failed: "❌ Failed"
-  }
-  return labels[status] || status
+export const SUBMISSION_TYPE_COLORS: Record<string, string> = {
+  project: "bg-blue-100 text-blue-800 border-blue-300"
 }
 
-export function getManualReviewStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: "⏳ Pending Review",
-    approved: "✅ Approved",
-    rejected: "❌ Rejected",
-    not_required: "➖ Not Required"
-  }
-  return labels[status] || status
+export const AI_GRADE_STATUS_LABELS: Record<string, string> = {
+  pending: "⏳ Pending",
+  completed: "✅ Completed", 
+  failed: "❌ Failed"
 }
 
-export function getSubmissionTypeColor(type: string): string {
-  const colors: Record<string, string> = {
-    project: "bg-blue-100 text-blue-800 border-blue-300",
-    interview: "bg-purple-100 text-purple-800 border-purple-300"
-  }
-  return colors[type] || "bg-gray-100 text-gray-800 border-gray-300"
+export const AI_GRADE_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  completed: "bg-green-100 text-green-800 border-green-300",
+  failed: "bg-red-100 text-red-800 border-red-300"
 }
 
-export function getAiGradeStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
-    completed: "bg-green-100 text-green-800 border-green-300",
-    failed: "bg-red-100 text-red-800 border-red-300"
-  }
-  return colors[status] || "bg-gray-100 text-gray-800 border-gray-300"
+export const MANUAL_REVIEW_STATUS_LABELS: Record<string, string> = {
+  pending: "⏳ Pending Review",
+  approved: "✅ Approved",
+  rejected: "❌ Rejected",
+  not_required: "➖ Not Required"
 }
 
-export function getManualReviewStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
-    approved: "bg-green-100 text-green-800 border-green-300",
-    rejected: "bg-red-100 text-red-800 border-red-300",
-    not_required: "bg-gray-100 text-gray-800 border-gray-300"
-  }
-  return colors[status] || "bg-gray-100 text-gray-800 border-gray-300"
-}
-
-export function formatSubmissionDate(dateString?: string): string {
-  if (!dateString) return "No date"
-  
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return "Invalid date"
-  }
-}
-
-export function isInterviewSubmission(submission: JrSubmission): boolean {
-  return submission.submission_type === "interview"
+export const MANUAL_REVIEW_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  approved: "bg-green-100 text-green-800 border-green-300", 
+  rejected: "bg-red-100 text-red-800 border-red-300",
+  not_required: "bg-gray-100 text-gray-800 border-gray-300"
 }
 
 export function isProjectSubmission(submission: JrSubmission): boolean {
@@ -248,10 +200,9 @@ export function isProjectSubmission(submission: JrSubmission): boolean {
 }
 
 export function requiresManualReview(submission: JrSubmission): boolean {
-  return (
-    submission.submission_type === "interview" &&
-    submission.manual_review_status === "pending"
-  )
+  return submission.submission_type === "project" &&
+    submission.score !== undefined &&
+    submission.score < 80
 }
 
 export function isJrSubmission(submission: any): submission is JrSubmission {

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, GenerationConfig, Schema } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 // Type definitions for structured responses
 export interface GeminiResponse<T> {
@@ -12,13 +12,13 @@ export interface GeminiResponse<T> {
  * @returns The Gemini API client instance
  */
 export function initGeminiClient() {
-  const apiKey = process.env.GOOGLE_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   
   if (!apiKey) {
-    throw new Error('GOOGLE_API_KEY is not configured in environment variables');
+    throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is not configured in environment variables');
   }
   
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenAI({ apiKey });
 }
 
 /**
@@ -27,20 +27,20 @@ export function initGeminiClient() {
  */
 export const defaultSafetySettings = [
   {
-    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    category: 'HARM_CATEGORY_HARASSMENT',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
   },
   {
-    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    category: 'HARM_CATEGORY_HATE_SPEECH',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
   },
   {
-    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
   },
   {
-    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
   },
 ];
 
@@ -60,13 +60,9 @@ export async function callGeminiAPI<T>(
   structuredOutputSchema?: object
 ): Promise<GeminiResponse<T>> {
   try {
-    const genAI = initGeminiClient();
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      safetySettings: defaultSafetySettings,
-    });
+    const ai = initGeminiClient();
     
-    const generationConfig: GenerationConfig = {
+    const generationConfig = {
       temperature,
       topP: 1,
       topK: 16,
@@ -79,15 +75,19 @@ export async function callGeminiAPI<T>(
       const structuredGenerationConfig = {
         ...generationConfig,
         responseMimeType: "application/json",
-        responseSchema: structuredOutputSchema as Schema
+        responseSchema: structuredOutputSchema
       };
       
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: structuredGenerationConfig,
+      const result = await ai.models.generateContent({
+        model: modelName,
+        contents: [{ 
+          role: 'user', 
+          parts: [{ text: prompt }] 
+        }],
+        config: structuredGenerationConfig
       });
       
-      const text = result.response.text();
+      const text = result.text || '';
       try {
         // The API should return properly formatted JSON now
         const jsonData = JSON.parse(text) as T;
@@ -102,13 +102,16 @@ export async function callGeminiAPI<T>(
       }
     } else {
       // For non-structured output, proceed as before
-      const response = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig,
+      const result = await ai.models.generateContent({
+        model: modelName,
+        contents: [{ 
+          role: 'user', 
+          parts: [{ text: prompt }] 
+        }],
+        config: generationConfig
       });
       
-      const result = response.response;
-      const text = result.text();
+      const text = result.text || '';
       
       // For non-structured responses, attempt to parse JSON if possible
       try {
@@ -119,7 +122,7 @@ export async function callGeminiAPI<T>(
         return { data: text as unknown as T, success: true };
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error calling Gemini API:', error);
     return {
       data: null as unknown as T,
@@ -199,14 +202,8 @@ export function logAICall(
   console.log({
     timestamp: new Date().toISOString(),
     service: serviceName,
-    promptLength: prompt.length,
-    success: Boolean(result?.success),
+    prompt: prompt.substring(0, 200) + (prompt.length > 200 ? '...' : ''),
+    result: typeof result === 'string' ? result.substring(0, 200) + (result.length > 200 ? '...' : '') : result,
     metadata,
-    // Don't log the full prompt/response in production for privacy/security
-    // unless explicitly configured for debugging
-    ...(process.env.NODE_ENV === 'development' ? {
-      promptExcerpt: prompt.substring(0, 100) + '...',
-      resultExcerpt: JSON.stringify(result).substring(0, 100) + '...',
-    } : {})
   });
 } 

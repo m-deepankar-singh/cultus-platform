@@ -1,101 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { generateInterviewQuestions, transformQuestionsForClient } from '@/lib/ai/interview-question-generator';
-import { checkModuleAccess } from '@/lib/api/job-readiness/check-module-access';
+import { generateInterviewQuestions } from '@/lib/ai/question-generator';
+import { Background, StudentProfile } from '@/lib/ai/interview-config';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user from auth server (more secure than getSession)
+    // Get authenticated user
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (authError || !user) {
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const backgroundId = url.searchParams.get('backgroundId');
+    
+    if (!backgroundId) {
       return NextResponse.json(
-        { error: 'Unauthorized: Login required' },
-        { status: 401 }
+        { error: 'Background ID is required' },
+        { status: 400 }
       );
     }
-    
-    // Get student directly using the authenticated user ID
-    // Since students.id is directly linked to auth.users.id
+
+    // Get student profile
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id')
+      .select('id, full_name, job_readiness_tier, job_readiness_star_level, job_readiness_background_type')
       .eq('id', user.id)
       .single();
       
     if (studentError || !student) {
       return NextResponse.json(
-        { error: 'Student profile not found' },
+        { error: 'Student record not found' },
         { status: 404 }
       );
     }
-    
-    // Check if the student has access to interview module
-    const moduleAccess = await checkModuleAccess(student.id, 'interview');
-    if (!moduleAccess.has_access) {
-      return NextResponse.json(
-        { error: `Module access denied: ${moduleAccess.error}` },
-        { status: 403 }
-      );
-    }
-    
-    // Check for cached questions first (to ensure consistent questions during a session)
-    const { data: activeSession, error: sessionError } = await supabase
-      .from('job_readiness_active_interview_sessions')
-      .select('questions, created_at')
-      .eq('student_id', student.id)
-      .maybeSingle();
-    
-    // If there's an active session with cached questions and it's recent (< 30 minutes old)
-    const SESSION_VALID_MINUTES = 30;
-    
-    if (activeSession?.questions && activeSession.created_at) {
-      const sessionTime = new Date(activeSession.created_at);
-      const now = new Date();
-      const diffMinutes = (now.getTime() - sessionTime.getTime()) / (1000 * 60);
+
+    // Get background information from the correct table
+    const { data: background, error: backgroundError } = await supabase
+      .from('job_readiness_background_interview_types')
+      .select('id, background_type, interview_focus_area, question_quantity, grading_criteria')
+      .eq('background_type', backgroundId)
+      .single();
       
-      if (diffMinutes < SESSION_VALID_MINUTES) {
-        return NextResponse.json({
-          questions: activeSession.questions,
-          cached: true
-        });
-      }
-    }
-    
-    // If no cached questions or cache expired, generate new questions
-    const questions = await generateInterviewQuestions(student.id);
-    
-    if (!questions) {
+    if (backgroundError || !background) {
       return NextResponse.json(
-        { error: 'Failed to generate interview questions' },
-        { status: 500 }
+        { error: 'Background not found' },
+        { status: 404 }
       );
     }
-    
-    // Transform questions for client (remove any sensitive data)
-    const clientQuestions = transformQuestionsForClient(questions);
-    
-    // Store questions in active session table for caching
-    const { error: insertError } = await supabase
-      .from('job_readiness_active_interview_sessions')
-      .upsert({
-        student_id: student.id,
-        questions: clientQuestions,
-        created_at: new Date().toISOString()
-      });
-    
-    if (insertError) {
-      console.error('Error caching interview questions:', insertError);
-      // Continue anyway - this is just for caching
+
+    // Format data for question generation
+    const backgroundData: Background = {
+      id: background.id,
+      name: background.background_type,
+      description: background.interview_focus_area,
+      skills: [], // Will be populated based on background_type
+      focus_areas: [background.interview_focus_area]
+    };
+
+    // Add skills based on background type
+    switch (background.background_type) {
+      case 'COMPUTER_SCIENCE':
+        backgroundData.skills = ['Programming', 'Problem Solving', 'Technical Communication', 'Software Development'];
+        break;
+      default:
+        backgroundData.skills = ['Communication', 'Problem Solving', 'Analytical Thinking'];
     }
-    
-    return NextResponse.json({
-      questions: clientQuestions,
-      cached: false
+
+    const studentProfile: StudentProfile = {
+      id: student.id,
+      full_name: student.full_name, // Use the full_name directly from students table
+      background_type: student.job_readiness_background_type || 'COMPUTER_SCIENCE',
+      job_readiness_tier: student.job_readiness_tier || 'BRONZE',
+      job_readiness_star_level: student.job_readiness_star_level || 'FOUR'
+    };
+
+    console.log('Generating questions for:', {
+      background: backgroundData.name,
+      student: studentProfile.full_name,
+      tier: studentProfile.job_readiness_tier,
+      questionQuantity: background.question_quantity
     });
+
+    // Generate questions using AI
+    const questionsResponse = await generateInterviewQuestions(
+      backgroundData, 
+      studentProfile, 
+      background.question_quantity
+    );
+
+    return NextResponse.json({
+      success: true,
+      background: backgroundData,
+      ...questionsResponse
+    });
+
   } catch (error) {
-    console.error('Error in interview questions API:', error);
+    console.error('Error generating interview questions:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

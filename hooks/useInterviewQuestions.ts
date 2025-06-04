@@ -8,6 +8,7 @@ interface InterviewQuestion {
 interface InterviewQuestionsResponse {
   questions: InterviewQuestion[]
   cached: boolean
+  sessionId?: string
 }
 
 export function useInterviewQuestions() {
@@ -20,8 +21,9 @@ export function useInterviewQuestions() {
       }
       return response.json()
     },
-    staleTime: 30 * 60 * 1000, // 30 minutes - questions are cached on backend
-    gcTime: 60 * 60 * 1000, // 60 minutes
-    refetchOnWindowFocus: false, // Prevent refetch to maintain consistency during interview session
+    staleTime: 0, // Always fetch fresh questions
+    gcTime: 0, // Don't cache in memory
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnMount: true, // Always refetch when component mounts
   })
 } 

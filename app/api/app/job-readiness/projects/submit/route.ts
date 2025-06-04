@@ -31,15 +31,15 @@ export async function POST(req: NextRequest) {
     }
     
     // Validate submission based on submission type
-    if (submission_type === 'github_url' && !submission_url) {
+    if (submission_type !== 'text_input') {
       return NextResponse.json({ 
-        error: 'GitHub URL is required for code repository submissions' 
+        error: 'Only text submissions are supported' 
       }, { status: 400 });
     }
     
-    if (submission_type === 'text_input' && !submission_content) {
+    if (!submission_content || submission_content.trim().length < 100) {
       return NextResponse.json({ 
-        error: 'Submission content is required for text submissions' 
+        error: 'Submission content is required and must be at least 100 characters' 
       }, { status: 400 });
     }
 
@@ -77,19 +77,22 @@ export async function POST(req: NextRequest) {
       starLevel: student.job_readiness_star_level
     });
 
-    // Check if the student has already submitted a project for this product
+    // Check if the student has already submitted a SUCCESSFUL project for this product
     const { data: existingSubmission, error: existingError } = await supabase
       .from('job_readiness_ai_project_submissions')
-      .select('id')
+      .select('id, passed, score')
       .eq('student_id', user.id)
       .eq('product_id', product_id)
       .not('submission_content', 'is', null) // Only check for actual submissions
+      .order('created_at', { ascending: false }) // Get the most recent submission
+      .limit(1)
       .maybeSingle();
     
-    if (existingSubmission) {
+    if (existingSubmission && existingSubmission.passed) {
       return NextResponse.json({ 
-        error: 'You have already submitted a project for this product',
-        submission_id: existingSubmission.id
+        error: 'You have already successfully completed a project for this product',
+        submission_id: existingSubmission.id,
+        previous_score: existingSubmission.score
       }, { status: 400 });
     }
 
@@ -130,6 +133,45 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Determine if this is likely a coding project with large content
+    const isLikelyCodeProject = project_title.toLowerCase().includes('code') || 
+                               project_title.toLowerCase().includes('programming') ||
+                               project_title.toLowerCase().includes('software') ||
+                               project_description.toLowerCase().includes('code') ||
+                               project_description.toLowerCase().includes('programming');
+    
+    const contentLength = submission_content?.length || 0;
+    const isLargeContent = contentLength > 5000; // 5KB threshold
+    
+    // For coding projects with large content, store only a summary
+    let finalSubmissionContent = submission_content;
+    let storeFullContent = true;
+    let contentTruncated = false;
+    
+    if (isLikelyCodeProject && isLargeContent && submission_content) {
+      // Store only a summary for large coding submissions
+      const lines = submission_content.split('\n');
+      const summaryLines = [
+        '=== PROJECT SUBMISSION SUMMARY ===',
+        `Original content length: ${contentLength} characters`,
+        `Submission type: Code project with GitIngest output`,
+        '',
+        '=== FIRST 50 LINES ===',
+        ...lines.slice(0, 50),
+        '',
+        '=== LAST 20 LINES ===',
+        ...lines.slice(-20),
+        '',
+        '=== CONTENT TRUNCATED FOR STORAGE OPTIMIZATION ==='
+      ];
+      
+      finalSubmissionContent = summaryLines.join('\n');
+      storeFullContent = false;
+      contentTruncated = true;
+      
+      console.log(`Optimized storage for large coding project: ${contentLength} chars -> ${finalSubmissionContent.length} chars`);
+    }
+
     // Use the AI project grader to evaluate the submission
     const submissionData = {
       projectTitle: project_title,
@@ -137,7 +179,7 @@ export async function POST(req: NextRequest) {
       tasks: Array.isArray(tasks) ? tasks : [],
       deliverables: Array.isArray(deliverables) ? deliverables : [],
       submissionType: submission_type,
-      submissionContent: submission_content,
+      submissionContent: submission_content, // Use original content for AI grading
       submissionUrl: submission_url,
       studentBackground: student.job_readiness_background_type || 'GENERAL',
       studentTier: student.job_readiness_tier || 'BRONZE'
@@ -165,7 +207,7 @@ export async function POST(req: NextRequest) {
       tasks,
       deliverables,
       submission_type,
-      submission_content: submission_content || null,
+      submission_content: finalSubmissionContent || null,
       submission_url: submission_url || null,
       score: gradingResult.score,
       passed: gradingResult.passed,
@@ -174,7 +216,10 @@ export async function POST(req: NextRequest) {
         strengths: gradingResult.feedback.strengths,
         weaknesses: gradingResult.feedback.weaknesses,
         improvements: gradingResult.feedback.improvements
-      })
+      }),
+      store_submission_content: storeFullContent,
+      content_truncated: contentTruncated,
+      original_content_length: contentLength
     };
     
     // Save the submission to the database
@@ -226,7 +271,9 @@ export async function POST(req: NextRequest) {
         submission_content: savedSubmission.submission_content,
         submission_url: savedSubmission.submission_url,
         score: savedSubmission.score,
-        passed: savedSubmission.passed
+        passed: savedSubmission.passed,
+        content_optimized: contentTruncated,
+        original_content_length: contentLength
       },
       feedback: {
         summary: gradingResult.feedback.summary,
@@ -236,7 +283,14 @@ export async function POST(req: NextRequest) {
       },
       star_level_updated: starLevelUpdated,
       new_star_level: newStarLevel,
-      passing_threshold: PASSING_SCORE_THRESHOLD
+      passing_threshold: PASSING_SCORE_THRESHOLD,
+      ...(contentTruncated && {
+        storage_optimization: {
+          message: "Your code submission was successfully processed. For storage efficiency, we've kept a summary of your submission along with your results.",
+          original_size: `${Math.round(contentLength / 1024)}KB`,
+          optimized: true
+        }
+      })
     });
   } catch (error) {
     console.error('Unexpected error in job-readiness projects submit POST:', error);
