@@ -100,10 +100,34 @@ export function useJobReadinessModuleGroups() {
         'FOUR': 4,
         'FIVE': 5
       }
-      const currentStars = starLevelMap[data.student.job_readiness_star_level || 'ONE'] || 0
+      // Don't default to 'ONE' if star level is null - show 0 stars instead
+      const currentStars = data.student.job_readiness_star_level 
+        ? (starLevelMap[data.student.job_readiness_star_level] || 0) 
+        : 0
       
       // Helper function to calculate group status
-      const calculateGroupStatus = (modules: JobReadinessModule[], requiredStars: number) => {
+      const calculateGroupStatus = (modules: JobReadinessModule[], requiredStars: number, moduleType?: string) => {
+        // Special handling for Expert Sessions - if user has 3+ stars, they've completed expert sessions
+        if (moduleType === 'expert_sessions') {
+          const totalSessions = 5;
+          const isUnlocked = currentStars >= requiredStars || requiredStars === 0;
+          const isCompleted = currentStars >= 3; // 3+ stars means expert sessions are completed
+          const completedSessions = isCompleted ? totalSessions : 0; // Show 5/5 if completed, 0/5 if not
+          
+          return { completedCount: completedSessions, totalCount: totalSessions, isUnlocked, isCompleted };
+        }
+        
+        // Special handling for Projects - if user has 4+ stars, they've completed projects
+        if (moduleType === 'projects') {
+          const totalProjects = modules.length || 1; // Default to 1 if no modules found
+          const isUnlocked = currentStars >= requiredStars || requiredStars === 0;
+          const isCompleted = currentStars >= 4; // 4+ stars means projects are completed
+          const completedProjects = isCompleted ? totalProjects : 0; // Show all projects completed if star 4+
+          
+          return { completedCount: completedProjects, totalCount: totalProjects, isUnlocked, isCompleted };
+        }
+        
+        // Default handling for other module types
         const completedCount = modules.filter(m => m.progress?.status === 'Completed').length
         const totalCount = modules.length
         const isUnlocked = currentStars >= requiredStars || requiredStars === 0
@@ -152,7 +176,7 @@ export function useJobReadinessModuleGroups() {
           requiredStars: 2,
           modules: expertSessionModules,
           href: `/app/job-readiness/expert-sessions?productId=${primaryProduct?.id}`,
-          ...calculateGroupStatus(expertSessionModules, 2)
+          ...calculateGroupStatus(expertSessionModules, 2, 'expert_sessions')
         },
         {
           type: 'projects',
@@ -162,7 +186,7 @@ export function useJobReadinessModuleGroups() {
           requiredStars: 3,
           modules: projectModules,
           href: `/app/job-readiness/projects?productId=${primaryProduct?.id}`,
-          ...calculateGroupStatus(projectModules, 3)
+          ...calculateGroupStatus(projectModules, 3, 'projects')
         },
         {
           type: 'interviews',

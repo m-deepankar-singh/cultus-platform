@@ -14,7 +14,7 @@ export interface StudentProfile {
   full_name: string;
   background_type: string;
   job_readiness_tier: string;
-  job_readiness_star_level: string;
+  job_readiness_star_level: string | null;
 }
 
 export function createInterviewConfig(
@@ -51,7 +51,7 @@ You are an AI interviewer conducting a professional job interview simulation for
 ## Interview Context
 - **Candidate**: ${studentProfile.full_name}
 - **Background**: ${background.name}
-- **Current Level**: ${studentProfile.job_readiness_tier} tier, ${studentProfile.job_readiness_star_level} star
+- **Current Level**: ${studentProfile.job_readiness_tier} tier, ${studentProfile.job_readiness_star_level || '0'} star
 - **Focus Areas**: ${background.focus_areas.join(', ')}
 - **Key Skills**: ${background.skills.join(', ')}
 
@@ -121,7 +121,7 @@ export function buildQuestionGenerationPrompt(
 ## Candidate Profile
 - **Name**: ${userProfile.full_name}
 - **Tier**: ${userProfile.job_readiness_tier}
-- **Star Level**: ${userProfile.job_readiness_star_level}
+- **Star Level**: ${userProfile.job_readiness_star_level || '0'}
 
 ## Question Requirements
 

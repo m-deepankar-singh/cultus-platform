@@ -9,6 +9,7 @@ import { OverallSessionProgress } from '@/components/job-readiness/OverallSessio
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle, Lock } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Toaster } from 'sonner'
 
 export default function ExpertSessionsPage() {
   const { data: progressData, isLoading: progressLoading } = useJobReadinessProgress()
@@ -57,7 +58,7 @@ export default function ExpertSessionsPage() {
   const isUnlocked = currentStars >= 2
   
   // Also check if the module is explicitly unlocked via the modules data
-  const isModuleUnlocked = progressData?.modules?.expertSessions?.unlocked || false
+  const isModuleUnlocked = progressData?.modules?.expert_sessions?.unlocked || false
   
 
 
@@ -93,6 +94,7 @@ export default function ExpertSessionsPage() {
       title="Expert Sessions" 
       description="Learn from industry experts through exclusive video sessions"
     >
+      <Toaster richColors position="top-right" />
       {/* Overall Progress */}
       {sessionsData && (
         <OverallSessionProgress overallProgress={sessionsData.overall_progress} />

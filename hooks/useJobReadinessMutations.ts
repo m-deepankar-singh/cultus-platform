@@ -22,10 +22,12 @@ export function useSubmitQuiz() {
       
       return response.json()
     },
-    onSuccess: () => {
-      // Invalidate relevant queries
+    onSuccess: (data, variables) => {
+      // Invalidate relevant queries to update UI immediately
       queryClient.invalidateQueries({ queryKey: ['job-readiness', 'progress'] })
       queryClient.invalidateQueries({ queryKey: ['job-readiness', 'courses'] })
+      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'course-content'] })
+      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'course-content', variables.moduleId] })
     }
   })
 }
@@ -38,7 +40,16 @@ export function useUpdateProgress() {
     mutationFn: async ({ moduleId, progressData }: {
       moduleId: string
       progressData: {
+        progress_percentage?: number
+        progress_details?: Record<string, any>
+        status?: 'InProgress' | 'Completed'
+        lesson_id?: string
+        video_playback_position?: number
+        lesson_completed?: boolean
+        video_completed?: boolean
+        video_fully_watched?: boolean
         last_viewed_lesson_sequence?: number
+        // Legacy support
         video_playback_positions?: Record<string, number>
         fully_watched_video_ids?: string[]
       }
@@ -55,9 +66,12 @@ export function useUpdateProgress() {
       
       return response.json()
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      // Invalidate all relevant queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ['job-readiness', 'progress'] })
       queryClient.invalidateQueries({ queryKey: ['job-readiness', 'courses'] })
+      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'course-content'] })
+      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'course-content', variables.moduleId] })
     }
   })
 }
@@ -98,12 +112,19 @@ export function useSubmitProject() {
   })
 }
 
-// Update expert session watch progress
+// Update expert session watch progress with milestone support
 export function useUpdateExpertSessionProgress() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async ({ sessionId, progressData }: {
+    mutationFn: async (event: {
+      sessionId: string
+      currentTime: number
+      duration: number
+      triggerType: string
+      milestone?: number
+      forceCompletion?: boolean
+    } | {
       sessionId: string
       progressData: {
         current_time_seconds: number
@@ -111,19 +132,67 @@ export function useUpdateExpertSessionProgress() {
         force_completion?: boolean
       }
     }) => {
+      // Handle both new milestone event format and legacy format
+      let requestBody: any
+      let sessionId: string
+      
+      if ('triggerType' in event) {
+                 // New milestone-based format
+         sessionId = event.sessionId
+         requestBody = {
+           current_time_seconds: Math.floor(event.currentTime),
+           total_duration_seconds: Math.floor(event.duration),
+           trigger_type: event.triggerType,
+           milestone: event.milestone ? Math.floor(event.milestone) : undefined,
+           force_completion: event.forceCompletion
+         }
+      } else {
+        // Legacy format for backward compatibility
+        sessionId = event.sessionId
+        requestBody = event.progressData
+      }
+      
       const response = await fetch(`/api/app/job-readiness/expert-sessions/${sessionId}/watch-progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(progressData)
+        body: JSON.stringify(requestBody)
       })
       
       if (!response.ok) {
-        throw new Error('Failed to update watch progress')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || 'Failed to update watch progress')
       }
       
       return response.json()
     },
     onSuccess: (data, variables) => {
+      // Get sessionId from either format
+      const sessionId = 'triggerType' in variables ? variables.sessionId : variables.sessionId
+      
+      // Handle success notifications for major milestones
+      if (data?.success && data?.progress?.session_just_completed) {
+        // Using dynamic import to avoid SSR issues
+        import('sonner').then(({ toast }) => {
+          toast.success('Expert session completed!', {
+            description: 'Great job! Your progress has been saved.',
+            icon: '🎉',
+          })
+        })
+      }
+
+      if (data?.success && data?.overall_progress?.third_star_unlocked) {
+        // Using dynamic import to avoid SSR issues
+        import('sonner').then(({ toast }) => {
+          toast.success('Congratulations! Third star unlocked! ⭐', {
+            description: 'You\'ve completed 5+ expert sessions with second star progression!',
+            duration: 5000,
+            icon: '🌟',
+          })
+        })
+      }
+
+      // Silent milestone tracking - no notifications for seamless experience
+
       // Only invalidate if session was just completed or major milestone reached
       if (data?.progress?.session_just_completed || data?.overall_progress?.third_star_unlocked) {
         queryClient.invalidateQueries({ queryKey: ['job-readiness', 'progress'] })
@@ -137,15 +206,16 @@ export function useUpdateExpertSessionProgress() {
           return {
             ...oldData,
             sessions: oldData.sessions?.map((session: any) => 
-              session.id === variables.sessionId 
+              session.id === sessionId 
                 ? { 
                     ...session, 
                     student_progress: {
                       ...session.student_progress,
-                      watch_time_seconds: data.progress.watch_time_seconds,
-                      completion_percentage: data.progress.completion_percentage,
-                      is_completed: data.progress.is_completed,
-                      completed_at: data.progress.completed_at
+                      watch_time_seconds: data.progress?.watch_time_seconds || session.student_progress.watch_time_seconds,
+                      completion_percentage: data.progress?.completion_percentage || session.student_progress.completion_percentage,
+                      is_completed: data.progress?.is_completed || session.student_progress.is_completed,
+                      completed_at: data.progress?.completed_at || session.student_progress.completed_at,
+                      last_milestone_reached: data.progress?.last_milestone_reached || session.student_progress.last_milestone_reached
                     }
                   }
                 : session
@@ -153,6 +223,14 @@ export function useUpdateExpertSessionProgress() {
           }
         })
       }
+    },
+    onError: (error: Error) => {
+      // Handle error notifications
+      import('sonner').then(({ toast }) => {
+        toast.error('Failed to save progress', {
+          description: error.message || 'Please check your connection and try again.',
+        })
+      })
     }
   })
 } 

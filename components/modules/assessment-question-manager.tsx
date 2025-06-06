@@ -103,8 +103,11 @@ export function AssessmentQuestionManager({
       // Add debug log to see data structure
       console.log('Received questions data:', data)
       
+      // Extract questions from the response - API returns { questions: [...], configuration: {...} }
+      const questionsArray = data.questions || []
+      
       // Ensure each question has a sequence property
-      const questionsWithSequence = data.map((q: Question, index: number) => ({
+      const questionsWithSequence = questionsArray.map((q: Question, index: number) => ({
         ...q,
         sequence: q.sequence ?? index + 1
       }))

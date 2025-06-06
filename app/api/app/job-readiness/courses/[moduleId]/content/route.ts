@@ -28,6 +28,9 @@ interface LessonOutput {
   quiz_generation_prompt?: string | null; // From plan
   quiz_questions?: QuizQuestionClient[] | null; // Questions for client (no answers)
   quiz_already_passed?: boolean; // Flag indicating if the quiz has already been passed
+  quiz_available?: boolean; // Flag indicating if the quiz is available (video watched or quiz passed)
+  video_fully_watched?: boolean; // Flag indicating if the video has been fully watched
+  video_playback_position?: number; // Current video position in seconds
 }
 
 // Add a specific type for MSQ answers
@@ -225,6 +228,13 @@ export async function GET(
       // Check if the quiz for this lesson has been completed successfully
       const quizAlreadyPassed = progressDetails?.lesson_quiz_results?.[lesson.id]?.passed === true;
       
+      // Check if video has been fully watched to determine quiz availability
+      const videoFullyWatched = progressDetails?.fully_watched_video_ids?.includes(lesson.id) === true ||
+                               progressDetails?.video_playback_positions?.[lesson.id] === -1; // -1 indicates completed
+      
+      // Quiz should only be available if video is fully watched (unless already passed)
+      const quizShouldBeAvailable = quizAlreadyPassed || videoFullyWatched;
+      
       if (enableAiQuiz) {
         // First, check if there are predefined quiz questions
         if (lesson.quiz_questions && Array.isArray(lesson.quiz_questions) && lesson.quiz_questions.length > 0) {
@@ -236,8 +246,8 @@ export async function GET(
             question_type: q.question_type as 'MCQ' | 'MSQ',
           }));
         } 
-        // Only generate AI quiz if we have a prompt, no predefined questions, and the quiz hasn't been passed already
-        else if (quizGenerationPrompt && !quizAlreadyPassed) {
+        // Only generate AI quiz if we have a prompt, no predefined questions, quiz should be available, and hasn't been passed
+        else if (quizGenerationPrompt && !quizAlreadyPassed && quizShouldBeAvailable) {
           // Generate or retrieve cached quiz
           // Cache key includes student ID to ensure quiz is for this user, preventing reuse if not intended
           // Also includes a time component (rounded to 10-minute intervals) to ensure new questions periodically
@@ -305,9 +315,9 @@ export async function GET(
             ? transformQuestionsForClient(fullQuizQuestions)
             : null;
         }
-        // Even if no AI quizzes or predefined questions, and quiz hasn't been passed,
-        // check for fallback questions from question bank
-        else if (!quizAlreadyPassed) {
+        // Even if no AI quizzes or predefined questions, check for fallback questions from question bank
+        // but only if quiz should be available and hasn't been passed
+        else if (!quizAlreadyPassed && quizShouldBeAvailable) {
           // Get fallback questions from our helper function
           const fallbackQuestions = await getFallbackQuestions(lesson.id, supabase);
           
@@ -346,6 +356,9 @@ export async function GET(
         quiz_generation_prompt: enableAiQuiz ? quizGenerationPrompt : null, // Only send prompt if quiz is enabled
         quiz_questions: clientQuizQuestions,
         quiz_already_passed: quizAlreadyPassed || false,  // Add this flag to indicate if quiz has been passed
+        quiz_available: enableAiQuiz ? quizShouldBeAvailable : false, // Quiz is available if video watched or already passed
+        video_fully_watched: videoFullyWatched || false, // Video completion status
+        video_playback_position: progressDetails?.video_playback_positions?.[lesson.id] || 0, // Current video position
       });
     }
 

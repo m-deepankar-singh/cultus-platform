@@ -130,10 +130,78 @@ export async function removeFileByUrl(publicUrl: string): Promise<boolean> {
 }
 
 /**
- * Uploads an expert session video to the expert_session_videos bucket
+ * Uploads an expert session video to the expert_session_videos bucket using session-based path
+ * @param file The video file to upload
+ * @param sessionId The ID of the expert session for organization
+ * @returns Object with upload path and public URL
+ */
+export async function uploadExpertSessionVideoById(file: File, sessionId: string): Promise<{path: string, publicUrl: string}> {
+  try {
+    const supabase = await createClient();
+    
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      throw new Error('File must be a video');
+    }
+
+    // Check file size (limit to 500MB for expert session videos)
+    const maxSizeInMB = 500;
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+      throw new Error(`File size must be less than ${maxSizeInMB}MB`);
+    }
+
+    // Generate unique file path using session ID
+    const fileExtension = file.name.split('.').pop() || 'mp4';
+    const uniqueFileName = `${crypto.randomUUID()}.${fileExtension}`;
+    const filePath = `expert-sessions/${sessionId}/${uniqueFileName}`;
+    
+    console.log(`Uploading expert session video to path: ${filePath}`);
+    
+    // Upload video to public bucket
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('expert-session-videos-public')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Video upload error:', uploadError);
+      throw new Error(`Failed to upload video: ${uploadError.message}`);
+    }
+
+    if (!uploadData || !uploadData.path) {
+      throw new Error('Failed to upload video: No path returned');
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('expert-session-videos-public')
+      .getPublicUrl(uploadData.path);
+
+    if (!urlData || !urlData.publicUrl) {
+      throw new Error('Failed to get public URL for uploaded video');
+    }
+
+    console.log('Expert session video uploaded successfully with session-based path');
+    
+    return {
+      path: uploadData.path,
+      publicUrl: urlData.publicUrl
+    };
+  } catch (error) {
+    console.error('Error in uploadExpertSessionVideoById:', error);
+    throw error;
+  }
+}
+
+/**
+ * Uploads an expert session video to the expert_session_videos bucket (legacy product-based path)
  * @param file The video file to upload
  * @param productId The ID of the product for organization
  * @returns Object with upload path and public URL
+ * @deprecated Use uploadExpertSessionVideoById for new sessions
  */
 export async function uploadExpertSessionVideo(file: File, productId: string): Promise<{path: string, publicUrl: string}> {
   try {

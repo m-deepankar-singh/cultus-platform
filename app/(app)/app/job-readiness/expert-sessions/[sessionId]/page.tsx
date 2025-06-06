@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ArrowLeft, CheckCircle2, Clock, Play, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { Toaster } from 'sonner'
 
 export default function ExpertSessionViewerPage() {
   const params = useParams()
@@ -71,13 +72,23 @@ export default function ExpertSessionViewerPage() {
     )
   }
 
-  const handleProgressUpdate = (currentTime: number, duration: number, forceComplete?: boolean) => {
-    updateProgressMutation.mutate({
-      sessionId,
-      progressData: {
-        current_time_seconds: Math.floor(currentTime),
-        total_duration_seconds: Math.floor(duration),
-        force_completion: forceComplete || false
+  // Import the progress update event type
+  const handleProgressUpdate = (event: {
+    sessionId: string
+    currentTime: number
+    duration: number
+    triggerType: string
+    milestone?: number
+    forceCompletion?: boolean
+  }) => {
+    updateProgressMutation.mutate(event, {
+      onSuccess: (data) => {
+        console.log('Progress updated successfully:', data)
+        // Success handling is managed in the hook with toasts
+      },
+      onError: (error) => {
+        console.error('Failed to update expert session progress:', error)
+        // Error handling is already managed in the hook
       }
     })
   }
@@ -94,8 +105,70 @@ export default function ExpertSessionViewerPage() {
   const isCompleted = session.student_progress.is_completed
   const completionPercentage = session.student_progress.completion_percentage
 
+  // If session is completed, show completion message instead of allowing re-access
+  if (isCompleted) {
+    return (
+      <JobReadinessLayout showProgress={false}>
+        <Toaster richColors position="top-right" />
+        {/* Navigation */}
+        <div className="mb-6">
+          <Link href="/app/job-readiness/expert-sessions">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Expert Sessions
+            </Button>
+          </Link>
+        </div>
+
+        {/* Completion Message */}
+        <div className="max-w-2xl mx-auto text-center">
+          <Card>
+            <CardContent className="p-8">
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-semibold text-gray-900">Session Completed!</h2>
+                  <p className="text-gray-600">
+                    You have successfully completed "<strong>{session.title}</strong>"
+                  </p>
+                </div>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-center space-x-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="text-green-800 font-medium">
+                      Completed on {new Date(session.student_progress.completed_at!).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-500">
+                  For security and progress tracking purposes, completed expert sessions cannot be re-watched. 
+                  Continue with your next learning objectives.
+                </p>
+
+                <div className="pt-4">
+                  <Link href="/app/job-readiness/expert-sessions">
+                    <Button size="lg" className="w-full sm:w-auto">
+                      Continue to Next Sessions
+                      <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </JobReadinessLayout>
+    )
+  }
+
   return (
     <JobReadinessLayout showProgress={false}>
+      <Toaster richColors position="top-right" />
       {/* Navigation */}
       <div className="mb-6">
         <Link href="/app/job-readiness/expert-sessions">
@@ -146,6 +219,7 @@ export default function ExpertSessionViewerPage() {
         <ExpertSessionPlayer
           session={session}
           onProgressUpdate={handleProgressUpdate}
+          isUpdatingProgress={updateProgressMutation.isPending}
         />
 
         {/* Session Details */}

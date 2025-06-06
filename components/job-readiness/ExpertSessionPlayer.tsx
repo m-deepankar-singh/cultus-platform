@@ -1,11 +1,32 @@
 "use client"
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, RotateCw } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
+import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, RotateCw, CheckCircle2, Star, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { 
+  SAVE_TRIGGERS,
+  type SaveTriggerType,
+  type ProgressMilestone 
+} from '@/lib/constants/progress-milestones'
+import {
+  calculateCompletionPercentage,
+  shouldSaveMilestone,
+  shouldSaveOnPause,
+  shouldMarkAsCompleted,
+  calculateDisplayProgress,
+  determineSaveTrigger,
+  getPassedMilestones,
+  getMilestoneMarkers
+} from '@/lib/utils/progress-utils'
+import type { 
+  MilestoneTrackingState, 
+  ProgressUpdateEvent
+} from '@/types/expert-session-progress'
 
 interface ExpertSession {
   id: string
@@ -19,15 +40,17 @@ interface ExpertSession {
     completion_percentage: number
     is_completed: boolean
     completed_at: string | null
+    last_milestone_reached?: ProgressMilestone
   }
 }
 
 interface ExpertSessionPlayerProps {
   session: ExpertSession
-  onProgressUpdate: (currentTime: number, duration: number, forceComplete?: boolean) => void
+  onProgressUpdate: (event: ProgressUpdateEvent) => void
+  isUpdatingProgress?: boolean
 }
 
-export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSessionPlayerProps) {
+export function ExpertSessionPlayer({ session, onProgressUpdate, isUpdatingProgress = false }: ExpertSessionPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -36,11 +59,79 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
   const [isMuted, setIsMuted] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [lastProgressUpdate, setLastProgressUpdate] = useState(0)
+  const [progressError, setProgressError] = useState<string | null>(null)
   const [hasWatchedComplete, setHasWatchedComplete] = useState(false)
 
-  const progressUpdateInterval = 30 // seconds
+  // Milestone tracking state
+  const [milestoneState, setMilestoneState] = useState<MilestoneTrackingState>({
+    lastMilestoneSaved: session.student_progress.last_milestone_reached || 0,
+    pauseStartTime: null,
+    pauseDuration: 0,
+    lastSeekPosition: 0, // Not used since seeking is disabled
+    pendingMilestone: null,
+    isTrackingProgress: false
+  })
 
+  // Milestone-based progress update with enhanced feedback
+  const handleMilestoneUpdate = useCallback((
+    currentTime: number, 
+    duration: number, 
+    triggerType: SaveTriggerType,
+    milestone?: ProgressMilestone,
+    forceComplete?: boolean
+  ) => {
+    if (isUpdatingProgress) return
+
+    setProgressError(null)
+
+    try {
+      const event: ProgressUpdateEvent = {
+        sessionId: session.id,
+        currentTime,
+        duration,
+        triggerType,
+        milestone,
+        forceCompletion: forceComplete
+      }
+      
+      onProgressUpdate(event)
+    } catch (error) {
+      console.error('Failed to update progress:', error)
+      setProgressError('Failed to save progress. Please check your connection.')
+      toast.error('Failed to save progress', {
+        description: 'Your progress may not be saved. Please try again.',
+      })
+    }
+  }, [isUpdatingProgress, session.id, onProgressUpdate])
+
+  // Check and save milestone if reached
+  const checkAndSaveMilestone = useCallback((currentTime: number, duration: number) => {
+    const currentPercentage = calculateCompletionPercentage(currentTime, duration)
+    const milestoneCheck = shouldSaveMilestone(currentPercentage, milestoneState.lastMilestoneSaved)
+    
+    if (milestoneCheck.shouldSave && milestoneCheck.milestone) {
+      console.log(`Milestone ${milestoneCheck.milestone}% reached at ${currentTime}s`)
+      
+      // Update milestone state
+      setMilestoneState(prev => ({
+        ...prev,
+        lastMilestoneSaved: milestoneCheck.milestone!,
+        pendingMilestone: milestoneCheck.milestone!
+      }))
+      
+      // Save to database
+      handleMilestoneUpdate(
+        currentTime, 
+        duration, 
+        SAVE_TRIGGERS.MILESTONE,
+        milestoneCheck.milestone
+      )
+      
+      // Silent milestone tracking - no notifications for seamless experience
+    }
+  }, [milestoneState.lastMilestoneSaved, handleMilestoneUpdate])
+
+  // Video event handlers
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -48,11 +139,6 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
     // Set initial time from saved progress
     if (session.student_progress.watch_time_seconds > 0) {
       video.currentTime = session.student_progress.watch_time_seconds
-    }
-
-    // Check if user has already watched the complete video based on progress
-    if (session.student_progress.watch_time_seconds >= video.duration - 0.5) {
-      setHasWatchedComplete(true)
     }
 
     const handleLoadedMetadata = () => {
@@ -69,33 +155,54 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
         setHasWatchedComplete(true)
       }
 
-      // Send regular progress updates (no automatic completion)
-      const shouldUpdate = 
-        current - lastProgressUpdate >= progressUpdateInterval || // Every 30 seconds
-        (current > 0 && lastProgressUpdate === 0)                 // First progress update
-
-      if (shouldUpdate) {
-        onProgressUpdate(current, video.duration)
-        setLastProgressUpdate(current)
+      // Check for milestone progression (replaces interval-based updates)
+      if (!isUpdatingProgress) {
+        checkAndSaveMilestone(current, video.duration)
       }
     }
 
-    const handlePlay = () => setIsPlaying(true)
+    const handlePlay = () => {
+      setIsPlaying(true)
+      
+      // Check pause duration and save if needed
+      if (milestoneState.pauseStartTime) {
+        const pauseDuration = (Date.now() - milestoneState.pauseStartTime) / 1000
+        
+        if (shouldSaveOnPause(pauseDuration)) {
+          console.log(`Extended pause detected: ${pauseDuration}s`)
+          handleMilestoneUpdate(
+            video.currentTime,
+            video.duration,
+            SAVE_TRIGGERS.PAUSE
+          )
+        }
+        
+        // Clear pause timer
+        setMilestoneState(prev => ({
+          ...prev,
+          pauseStartTime: null,
+          pauseDuration: 0
+        }))
+      }
+    }
+
     const handlePause = () => {
       setIsPlaying(false)
-      // Send progress update on pause (but debounce if recently sent)
-      const timeSinceLastUpdate = video.currentTime - lastProgressUpdate
-      if (timeSinceLastUpdate >= 5) { // At least 5 seconds since last update
-        onProgressUpdate(video.currentTime, video.duration)
-        setLastProgressUpdate(video.currentTime)
-      }
+      
+      // Start pause timer for milestone tracking
+      setMilestoneState(prev => ({
+        ...prev,
+        pauseStartTime: Date.now()
+      }))
     }
+
     const handleEnded = () => {
       setIsPlaying(false)
       setHasWatchedComplete(true)
-      // Send final progress update but don't auto-complete
-      onProgressUpdate(video.duration, video.duration)
-      setLastProgressUpdate(video.duration)
+      // Send final progress update
+      if (!isUpdatingProgress) {
+        handleMilestoneUpdate(video.duration, video.duration, SAVE_TRIGGERS.COMPLETION)
+      }
     }
 
     const handleVolumeChange = () => {
@@ -103,29 +210,115 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
       setIsMuted(video.muted)
     }
 
+    const handleLoadStart = () => {
+      setProgressError(null)
+    }
+
+    const handleError = (e: Event) => {
+      console.error('Video error:', e)
+      setProgressError('Error loading video. Please try refreshing the page.')
+      toast.error('Video Error', {
+        description: 'There was an error loading the video. Please try refreshing the page.',
+      })
+    }
+
+    // Add event listeners
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('play', handlePlay)
     video.addEventListener('pause', handlePause)
     video.addEventListener('ended', handleEnded)
     video.addEventListener('volumechange', handleVolumeChange)
+    video.addEventListener('loadstart', handleLoadStart)
+    video.addEventListener('error', handleError)
 
     return () => {
+      // Cleanup event listeners
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
       video.removeEventListener('timeupdate', handleTimeUpdate)
       video.removeEventListener('play', handlePlay)
       video.removeEventListener('pause', handlePause)
       video.removeEventListener('ended', handleEnded)
       video.removeEventListener('volumechange', handleVolumeChange)
+      video.removeEventListener('loadstart', handleLoadStart)
+      video.removeEventListener('error', handleError)
     }
-  }, [session.student_progress.watch_time_seconds, onProgressUpdate, lastProgressUpdate, session.id])
+  }, [session.student_progress.watch_time_seconds, session.id, isUpdatingProgress, milestoneState.pauseStartTime, checkAndSaveMilestone, handleMilestoneUpdate, hasWatchedComplete])
 
   // Reset watched complete flag when session changes
   useEffect(() => {
     setHasWatchedComplete(session.student_progress.watch_time_seconds >= duration - 0.5)
-    setLastProgressUpdate(session.student_progress.watch_time_seconds)
-  }, [session.id, session.student_progress.watch_time_seconds, duration])
+    setProgressError(null)
+    
+    // Initialize milestone state from saved progress
+    setMilestoneState(prev => ({
+      ...prev,
+      lastMilestoneSaved: session.student_progress.last_milestone_reached || 0
+    }))
+  }, [session.id, session.student_progress.watch_time_seconds, session.student_progress.last_milestone_reached, duration])
 
+  // Handle page unload to save progress
+  useEffect(() => {
+    const handleUnload = () => {
+      if (videoRef.current && !isUpdatingProgress) {
+        const currentTime = videoRef.current.currentTime
+        const duration = videoRef.current.duration
+        
+        if (currentTime > 0 && duration > 0) {
+          // Use navigator.sendBeacon for reliable unload progress saving
+          const event: ProgressUpdateEvent = {
+            sessionId: session.id,
+            currentTime,
+            duration,
+            triggerType: SAVE_TRIGGERS.UNLOAD
+          }
+          
+          try {
+            // Attempt immediate save on unload
+            navigator.sendBeacon(
+              `/api/app/job-readiness/expert-sessions/${session.id}/watch-progress`,
+              JSON.stringify(event)
+            )
+          } catch (error) {
+            console.warn('Failed to save progress on unload:', error)
+          }
+        }
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && videoRef.current) {
+        // Page is being hidden, save current progress
+        const currentTime = videoRef.current.currentTime
+        const duration = videoRef.current.duration
+        
+        if (currentTime > 0 && duration > 0) {
+          handleMilestoneUpdate(currentTime, duration, SAVE_TRIGGERS.UNLOAD)
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [session.id, isUpdatingProgress, handleMilestoneUpdate])
+
+  // Calculate display progress (real-time but milestone-aware)
+  const progressPercentage = duration > 0 ? calculateDisplayProgress(
+    currentTime, 
+    duration, 
+    milestoneState.lastMilestoneSaved
+  ) : 0
+  
+  // Get milestone markers for progress bar
+  const milestoneMarkers = getMilestoneMarkers()
+  const passedMilestones = getPassedMilestones(progressPercentage)
+
+  // Control handlers
   const togglePlay = () => {
     if (!videoRef.current) return
     
@@ -136,17 +329,7 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
     }
   }
 
-  const handleSeek = (value: number[]) => {
-    if (!videoRef.current) return
-    const newTime = (value[0] / 100) * duration
-    videoRef.current.currentTime = newTime
-    setCurrentTime(newTime)
-    
-    // Update watched complete status based on seek position
-    if (newTime >= duration - 0.5) {
-      setHasWatchedComplete(true)
-    }
-  }
+  // Seeking disabled - users must watch video sequentially
 
   const handleVolumeChange = (value: number[]) => {
     if (!videoRef.current) return
@@ -159,26 +342,23 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
   const toggleMute = () => {
     if (!videoRef.current) return
     videoRef.current.muted = !isMuted
-    setIsMuted(!isMuted)
   }
 
   const skip = (seconds: number) => {
     if (!videoRef.current) return
     const newTime = Math.max(0, Math.min(duration, currentTime + seconds))
     videoRef.current.currentTime = newTime
-    setCurrentTime(newTime)
   }
 
   const toggleFullscreen = () => {
     if (!videoRef.current) return
     
-    if (!document.fullscreenElement) {
-      videoRef.current.requestFullscreen()
-      setIsFullscreen(true)
+    if (!isFullscreen) {
+      videoRef.current.requestFullscreen?.()
     } else {
-      document.exitFullscreen()
-      setIsFullscreen(false)
+      document.exitFullscreen?.()
     }
+    setIsFullscreen(!isFullscreen)
   }
 
   const formatTime = (time: number) => {
@@ -192,116 +372,153 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
     return `${minutes}:${seconds.toString().padStart(2, '0')}`
   }
 
-  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
-  
-  // Handle manual completion
+  // Handle manual completion with enhanced feedback
   const handleMarkAsCompleted = () => {
     if (!hasWatchedComplete) return
     
+    setProgressError(null)
+
+    try {
     // Send completion update to API
-    onProgressUpdate(duration, duration, true) // Add completion flag
+      handleMilestoneUpdate(duration, duration, SAVE_TRIGGERS.COMPLETION, 100, true)
+      
+      toast.success('Session completed!', {
+        description: 'Your progress has been saved successfully.',
+        icon: <CheckCircle2 className="h-4 w-4" />,
+      })
+    } catch (error) {
+      console.error('Failed to mark as completed:', error)
+      setProgressError('Failed to mark session as completed.')
+      toast.error('Failed to mark as completed', {
+        description: 'Please try again or contact support if the issue persists.',
+      })
+    }
   }
 
+  const isCompleted = session.student_progress.is_completed
+
   return (
-    <Card>
+    <Card className="w-full">
       <CardContent className="p-0">
-        <div 
-          className="relative bg-black group"
-          onMouseEnter={() => setShowControls(true)}
-          onMouseLeave={() => setShowControls(false)}
-        >
-          {/* Video Element */}
+        <div className="relative bg-black aspect-video group">
           <video
             ref={videoRef}
-            className="w-full aspect-video"
             src={session.video_url}
+            className="w-full h-full object-contain pointer-events-none"
+            playsInline
             preload="metadata"
-            onClick={togglePlay}
+            onSeeking={(e) => {
+              // Prevent seeking - reset to current time
+              if (videoRef.current) {
+                e.preventDefault()
+                videoRef.current.currentTime = currentTime
+              }
+            }}
           />
 
-          {/* Loading Overlay */}
-          {duration === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="text-white text-center">
-                <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p>Loading video...</p>
-              </div>
-            </div>
-          )}
+          {/* No loading overlay - progress saves in background seamlessly */}
 
-          {/* Controls Overlay */}
-          <div className={cn(
-            "absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300",
-            (showControls || !isPlaying) && "opacity-100"
-          )}>
-            {/* Center Play Button */}
-            {!isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center">
+          {/* Controls overlay */}
+          <div 
+            className={cn(
+              "absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300",
+              showControls ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}
+            onMouseEnter={() => setShowControls(true)}
+            onMouseLeave={() => setShowControls(false)}
+          >
+            {/* Top controls */}
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start">
+              <div className="text-white">
+                <h3 className="font-semibold text-lg truncate">{session.title}</h3>
+                <p className="text-sm text-gray-300 opacity-90">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                  {session.student_progress.completion_percentage > 0 && (
+                    <span className="ml-2">
+                      • {Math.round(session.student_progress.completion_percentage)}% complete
+                    </span>
+                  )}
+                </p>
+              </div>
+              
+              {/* Completion status */}
+              {isCompleted && (
+                <div className="flex items-center space-x-2 bg-green-600/20 backdrop-blur-sm border border-green-500/30 rounded-full px-3 py-1">
+                  <CheckCircle2 className="h-4 w-4 text-green-400" />
+                  <span className="text-green-400 text-sm font-medium">Completed</span>
+                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                </div>
+              )}
+            </div>
+
+            {/* Center play button */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <Button
+                variant="ghost"
+                size="icon"
                   onClick={togglePlay}
-                  size="lg"
-                  className="rounded-full w-16 h-16 bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                className="w-20 h-20 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm border border-white/20 pointer-events-auto"
                 >
+                {isPlaying ? (
+                  <Pause className="h-8 w-8 text-white" />
+                ) : (
                   <Play className="h-8 w-8 text-white ml-1" />
+                )}
                 </Button>
               </div>
-            )}
 
-            {/* Bottom Controls */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
-              {/* Progress Bar */}
-              <div className="space-y-1">
+            {/* Bottom controls */}
+            <div className="absolute bottom-0 left-0 right-0 p-4">
+              {/* Progress bar with milestone markers */}
+              <div className="relative mb-4">
+                {/* Milestone markers */}
+                <div className="absolute inset-0 flex justify-between items-center px-1">
+                  {milestoneMarkers.map((marker) => (
+                    <div
+                      key={marker.milestone}
+                      className={cn(
+                        "w-2 h-2 rounded-full border-2 border-white transition-colors",
+                        passedMilestones.includes(marker.milestone)
+                          ? "bg-green-500 border-green-500"
+                          : "bg-transparent"
+                      )}
+                      style={{ left: `${marker.position}%` }}
+                      title={`${marker.milestone}% milestone`}
+                    />
+                  ))}
+                </div>
+                
                 <Slider
                   value={[progressPercentage]}
-                  onValueChange={handleSeek}
+                  onValueChange={() => {}} // Disabled - no seeking allowed
                   max={100}
                   step={0.1}
-                  className="w-full"
+                  className="relative pointer-events-none"
+                  disabled
                 />
-                <div className="flex justify-between text-xs text-white/80">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
               </div>
 
-              {/* Control Buttons */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={togglePlay}
-                    size="sm"
-                    variant="ghost"
-                    className="text-white hover:bg-white/20"
-                  >
-                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {/* Control buttons */}
+              <div className="flex items-center justify-between pointer-events-auto">
+                <div className="flex items-center space-x-2">
+                  <Button variant="ghost" size="icon" onClick={togglePlay}>
+                    {isPlaying ? (
+                      <Pause className="h-5 w-5 text-white" />
+                    ) : (
+                      <Play className="h-5 w-5 text-white" />
+                    )}
                   </Button>
 
-                  <Button
-                    onClick={() => skip(-10)}
-                    size="sm"
-                    variant="ghost"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
+                  {/* Skip buttons removed - users must watch sequentially */}
 
-                  <Button
-                    onClick={() => skip(10)}
-                    size="sm"
-                    variant="ghost"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <RotateCw className="h-4 w-4" />
-                  </Button>
-
-                  <div className="flex items-center gap-1">
-                    <Button
-                      onClick={toggleMute}
-                      size="sm"
-                      variant="ghost"
-                      className="text-white hover:bg-white/20"
-                    >
-                      {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {/* Volume controls */}
+                  <div className="flex items-center space-x-2">
+                    <Button variant="ghost" size="icon" onClick={toggleMute}>
+                      {isMuted || volume === 0 ? (
+                        <VolumeX className="h-4 w-4 text-white" />
+                      ) : (
+                        <Volume2 className="h-4 w-4 text-white" />
+                      )}
                     </Button>
                     <div className="w-20">
                       <Slider
@@ -309,36 +526,41 @@ export function ExpertSessionPlayer({ session, onProgressUpdate }: ExpertSession
                         onValueChange={handleVolumeChange}
                         max={100}
                         step={1}
-                        className="w-full"
                       />
                     </div>
                   </div>
                 </div>
 
+                <div className="flex items-center space-x-2">
+                  {/* Manual completion button - only available when fully watched */}
+                  {hasWatchedComplete && !isCompleted && (
                 <Button
-                  onClick={toggleFullscreen}
-                  size="sm"
-                  variant="ghost"
-                  className="text-white hover:bg-white/20"
-                >
-                  <Maximize className="h-4 w-4" />
+                      onClick={handleMarkAsCompleted}
+                      disabled={isUpdatingProgress}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Mark Complete
+                    </Button>
+                  )}
+                  
+                  <Button variant="ghost" size="icon" onClick={toggleFullscreen}>
+                    <Maximize className="h-4 w-4 text-white" />
                 </Button>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Mark as Completed Button */}
-        {hasWatchedComplete && !session.student_progress.is_completed && (
-          <div className="absolute top-4 right-4 z-10">
-            <Button
-              onClick={handleMarkAsCompleted}
-              className="bg-green-600 hover:bg-green-700 text-white shadow-lg animate-pulse"
-              size="sm"
-            >
-              ✓ Mark as Completed
-            </Button>
-          </div>
+        {/* Progress error alert */}
+        {progressError && (
+          <Alert className="m-4 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              {progressError}
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
     </Card>

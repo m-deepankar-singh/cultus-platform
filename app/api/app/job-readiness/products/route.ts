@@ -173,6 +173,32 @@ export async function GET(req: NextRequest) {
           };
         }
 
+        // For Expert Session modules, we need to get progress from the separate expert session progress table
+        let expertSessionProgress: any[] = [];
+        const expertSessionModules = modules?.filter(m => 
+          m.type === 'Expert_Session' || m.type === 'expert_session'
+        ) || [];
+
+        if (expertSessionModules.length > 0) {
+          // Get expert session progress for this student
+          const { data: sessionProgress, error: sessionProgressError } = await supabase
+            .from('job_readiness_expert_session_progress')
+            .select('expert_session_id, is_completed, completion_percentage, completed_at, watch_time_seconds')
+            .eq('student_id', student.id);
+
+          console.log(`[EXPERT_SESSION_DEBUG] Student ${student.id} expert session progress:`, {
+            sessionProgressError,
+            sessionProgress,
+            expertSessionModulesCount: expertSessionModules.length
+          });
+
+          if (sessionProgressError) {
+            console.error('Error fetching expert session progress:', sessionProgressError);
+          } else if (sessionProgress) {
+            expertSessionProgress = sessionProgress;
+          }
+        }
+
         // Determine which modules are locked/unlocked based on star level
         const modulesWithAccess = modules?.map((module) => {
           let isUnlocked = false;
@@ -204,10 +230,33 @@ export async function GET(req: NextRequest) {
               isUnlocked = false;
           }
 
+          // For Expert Session modules, use the expert session progress data
+          let moduleProgress = null;
+          if (module.type === 'Expert_Session' || module.type === 'expert_session') {
+            // This module represents the Expert Sessions collection, so aggregate progress
+            const completedSessions = expertSessionProgress.filter(p => p.is_completed).length;
+            const totalSessions = 5; // Required sessions for completion
+            const aggregateProgress = completedSessions >= totalSessions ? 'Completed' : 
+                                    completedSessions > 0 ? 'In Progress' : 'Not Started';
+            
+            console.log(`[EXPERT_SESSION_DEBUG] Expert sessions completed: ${completedSessions}/${totalSessions}`);
+            
+            moduleProgress = {
+              status: aggregateProgress,
+              progress_percentage: Math.round((completedSessions / totalSessions) * 100),
+              completed_at: completedSessions >= totalSessions ? 
+                expertSessionProgress.filter(p => p.is_completed)
+                  .sort((a, b) => new Date(b.completed_at || '').getTime() - new Date(a.completed_at || '').getTime())[0]?.completed_at : null
+            };
+          } else {
+            // Use regular module progress for other module types
+            moduleProgress = module.student_module_progress?.[0] || null;
+          }
+
           return {
             ...module,
             is_unlocked: isUnlocked,
-            progress: module.student_module_progress?.[0] || null
+            progress: moduleProgress
           };
         });
 

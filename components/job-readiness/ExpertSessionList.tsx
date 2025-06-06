@@ -84,11 +84,13 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className={`transition-all ${isCompleted ? 'opacity-75 bg-gray-50' : 'hover:shadow-md'}`}>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="space-y-2">
-            <CardTitle className="text-xl">{session.title}</CardTitle>
+            <CardTitle className={`text-xl ${isCompleted ? 'text-gray-600' : ''}`}>
+              {session.title}
+            </CardTitle>
             <CardDescription className="text-sm">
               {session.description}
             </CardDescription>
@@ -160,12 +162,28 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
 
         {/* Action Button */}
         <div className="pt-2">
-          <Link href={`/app/job-readiness/expert-sessions/${session.id}`}>
-            <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
-              <Play className="h-4 w-4 mr-2" />
-              {isCompleted ? "Watch Again" : completionPercentage > 0 ? "Continue Watching" : "Start Watching"}
-            </Button>
-          </Link>
+          {isCompleted ? (
+            <div className="space-y-2">
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                disabled
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Session Completed
+              </Button>
+              <p className="text-xs text-center text-gray-500">
+                Completed sessions cannot be re-watched
+              </p>
+            </div>
+          ) : (
+            <Link href={`/app/job-readiness/expert-sessions/${session.id}`}>
+              <Button className="w-full" variant="default">
+                <Play className="h-4 w-4 mr-2" />
+                {completionPercentage > 0 ? "Continue Watching" : "Start Watching"}
+              </Button>
+            </Link>
+          )}
         </div>
       </CardContent>
     </Card>

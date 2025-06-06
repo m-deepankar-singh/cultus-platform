@@ -258,6 +258,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Update the project module progress to mark it as completed if the submission passed
+    if (gradingResult.passed) {
+      // Get the Project module for this product
+      const { data: projectModule, error: moduleError } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('product_id', product_id)
+        .eq('type', 'project')
+        .maybeSingle();
+
+      if (moduleError) {
+        console.error('Error finding project module:', moduleError);
+        // Don't fail the whole submission if we can't update module progress
+      } else if (projectModule) {
+        // Update the module progress to mark as completed
+        const { error: progressError } = await supabase
+          .from('student_module_progress')
+          .upsert({
+            student_id: user.id,
+            module_id: projectModule.id,
+            status: 'Completed',
+            progress_percentage: 100,
+            progress_details: {
+              project_submitted: true,
+              project_title: project_title,
+              score: gradingResult.score,
+              passed: gradingResult.passed,
+              submission_id: savedSubmission.id,
+              completion_date: new Date().toISOString()
+            },
+            completed_at: new Date().toISOString(),
+            last_updated: new Date().toISOString()
+          });
+
+        if (progressError) {
+          console.error('Error updating project module progress:', progressError);
+          // Don't fail the whole submission if we can't update module progress
+        } else {
+          console.log(`Updated project module progress for student ${user.id}, module ${projectModule.id}`);
+        }
+      } else {
+        console.warn(`No Project module found for product ${product_id}`);
+      }
+    }
+
     // Return submission results with detailed feedback
     return NextResponse.json({
       success: true,

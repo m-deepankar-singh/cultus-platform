@@ -95,15 +95,6 @@ export function CourseCard({ course, currentTier }: CourseCardProps) {
                   <Badge variant="outline" className="text-xs">
                     Course {course.sequence}
                   </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {difficultyLevel}
-                  </Badge>
-                  {requiredTier !== 'BRONZE' && (
-                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                      <Star className="h-3 w-3" />
-                      {requiredTier} Required
-                    </Badge>
-                  )}
                 </div>
               </div>
             </div>
@@ -122,7 +113,7 @@ export function CourseCard({ course, currentTier }: CourseCardProps) {
       <CardContent>
         <div className="space-y-4">
           {/* Course Info */}
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <span>{course.lessons_count} lessons</span>
@@ -133,10 +124,6 @@ export function CourseCard({ course, currentTier }: CourseCardProps) {
                 <span>{estimatedHours}h estimated</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <span>{requiredTier} tier</span>
-            </div>
           </div>
 
           {/* Progress Bar (only show if started) */}

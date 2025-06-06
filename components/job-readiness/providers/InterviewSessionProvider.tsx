@@ -67,7 +67,7 @@ export function InterviewSessionProvider({
         full_name: userData.full_name || `${userData.first_name} ${userData.last_name}`,
         background_type: userData.background_type || 'general',
         job_readiness_tier: userData.job_readiness_tier || 'bronze',
-        job_readiness_star_level: userData.job_readiness_star_level || '1'
+        job_readiness_star_level: userData.job_readiness_star_level || null
       };
       
       setStudentProfile(profile);

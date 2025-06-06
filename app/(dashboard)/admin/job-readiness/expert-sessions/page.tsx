@@ -11,13 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { Upload, Edit, Trash2, Play, Users, Clock, TrendingUp, Plus, Eye, EyeOff } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ExpertSession {
   id: string;
-  product_id: string;
   title: string;
   description: string;
   video_storage_path: string;
@@ -32,9 +32,14 @@ interface ExpertSession {
     completion_rate: number;
     average_completion_percentage: number;
   };
-  products?: {
-    name: string;
-  };
+  job_readiness_expert_session_products?: Array<{
+    product_id: string;
+    products: {
+      id: string;
+      name: string;
+      type: string;
+    };
+  }>;
 }
 
 interface Product {
@@ -57,7 +62,7 @@ export default function ExpertSessionsPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    product_id: '',
+    product_ids: [] as string[],
     video_file: null as File | null,
     video_duration: ''
   });
@@ -135,10 +140,10 @@ export default function ExpertSessionsPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.video_file || !formData.title || !formData.product_id) {
+    if (!formData.video_file || !formData.title || formData.product_ids.length === 0) {
       toast({
         title: 'Missing required fields',
-        description: 'Please fill in all required fields and select a video file',
+        description: 'Please fill in all required fields, select at least one product, and upload a video file',
         variant: 'destructive'
       });
       return;
@@ -149,7 +154,7 @@ export default function ExpertSessionsPage() {
       const formDataToSend = new FormData();
       formDataToSend.append('title', formData.title);
       formDataToSend.append('description', formData.description);
-      formDataToSend.append('product_id', formData.product_id);
+      formDataToSend.append('product_ids', JSON.stringify(formData.product_ids));
       formDataToSend.append('video_file', formData.video_file);
       if (formData.video_duration) {
         formDataToSend.append('video_duration', formData.video_duration);
@@ -174,7 +179,7 @@ export default function ExpertSessionsPage() {
       setFormData({
         title: '',
         description: '',
-        product_id: '',
+        product_ids: [],
         video_file: null,
         video_duration: ''
       });
@@ -195,6 +200,15 @@ export default function ExpertSessionsPage() {
     e.preventDefault();
     if (!editingSession) return;
 
+    if (formData.product_ids.length === 0) {
+      toast({
+        title: 'Missing required fields',
+        description: 'Please select at least one product',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/job-readiness/expert-sessions', {
         method: 'PATCH',
@@ -205,6 +219,7 @@ export default function ExpertSessionsPage() {
           id: editingSession.id,
           title: formData.title,
           description: formData.description,
+          product_ids: formData.product_ids,
           is_active: editingSession.is_active
         })
       });
@@ -295,10 +310,16 @@ export default function ExpertSessionsPage() {
 
   const openEditDialog = (session: ExpertSession) => {
     setEditingSession(session);
+    
+    // Extract product IDs from the session
+    const currentProductIds = session.job_readiness_expert_session_products?.map(
+      item => item.product_id
+    ) || [];
+    
     setFormData({
       title: session.title,
       description: session.description,
-      product_id: session.product_id,
+      product_ids: currentProductIds,
       video_file: null,
       video_duration: session.video_duration.toString()
     });
@@ -376,23 +397,41 @@ export default function ExpertSessionsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="product_id">Job Readiness Product *</Label>
-                <Select
-                  value={formData.product_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, product_id: value }))}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
+                <Label htmlFor="product_ids">Job Readiness Products *</Label>
+                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
+                  {products.map((product) => (
+                    <div key={product.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`product-${product.id}`}
+                        checked={formData.product_ids.includes(product.id)}
+                        onCheckedChange={(checked) => {
+                          setFormData(prev => {
+                            if (checked) {
+                              return {
+                                ...prev,
+                                product_ids: [...prev.product_ids, product.id]
+                              };
+                            } else {
+                              return {
+                                ...prev,
+                                product_ids: prev.product_ids.filter(id => id !== product.id)
+                              };
+                            }
+                          });
+                        }}
+                      />
+                      <Label 
+                        htmlFor={`product-${product.id}`} 
+                        className="text-sm font-normal cursor-pointer"
+                      >
                         {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Select one or more products to assign this expert session to.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="video_file">Video File *</Label>
@@ -537,8 +576,18 @@ export default function ExpertSessionsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm">
-                      {session.products?.name || 'Unknown Product'}
+                    <div className="text-sm space-y-1">
+                      {session.job_readiness_expert_session_products?.length ? (
+                        session.job_readiness_expert_session_products.map((item) => (
+                          <Badge key={item.product_id} variant="outline" className="mr-1 mb-1">
+                            {item.products.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          No products assigned
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -656,6 +705,43 @@ export default function ExpertSessionsPage() {
                 rows={3}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_product_ids">Job Readiness Products *</Label>
+              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
+                {products.map((product) => (
+                  <div key={product.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-product-${product.id}`}
+                      checked={formData.product_ids.includes(product.id)}
+                      onCheckedChange={(checked) => {
+                        setFormData(prev => {
+                          if (checked) {
+                            return {
+                              ...prev,
+                              product_ids: [...prev.product_ids, product.id]
+                            };
+                          } else {
+                            return {
+                              ...prev,
+                              product_ids: prev.product_ids.filter(id => id !== product.id)
+                            };
+                          }
+                        });
+                      }}
+                    />
+                    <Label 
+                      htmlFor={`edit-product-${product.id}`} 
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {product.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Select one or more products to assign this expert session to.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>

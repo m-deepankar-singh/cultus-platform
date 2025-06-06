@@ -234,53 +234,116 @@ function validateProjectDetails(project: ProjectDetails): boolean {
  * Gets a fallback project if AI generation fails
  */
 async function getFallbackProject(
-  backgroundType: string,
-  studentTier: string
+  backgroundType: string | null,
+  studentTier: 'BRONZE' | 'SILVER' | 'GOLD' | null
 ): Promise<ProjectDetails | null> {
+  console.log('Using fallback project generation:', { backgroundType, studentTier });
+  
   try {
+    // Initialize Supabase client
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Attempt to get a fallback project from the fallback table
-    const { data: fallbackProject, error } = await supabase
-      .from('job_readiness_fallback_projects')
+    // Default to BUSINESS background if null, and BRONZE tier if null
+    const fallbackBackground = backgroundType || 'BUSINESS';
+    const fallbackTier = studentTier || 'BRONZE';
+    
+    console.log('Using fallback values:', { fallbackBackground, fallbackTier });
+    
+    // Try to get a generic project configuration
+    const { data: fallbackConfig, error: fallbackError } = await supabase
+      .from('job_readiness_background_project_types')
       .select('*')
-      .eq('background_type', backgroundType)
-      .eq('tier', studentTier)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('background_type', fallbackBackground)
       .single();
       
-    if (error || !fallbackProject) {
-      console.error('Failed to fetch fallback project, using generic fallback:', error);
+    if (fallbackError || !fallbackConfig) {
+      console.error('Failed to fetch fallback project, using generic fallback:', fallbackError);
       
-      // If no specific fallback is found, return a generic fallback
+      // Return a completely generic project as last resort
       return {
-        title: "Professional Portfolio Project",
-        description: "Build a professional portfolio showcasing your skills and achievements. This project will help you create a compelling presentation of your work for potential employers.",
+        title: "Business Case Study Analysis",
+        description: "Analyze a business scenario and provide strategic recommendations based on your understanding of business principles and market dynamics.",
         tasks: [
-          "Create a structured outline of your professional skills and experience",
-          "Develop a presentation format (document or website)",
-          "Include at least 3 examples of your work or case studies"
+          "Read and understand the provided business scenario",
+          "Identify key challenges and opportunities",
+          "Research relevant market trends and competitive landscape",
+          "Develop strategic recommendations with supporting rationale",
+          "Present your analysis in a structured format"
         ],
         deliverables: [
-          "Complete portfolio document or website URL",
-          "Brief explanation of how you approached the project"
+          "Executive summary (2-3 paragraphs)",
+          "Problem identification and analysis",
+          "Strategic recommendations with justification",
+          "Implementation timeline and key milestones",
+          "Risk assessment and mitigation strategies"
         ],
-        submission_type: 'text_input'
+        submission_type: "text_input"
       };
     }
     
-    return {
-      title: fallbackProject.project_title,
-      description: fallbackProject.project_description,
-      tasks: fallbackProject.tasks || [],
-      deliverables: fallbackProject.deliverables || [],
-      submission_type: 'text_input'
+    // Use the fallback configuration with appropriate prompts
+    let systemPrompt: string;
+    let inputPrompt: string;
+    
+    switch (fallbackTier) {
+      case 'BRONZE':
+        systemPrompt = fallbackConfig.bronze_system_prompt;
+        inputPrompt = fallbackConfig.bronze_input_prompt;
+        break;
+      case 'SILVER':
+        systemPrompt = fallbackConfig.silver_system_prompt;
+        inputPrompt = fallbackConfig.silver_input_prompt;
+        break;
+      case 'GOLD':
+        systemPrompt = fallbackConfig.gold_system_prompt;
+        inputPrompt = fallbackConfig.gold_input_prompt;
+        break;
+    }
+    
+    // Generate project using AI with fallback configuration
+    const structuredOutputSchema = {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        tasks: { 
+          type: 'array',
+          items: { type: 'string' }
+        },
+        deliverables: {
+          type: 'array',
+          items: { type: 'string' }
+        },
+        submission_type: { 
+          type: 'string', 
+          enum: ['text_input'] 
+        }
+      },
+      required: ['title', 'description', 'tasks', 'deliverables', 'submission_type']
     };
+    
+    const generatePromptFn = () => constructProjectPrompt(systemPrompt, inputPrompt, fallbackBackground, fallbackTier);
+    
+    const result = await callGeminiWithRetry<ProjectDetails>(
+      generatePromptFn,
+      {
+        temperature: 0.7, // Allow some creativity in project generation
+        structuredOutputSchema
+      }
+    );
+    
+    if (result.success && result.data) {
+      console.log('Fallback project generated successfully');
+      return result.data;
+    } else {
+      console.error('Failed to generate fallback project:', result.error);
+      return null;
+    }
+    
   } catch (error) {
-    console.error('Error in getFallbackProject:', error);
+    console.error('Error in fallback project generation:', error);
     return null;
   }
 } 

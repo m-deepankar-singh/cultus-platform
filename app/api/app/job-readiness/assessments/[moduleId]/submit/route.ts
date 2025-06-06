@@ -326,14 +326,122 @@ export async function POST(
       );
     }
 
-    // 14. Update student's job readiness tier if improved
+    // 14. Check if ALL assessment modules are completed before awarding first star
     let tierChanged = false;
     let starLevelUnlocked = false;
     
     const currentTier = studentRecord.job_readiness_tier;
     const currentStarLevel = studentRecord.job_readiness_star_level;
 
-    // Tier hierarchy: BRONZE < SILVER < GOLD
+    console.log(`Star awarding check - Student: ${studentId}, Current Star: ${currentStarLevel}, Current Tier: ${currentTier}`);
+
+    // Only check for star unlock if student doesn't have a star yet
+    if (!currentStarLevel || currentStarLevel === null) {
+      console.log('Student has no star yet, checking if all assessments are completed...');
+      
+      // Get ALL assessment modules for this product
+      const { data: allAssessmentModules, error: allModulesError } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('product_id', productData.id)
+        .eq('type', 'Assessment');
+
+      if (allModulesError) {
+        console.error('Error fetching all assessment modules:', allModulesError);
+        // Continue without star evaluation
+      } else if (allAssessmentModules && allAssessmentModules.length > 0) {
+        console.log(`Found ${allAssessmentModules.length} assessment modules for product ${productData.id}`);
+        
+        // Get completed assessment modules for this student
+        const { data: completedModules, error: completedError } = await supabase
+          .from('student_module_progress')
+          .select('module_id, progress_details')
+          .eq('student_id', studentId)
+          .eq('status', 'Completed')
+          .in('module_id', allAssessmentModules.map(m => m.id));
+
+        if (completedError) {
+          console.error('Error fetching completed modules:', completedError);
+        } else {
+          console.log(`Found ${completedModules?.length || 0} completed modules`);
+          
+          // Check if ALL assessment modules are now completed (including the current one)
+          const completedModuleIds = completedModules?.map(m => m.module_id) || [];
+          const allModuleIds = allAssessmentModules.map(m => m.id);
+          const allCompleted = allModuleIds.every(id => completedModuleIds.includes(id));
+
+          console.log(`All modules: [${allModuleIds.join(', ')}]`);
+          console.log(`Completed modules: [${completedModuleIds.join(', ')}]`);
+          console.log(`All completed: ${allCompleted}`);
+
+          if (allCompleted) {
+            console.log('All assessments completed! Calculating overall performance...');
+            
+            // Calculate overall performance across all assessment modules
+            let totalScore = 0;
+            let totalModules = 0;
+
+            for (const completedModule of completedModules) {
+              const progressDetails = completedModule.progress_details as any;
+              if (progressDetails?.score) {
+                totalScore += progressDetails.score;
+                totalModules++;
+                console.log(`Module ${completedModule.module_id}: ${progressDetails.score}%`);
+              }
+            }
+
+            // Calculate average score across all assessments
+            const averageScore = totalModules > 0 ? Math.round(totalScore / totalModules) : 0;
+            console.log(`Average score across ${totalModules} modules: ${averageScore}%`);
+
+            // Determine tier based on overall performance
+            let overallTierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' = 'BRONZE';
+            
+            if (averageScore >= finalTierConfig.gold_assessment_min_score) {
+              overallTierAchieved = 'GOLD';
+            } else if (averageScore >= finalTierConfig.silver_assessment_min_score) {
+              overallTierAchieved = 'SILVER';
+            } else {
+              overallTierAchieved = 'BRONZE';
+            }
+
+            console.log(`Overall tier achieved: ${overallTierAchieved}`);
+
+            // Update student's tier and award first star
+            starLevelUnlocked = true;
+            tierChanged = true;
+            
+            console.log(`Updating student ${studentId} with tier: ${overallTierAchieved}, star: ONE`);
+            
+            const { error: updateStudentError } = await supabase
+              .from('students')
+              .update({
+                job_readiness_tier: overallTierAchieved,
+                job_readiness_star_level: 'ONE',
+                job_readiness_last_updated: new Date().toISOString(),
+              })
+              .eq('id', studentId);
+
+            if (updateStudentError) {
+              console.error('Error updating student tier and star level:', updateStudentError);
+              // Continue - don't fail the submission
+              starLevelUnlocked = false;
+              tierChanged = false;
+            } else {
+              console.log('Successfully updated student tier and star level!');
+              // Update the tierAchieved for response to reflect overall tier
+              tierAchieved = overallTierAchieved;
+            }
+          } else {
+            console.log('Not all assessments completed yet. Missing modules:', 
+              allModuleIds.filter(id => !completedModuleIds.includes(id)));
+          }
+        }
+      } else {
+        console.log('No assessment modules found for this product');
+      }
+    } else {
+      // Student already has a star, check if tier should be updated based on current performance
     const tierHierarchy = { 'BRONZE': 1, 'SILVER': 2, 'GOLD': 3 };
     const currentTierLevel = tierHierarchy[currentTier as keyof typeof tierHierarchy] || 0;
     const achievedTierLevel = tierAchieved ? tierHierarchy[tierAchieved] : 0;
@@ -341,7 +449,6 @@ export async function POST(
     if (achievedTierLevel > currentTierLevel) {
       tierChanged = true;
       
-      // Update student's tier
       const { error: updateTierError } = await supabase
         .from('students')
         .update({
@@ -352,24 +459,7 @@ export async function POST(
 
       if (updateTierError) {
         console.error('Error updating student tier:', updateTierError);
-        // Continue - don't fail the submission
-      }
-
-      // Check if this unlocks Star 1 (first completion)
-      if (!currentStarLevel || currentStarLevel === null) {
-        starLevelUnlocked = true;
-        
-        const { error: updateStarError } = await supabase
-          .from('students')
-          .update({
-            job_readiness_star_level: 'ONE',
-            job_readiness_last_updated: new Date().toISOString(),
-          })
-          .eq('id', studentId);
-
-        if (updateStarError) {
-          console.error('Error updating student star level:', updateStarError);
-          // Continue - don't fail the submission
+          tierChanged = false;
         }
       }
     }
@@ -382,11 +472,13 @@ export async function POST(
       if (tierAchieved) {
         feedback += `You achieved ${tierAchieved} tier performance. `;
       }
-      if (tierChanged) {
-        feedback += `Your Job Readiness tier has been upgraded to ${tierAchieved}! `;
-      }
       if (starLevelUnlocked) {
-        feedback += `You've unlocked Star Level ONE! `;
+        feedback += `🌟 Excellent! You've completed ALL assessment modules and unlocked Star Level ONE! Your overall tier is now ${tierAchieved}! `;
+      } else if (tierChanged) {
+        feedback += `Your Job Readiness tier has been upgraded to ${tierAchieved}! `;
+      } else if (!currentStarLevel) {
+        // Student hasn't completed all assessments yet
+        feedback += `Complete all assessment modules to unlock your first star and determine your overall tier. `;
       }
     } else {
       feedback += `You need ${passingThreshold}% to pass. `;

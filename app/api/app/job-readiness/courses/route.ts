@@ -137,13 +137,25 @@ export async function GET(request: NextRequest) {
     // Enhanced courses with progress data and Job Readiness specific information
     const enhancedCourses: CourseModuleOutput[] = (courses || []).map(course => {
       const progress = course.student_module_progress?.[0] || null;
-      const isCompleted = progress?.status === 'Completed';
+      const totalLessons = course.lessons?.length || 0;
+      
+      // Check completion based on lessons completed, not just status
+      const completedLessonIds = progress?.progress_details?.completed_lesson_ids || [];
+      const completedLessonsCount = Array.isArray(completedLessonIds) ? completedLessonIds.length : 0;
+      const isCompletedByLessons = totalLessons > 0 && completedLessonsCount >= totalLessons;
+      const isCompletedByStatus = progress?.status === 'Completed';
+      const isCompleted = isCompletedByStatus || isCompletedByLessons;
+      
+      // Calculate completion percentage
+      const statusPercentage = progress?.progress_percentage || 0;
+      const lessonPercentage = totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0;
+      const completionPercentage = Math.max(statusPercentage, lessonPercentage);
+      
       const isUnlocked = true; // Job Readiness courses are generally accessible based on tier
       
       // Extract course configuration
       const config = course.configuration || {};
       const description = config.description || null;
-      const completionPercentage = progress?.progress_percentage || 0;
       
       return {
         id: course.id,
@@ -154,7 +166,7 @@ export async function GET(request: NextRequest) {
         is_unlocked: isUnlocked,
         is_completed: isCompleted,
         progress: progress,
-        lessons_count: course.lessons?.length || 0,
+        lessons_count: totalLessons,
         description,
         completion_percentage: completionPercentage,
       };
@@ -197,82 +209,5 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Unexpected error in job-readiness courses GET:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-} 
-      // Verify the product exists at all
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('id, name, type')
-        .eq('id', validProductId)
-        .maybeSingle();
-      
-      console.log('Regular product query result:', product);
-      console.log('Regular product query error:', productError);
-        
-      if (productError || !product) {
-        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-      }
-      
-      if (product.type !== 'JOB_READINESS') {
-        return NextResponse.json(
-          { error: 'The specified product is not a Job Readiness product' }, 
-          { status: 400 }
-        );
-      }
-      
-      // Use our security definer function to ensure the job readiness product exists
-      const { data: ensureResult, error: ensureError } = await supabase
-        .rpc('ensure_job_readiness_product', { p_product_id: validProductId });
-        
-      console.log('Ensure job readiness product result:', ensureResult);
-      console.log('Ensure job readiness product error:', ensureError);
-        
-      if (ensureError || !ensureResult) {
-        console.error('Failed to ensure job readiness product exists:', ensureError);
-        return NextResponse.json(
-          { error: 'Job Readiness product configuration is missing and could not be created automatically' }, 
-          { status: 404 }
-        );
-      }
-      
-      jrProductId = ensureResult;
-      console.log('Successfully created/found job readiness product configuration with ID:', jrProductId);
-    }
-
-    // 2. Fetch all Course modules that belong to this product
-    const { data: modules, error: modulesError } = await supabase
-      .from('modules')
-      .select('id, name, type, configuration')
-      .eq('product_id', validProductId)
-      .eq('type', 'Course');
-
-    if (modulesError) {
-      console.error('Error fetching modules for product:', modulesError);
-      return NextResponse.json({ error: 'Failed to fetch course modules' }, { status: 500 });
-    }
-
-    console.log('Found course modules:', modules);
-
-    // Filter and format the course modules
-    const courseModules = (modules || []).map(module => {
-      const moduleConfig = module.configuration as any || {};
-      
-      return {
-        id: module.id,
-        name: module.name,
-        description: moduleConfig?.description || null,
-      };
-    });
-
-    // TODO: Implement module lock/unlock status check based on student's current star level and progress
-    // For now, returning all course modules. This needs to be integrated with `checkModuleAccess` utility.
-
-    console.log('Returning course modules:', courseModules);
-    return NextResponse.json(courseModules);
-
-  } catch (error) {
-    console.error('Error fetching job readiness courses:', error);
-    const err = error as Error;
-    return NextResponse.json({ error: 'Failed to fetch job readiness courses', details: err.message }, { status: 500 });
   }
 } 

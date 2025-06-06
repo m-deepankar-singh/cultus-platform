@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get all active expert sessions for the product
-    const { data: expertSessions, error: sessionsError } = await supabase
+    // Get all active expert sessions for the product using junction table
+    const { data: sessionData, error: sessionsError } = await supabase
       .from('job_readiness_expert_sessions')
       .select(`
         id,
@@ -58,9 +58,12 @@ export async function GET(req: NextRequest) {
         description,
         video_url,
         video_duration,
-        created_at
+        created_at,
+        job_readiness_expert_session_products!inner (
+          product_id
+        )
       `)
-      .eq('product_id', productId)
+      .eq('job_readiness_expert_session_products.product_id', productId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
 
@@ -68,6 +71,16 @@ export async function GET(req: NextRequest) {
       console.error('Error fetching expert sessions:', sessionsError);
       return NextResponse.json({ error: 'Failed to fetch expert sessions' }, { status: 500 });
     }
+
+    // Transform the data to remove the junction table structure
+    const expertSessions = sessionData?.map(session => ({
+      id: session.id,
+      title: session.title,
+      description: session.description,
+      video_url: session.video_url,
+      video_duration: session.video_duration,
+      created_at: session.created_at
+    })) || [];
 
     // For each session, create fresh signed URLs since the stored URLs may be expired
     const sessionsWithSignedUrls = await Promise.all(

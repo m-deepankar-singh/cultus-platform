@@ -99,8 +99,9 @@ export function useJobReadinessProgress() {
         'FIVE': 5
       }
       
-      const starLevel = data.student.job_readiness_star_level || 'ONE'
-      const currentStars = starLevelMap[starLevel] || 1
+      // Don't default to 'ONE' if star level is null - show 0 stars instead
+      const starLevel = data.student.job_readiness_star_level
+      const currentStars = starLevel ? (starLevelMap[starLevel] || 0) : 0
       
       return {
         currentStars,

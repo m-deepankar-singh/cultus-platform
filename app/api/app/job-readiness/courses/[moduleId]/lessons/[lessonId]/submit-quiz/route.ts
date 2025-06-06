@@ -1,0 +1,375 @@
+import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { z } from 'zod';
+
+// Schema for quiz submission validation
+const QuizSubmissionSchema = z.object({
+  answers: z.array(z.object({
+    question_id: z.string(),
+    selected_option_id: z.union([z.string(), z.array(z.string())]) // Support both single and multiple selections
+  }))
+});
+
+const ModuleIdSchema = z.string().uuid({ message: 'Invalid Module ID format' });
+const LessonIdSchema = z.string().uuid({ message: 'Invalid Lesson ID format' });
+
+interface QuizSubmissionResponse {
+  success: boolean;
+  score: number;
+  total_questions: number;
+  passed: boolean;
+  passing_threshold: number;
+  detailed_results: Array<{
+    question_id: string;
+    correct: boolean;
+    selected_answer: string | string[];
+    correct_answer: string | string[];
+  }>;
+  attempts: number;
+  can_retake: boolean;
+}
+
+// Cache for server-side quiz questions - same as used in content route
+const serverSideQuizCache = new Map<string, { 
+  questions: any[], 
+  studentId: string, 
+  moduleId: string, 
+  lessonId: string, 
+  timestamp: number,
+  is_fallback?: boolean
+}>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export async function POST(
+  request: NextRequest,
+  context: { params: { moduleId: string; lessonId: string } }
+) {
+  try {
+    // 1. Validate parameters
+    const { params } = context;
+    const moduleIdValidation = ModuleIdSchema.safeParse(params.moduleId);
+    const lessonIdValidation = LessonIdSchema.safeParse(params.lessonId);
+    
+    if (!moduleIdValidation.success) {
+      return NextResponse.json(
+        { error: 'Bad Request: Invalid Module ID format', details: moduleIdValidation.error.flatten().formErrors },
+        { status: 400 }
+      );
+    }
+    
+    if (!lessonIdValidation.success) {
+      return NextResponse.json(
+        { error: 'Bad Request: Invalid Lesson ID format', details: lessonIdValidation.error.flatten().formErrors },
+        { status: 400 }
+      );
+    }
+
+    const validModuleId = moduleIdValidation.data;
+    const validLessonId = lessonIdValidation.data;
+
+    // 2. Authentication
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error('User authentication error:', userError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 3. Parse and validate request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Bad Request', message: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+
+    const validation = QuizSubmissionSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { 
+          error: 'Bad Request', 
+          message: 'Invalid quiz submission data',
+          details: validation.error.format() 
+        },
+        { status: 400 }
+      );
+    }
+
+    const { answers } = validation.data;
+
+    // 4. Get student information
+    const { data: studentRecord, error: studentFetchError } = await supabase
+      .from('students')
+      .select('id, client_id, job_readiness_tier, is_active')
+      .eq('id', user.id)
+      .single();
+
+    if (studentFetchError || !studentRecord) {
+      console.error('Student Fetch Error:', studentFetchError);
+      return NextResponse.json(
+        { error: 'Forbidden: Student record not found' },
+        { status: 403 },
+      );
+    }
+
+    if (!studentRecord.is_active) {
+      return NextResponse.json(
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 },
+      );
+    }
+
+    // 5. Verify module is a Job Readiness course
+    const { data: moduleData, error: moduleError } = await supabase
+      .from('modules')
+      .select('id, name, type, product_id')
+      .eq('id', validModuleId)
+      .eq('type', 'Course')
+      .single();
+
+    if (moduleError || !moduleData) {
+      return NextResponse.json(
+        { error: 'Course module not found' },
+        { status: 404 }
+      );
+    }
+
+    // 6. Verify this is a Job Readiness product
+    const { data: productData, error: productError } = await supabase
+      .from('products')
+      .select('id, name, type')
+      .eq('id', moduleData.product_id)
+      .eq('type', 'JOB_READINESS')
+      .single();
+
+    if (productError || !productData) {
+      return NextResponse.json(
+        { error: 'This course is not part of a Job Readiness product' },
+        { status: 404 }
+      );
+    }
+
+    // 7. Verify enrollment
+    const { count, error: assignmentError } = await supabase
+      .from('client_product_assignments')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', studentRecord.client_id)
+      .eq('product_id', productData.id);
+
+    if (assignmentError || count === 0) {
+      return NextResponse.json(
+        { error: 'Forbidden: Student not enrolled in this Job Readiness course' },
+        { status: 403 }
+      );
+    }
+
+    // 8. Verify lesson belongs to module
+    const { data: lessonData, error: lessonError } = await supabase
+      .from('lessons')
+      .select('id, title, has_quiz, quiz_data')
+      .eq('id', validLessonId)
+      .eq('module_id', validModuleId)
+      .single();
+
+    if (lessonError || !lessonData) {
+      return NextResponse.json(
+        { error: 'Lesson not found in this module' },
+        { status: 404 }
+      );
+    }
+
+    if (!lessonData.has_quiz) {
+      return NextResponse.json(
+        { error: 'This lesson does not have a quiz' },
+        { status: 400 }
+      );
+    }
+
+    // 9. Get correct answers from cache or database
+    const timeComponent = Math.floor(Date.now() / (CACHE_TTL_MS * 2));
+    const cacheKey = `quiz_${validModuleId}_${validLessonId}_${user.id}_${timeComponent}`;
+    const cachedQuiz = serverSideQuizCache.get(cacheKey);
+
+    let correctQuestions: any[] = [];
+
+    if (cachedQuiz && (Date.now() - cachedQuiz.timestamp < CACHE_TTL_MS)) {
+      correctQuestions = cachedQuiz.questions;
+    } else {
+      // If no cached questions, try to get from lesson quiz_questions or fallback
+      const { data: lessonWithQuiz, error: quizError } = await supabase
+        .from('lessons')
+        .select('quiz_questions')
+        .eq('id', validLessonId)
+        .single();
+
+      if (quizError || !lessonWithQuiz?.quiz_questions || !Array.isArray(lessonWithQuiz.quiz_questions)) {
+        return NextResponse.json(
+          { error: 'Quiz questions not found. Please reload the page and try again.' },
+          { status: 400 }
+        );
+      }
+
+      correctQuestions = lessonWithQuiz.quiz_questions;
+    }
+
+    // 10. Calculate score
+    const totalQuestions = correctQuestions.length;
+    let correctAnswers = 0;
+    const detailedResults: Array<{
+      question_id: string;
+      correct: boolean;
+      selected_answer: string | string[];
+      correct_answer: string | string[];
+    }> = [];
+
+    for (const question of correctQuestions) {
+      const studentAnswer = answers.find(a => a.question_id === question.id);
+      
+      if (!studentAnswer) {
+        detailedResults.push({
+          question_id: question.id,
+          correct: false,
+          selected_answer: [],
+          correct_answer: question.correct_answer || question.correct_option_id || ''
+        });
+        continue;
+      }
+
+      const isCorrect = checkAnswer(question, studentAnswer.selected_option_id);
+      if (isCorrect) {
+        correctAnswers++;
+      }
+
+      detailedResults.push({
+        question_id: question.id,
+        correct: isCorrect,
+        selected_answer: studentAnswer.selected_option_id,
+        correct_answer: question.correct_answer || question.correct_option_id || ''
+      });
+    }
+
+    const score = Math.round((correctAnswers / totalQuestions) * 100);
+    const passingThreshold = 70; // 70% passing grade
+    const passed = score >= passingThreshold;
+
+    // 11. Get current progress and update quiz results
+    const { data: existingProgress, error: progressError } = await supabase
+      .from('student_module_progress')
+      .select('progress_details')
+      .eq('student_id', user.id)
+      .eq('module_id', validModuleId)
+      .maybeSingle();
+
+    const currentDetails = existingProgress?.progress_details || {};
+    const lessonQuizResults = currentDetails.lesson_quiz_results || {};
+    const currentAttempts = lessonQuizResults[validLessonId]?.attempts || 0;
+    const newAttempts = currentAttempts + 1;
+
+    // Update quiz results
+    lessonQuizResults[validLessonId] = {
+      score,
+      passed,
+      attempts: newAttempts,
+      last_attempt_at: new Date().toISOString(),
+      best_score: Math.max(score, lessonQuizResults[validLessonId]?.best_score || 0)
+    };
+
+    // If quiz passed, mark lesson as completed
+    if (passed) {
+      if (!currentDetails.completed_lesson_ids) {
+        currentDetails.completed_lesson_ids = [];
+      }
+      if (!currentDetails.completed_lesson_ids.includes(validLessonId)) {
+        currentDetails.completed_lesson_ids.push(validLessonId);
+      }
+    }
+
+    const updatedDetails = {
+      ...currentDetails,
+      lesson_quiz_results: lessonQuizResults,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 12. Save progress
+    const { error: saveError } = await supabase
+      .from('student_module_progress')
+      .upsert({
+        student_id: user.id,
+        module_id: validModuleId,
+        progress_details: updatedDetails,
+        last_updated: new Date().toISOString(),
+      });
+
+    if (saveError) {
+      console.error('Error saving quiz progress:', saveError);
+      return NextResponse.json(
+        { error: 'Failed to save quiz results', details: saveError.message },
+        { status: 500 }
+      );
+    }
+
+    // 13. Return results
+    const response: QuizSubmissionResponse = {
+      success: true,
+      score,
+      total_questions: totalQuestions,
+      passed,
+      passing_threshold: passingThreshold,
+      detailed_results: detailedResults,
+      attempts: newAttempts,
+      can_retake: !passed && newAttempts < 3 // Allow up to 3 attempts
+    };
+
+    return NextResponse.json(response);
+
+  } catch (e) {
+    const error = e as Error;
+    console.error('Unexpected error in submit-quiz:', error);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred.', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper function to check if an answer is correct
+function checkAnswer(question: any, selectedAnswer: string | string[]): boolean {
+  const correctAnswer = question.correct_answer || question.correct_option_id;
+  
+  if (!correctAnswer) {
+    return false;
+  }
+
+  // Handle MSQ (Multiple Select Questions)
+  if (question.question_type === 'MSQ') {
+    // Handle different MSQ correct answer formats
+    let correctAnswers: string[] = [];
+    
+    if (Array.isArray(correctAnswer)) {
+      // Direct array format: ["opt_a", "opt_b", "opt_d"]
+      correctAnswers = correctAnswer;
+    } else if (correctAnswer && typeof correctAnswer === 'object' && correctAnswer.answers) {
+      // Object format: {"answers": ["opt_a", "opt_b", "opt_d"]}
+      correctAnswers = correctAnswer.answers;
+    } else {
+      // Single answer wrapped in array
+      correctAnswers = [correctAnswer];
+    }
+    
+    const selectedAnswers = Array.isArray(selectedAnswer) ? selectedAnswer : [selectedAnswer];
+    
+    // For MSQ, all correct answers must be selected and no incorrect ones
+    return correctAnswers.length === selectedAnswers.length &&
+           correctAnswers.every(answer => selectedAnswers.includes(answer)) &&
+           selectedAnswers.every(answer => correctAnswers.includes(answer));
+  }
+  
+  // Handle MCQ (Multiple Choice Questions)  
+  const selectedSingle = Array.isArray(selectedAnswer) ? selectedAnswer[0] : selectedAnswer;
+  return selectedSingle === correctAnswer;
+} 

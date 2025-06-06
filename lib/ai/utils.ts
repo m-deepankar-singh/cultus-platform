@@ -11,12 +11,28 @@ const audioContextMap: Map<string, AudioContext> = new Map();
 export const audioContext: (
   options?: GetAudioContextOptions
 ) => Promise<AudioContext> = (() => {
-  const didInteract = new Promise((res) => {
-    window.addEventListener("pointerdown", res, { once: true });
-    window.addEventListener("keydown", res, { once: true });
-  });
+  let didInteract: Promise<void> | null = null;
+
+  const ensureUserInteraction = (): Promise<void> => {
+    if (!isBrowser()) {
+      return Promise.resolve();
+    }
+    
+    if (!didInteract) {
+      didInteract = new Promise((res) => {
+        const handleInteraction = () => res();
+        window.addEventListener("pointerdown", handleInteraction, { once: true });
+        window.addEventListener("keydown", handleInteraction, { once: true });
+      });
+    }
+    return didInteract;
+  };
 
   return async (options?: GetAudioContextOptions) => {
+    if (!isBrowser()) {
+      throw new Error('AudioContext is only available in browser environment');
+    }
+
     try {
       const a = new Audio();
       a.src =
@@ -34,7 +50,7 @@ export const audioContext: (
       }
       return ctx;
     } catch (e) {
-      await didInteract;
+      await ensureUserInteraction();
       if (options?.id && audioContextMap.has(options.id)) {
         const ctx = audioContextMap.get(options.id);
         if (ctx) {

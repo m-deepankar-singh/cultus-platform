@@ -2,16 +2,18 @@ import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayou
 import { AssessmentResults } from '@/components/job-readiness/AssessmentResults'
 
 interface AssessmentResultsPageProps {
-  params: {
+  params: Promise<{
     moduleId: string
-  }
+  }>
 }
 
-export default function AssessmentResultsPage({ params }: AssessmentResultsPageProps) {
+export default async function AssessmentResultsPage({ params }: AssessmentResultsPageProps) {
+  const { moduleId } = await params
+  
   return (
     <JobReadinessLayout>
       <div className="max-w-4xl mx-auto">
-        <AssessmentResults moduleId={params.moduleId} />
+        <AssessmentResults moduleId={moduleId} />
       </div>
     </JobReadinessLayout>
   )

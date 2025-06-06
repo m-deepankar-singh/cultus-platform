@@ -27,9 +27,11 @@ interface AiQuizProps {
   onSubmit: (answers: Array<{ question_id: string; selected_option_id: string | string[] }>) => void
   onCancel: () => void
   isSubmitting: boolean
+  remainingAttempts?: number
+  onReturnToCourse?: () => void
 }
 
-export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting }: AiQuizProps) {
+export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingAttempts, onReturnToCourse }: AiQuizProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
   const [showResults, setShowResults] = useState(false)
@@ -197,6 +199,11 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting }: AiQuizPr
         </div>
         <CardDescription className="text-purple-700 dark:text-purple-300">
           Answer the questions based on the lesson content
+          {remainingAttempts && remainingAttempts < 3 && (
+            <span className="block mt-1 text-orange-600 dark:text-orange-400 font-medium">
+              {remainingAttempts} attempts remaining
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
 
