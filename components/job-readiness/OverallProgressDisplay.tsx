@@ -1,6 +1,6 @@
  "use client"
 
-import { Star } from "lucide-react"
+import { Star, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -71,17 +71,24 @@ export function OverallProgressDisplay() {
   }
 
   const currentStars = progress?.currentStars || 0
-  const currentTier = progress?.currentTier || 'BRONZE'
-  const tierConfig = tierConfigs[currentTier]
+  const currentTier = progress?.currentTier
+  const tierConfig = currentTier ? tierConfigs[currentTier] : null
 
   return (
-    <Card className={cn("border-2", tierConfig.bgColor)}>
+    <Card className={cn("border-2", tierConfig?.bgColor || "bg-gray-50 dark:bg-gray-950/20")}>
       <CardHeader className="text-center">
         <CardTitle className="flex items-center justify-center gap-3">
           <span>Your Progress</span>
-          <Badge variant="secondary" className={cn("text-sm", tierConfig.textColor, tierConfig.color)}>
-            {tierConfig.name} Tier
-          </Badge>
+          {currentTier ? (
+            <Badge variant="secondary" className={cn("text-sm", tierConfig?.textColor, tierConfig?.color)}>
+              {tierConfig?.name} Tier
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-sm text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-600">
+              <Clock className="h-3 w-3 mr-1" />
+              No Tier Yet
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -94,9 +101,11 @@ export function OverallProgressDisplay() {
                 <Star
                   className={cn(
                     "w-12 h-12 transition-all duration-300",
-                    isEarned
+                    isEarned && tierConfig
                       ? `fill-current ${tierConfig.textColor} ${tierConfig.color}`
-                      : "text-gray-300 dark:text-gray-600"
+                      : isEarned 
+                        ? "fill-current text-blue-600 bg-blue-600"
+                        : "text-gray-300 dark:text-gray-600"
                   )}
                 />
                 <span className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs font-medium">

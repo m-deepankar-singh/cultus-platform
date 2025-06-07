@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { z } from 'zod';
+
+const quickVerdictSchema = z.object({
+  admin_verdict_override: z.enum(['approved', 'rejected']),
+  override_reason: z.string().optional().default('Quick verdict change via admin toggle'),
+});
+
+/**
+ * Quick verdict change endpoint for interview submissions
+ * Allows admins to quickly toggle between approved/rejected
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ submissionId: string }> }
+) {
+  try {
+    const { submissionId } = await params;
+
+    if (!submissionId) {
+      return NextResponse.json(
+        { error: 'Missing submission ID' },
+        { status: 400 }
+      );
+    }
+
+    // Validate admin role
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // Check if user is admin or staff
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    
+    if (profileError || !profile || 
+        (profile.role.toLowerCase() !== 'admin' && profile.role.toLowerCase() !== 'staff')) {
+      return NextResponse.json(
+        { error: 'Only administrators and staff can perform this action' },
+        { status: 403 }
+      );
+    }
+
+    // Parse and validate request body
+    const body = await req.json();
+    const validation = quickVerdictSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: validation.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const { admin_verdict_override, override_reason } = validation.data;
+
+    // Fetch the submission to make sure it exists and get current data
+    const { data: submission, error: submissionError } = await supabase
+      .from('job_readiness_ai_interview_submissions')
+      .select('id, student_id, ai_verdict, admin_verdict_override, analysis_result')
+      .eq('id', submissionId)
+      .single();
+
+    if (submissionError || !submission) {
+      return NextResponse.json(
+        { error: 'Submission not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update the submission with the admin verdict override
+    const updatedAnalysisResult = {
+      ...submission.analysis_result,
+      admin_verdict_override: admin_verdict_override,
+      admin_override_reason: override_reason,
+      admin_override_by: user.id,
+      admin_override_at: new Date().toISOString(),
+      final_verdict: admin_verdict_override, // Admin override becomes final verdict
+    };
+
+    const { error: updateError } = await supabase
+      .from('job_readiness_ai_interview_submissions')
+      .update({
+        admin_verdict_override: admin_verdict_override,
+        final_verdict: admin_verdict_override,
+        analysis_result: updatedAnalysisResult,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', submissionId);
+
+    if (updateError) {
+      console.error('Error updating submission verdict:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update verdict' },
+        { status: 500 }
+      );
+    }
+
+    // Note: Admin action logging would go here if admin_action_logs table existed
+    // For now, the action is logged in the analysis_result field
+    console.log(`Admin ${user.id} changed verdict for submission ${submissionId} to ${admin_verdict_override}`);
+
+    return NextResponse.json({
+      success: true,
+      message: `Interview verdict changed to ${admin_verdict_override}`,
+      data: {
+        submission_id: submissionId,
+        admin_verdict_override,
+        final_verdict: admin_verdict_override,
+        updated_at: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in quick verdict change:', error);
+    return NextResponse.json(
+      { error: 'Failed to process verdict change' },
+      { status: 500 }
+    );
+  }
+} 

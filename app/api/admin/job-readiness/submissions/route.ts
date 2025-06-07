@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 /**
  * GET /api/admin/job-readiness/submissions
  * Fetch all job readiness submissions (both interviews and projects) for admin review
+ * @deprecated Use /api/admin/job-readiness/interviews or /api/admin/job-readiness/projects instead
  */
 export async function GET(req: NextRequest) {
   try {
@@ -32,10 +33,17 @@ export async function GET(req: NextRequest) {
     const productId = searchParams.get('productId');
     const clientId = searchParams.get('clientId');
     const submissionType = searchParams.get('submissionType'); // 'project', 'interview', or undefined for all
+    const type = searchParams.get('type'); // Added for backward compatibility - same as submissionType
     const reviewStatus = searchParams.get('reviewStatus'); // 'pending', 'approved', 'rejected', or undefined for all
     const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '50');
+
+    // Add deprecation warning to console
+    console.warn('DEPRECATED: /api/admin/job-readiness/submissions endpoint is deprecated. Use /api/admin/job-readiness/interviews or /api/admin/job-readiness/projects instead.');
+
+    // Use type parameter if submissionType is not provided (backward compatibility)
+    const actualSubmissionType = submissionType || type;
 
     // Calculate offset for pagination
     const offset = (page - 1) * pageSize;
@@ -44,7 +52,7 @@ export async function GET(req: NextRequest) {
     let projectSubmissions: any[] = [];
 
     // Fetch interview submissions if not filtered out
-    if (!submissionType || submissionType === 'interview') {
+    if (!actualSubmissionType || actualSubmissionType === 'interview') {
       const interviewQuery = supabase
         .from('job_readiness_ai_interview_submissions')
         .select(`
@@ -105,7 +113,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch project submissions if not filtered out
-    if (!submissionType || submissionType === 'project') {
+    if (!actualSubmissionType || actualSubmissionType === 'project') {
       const projectQuery = supabase
         .from('job_readiness_ai_project_submissions')
         .select(`
@@ -260,15 +268,22 @@ export async function GET(req: NextRequest) {
     const endIndex = offset + pageSize;
     const paginatedSubmissions = transformedSubmissions.slice(startIndex, endIndex);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       submissions: paginatedSubmissions,
       pagination: {
         page,
         pageSize,
         total: transformedSubmissions.length,
         totalPages: Math.ceil(transformedSubmissions.length / pageSize),
-      }
+      },
+      deprecation_notice: "This endpoint is deprecated. Use /api/admin/job-readiness/interviews or /api/admin/job-readiness/projects instead."
     });
+
+    // Add deprecation header
+    response.headers.set('X-Deprecated', 'true');
+    response.headers.set('X-Deprecation-Message', 'Use /api/admin/job-readiness/interviews or /api/admin/job-readiness/projects instead');
+    
+    return response;
 
   } catch (error) {
     console.error('Error fetching submissions:', error);

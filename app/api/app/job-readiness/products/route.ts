@@ -170,8 +170,27 @@ export async function GET(req: NextRequest) {
           return {
             ...assignment,
             modules: [],
+            allAssessmentsComplete: false,
           };
         }
+
+        // Check if all assessment modules are completed for tier eligibility
+        const assessmentModules = modules?.filter(m => m.type === 'Assessment') || [];
+        const completedAssessments = assessmentModules.filter(m => 
+          m.student_module_progress?.[0]?.status === 'Completed'
+        );
+        
+        // If student already has a tier, they must have completed all assessments
+        // Only check assessment completion when tier is null
+        let allAssessmentsComplete = false;
+        if (student.job_readiness_tier) {
+          allAssessmentsComplete = true; // Must be true if tier was assigned
+        } else {
+          allAssessmentsComplete = assessmentModules.length > 0 && 
+            completedAssessments.length === assessmentModules.length;
+        }
+
+        console.log(`[TIER_CHECK] Product ${assignment.product_id} - Student has tier: ${student.job_readiness_tier}, Assessments: ${completedAssessments.length}/${assessmentModules.length}, All Complete: ${allAssessmentsComplete}`);
 
         // For Expert Session modules, we need to get progress from the separate expert session progress table
         let expertSessionProgress: any[] = [];
@@ -263,9 +282,27 @@ export async function GET(req: NextRequest) {
         return {
           ...assignment,
           modules: modulesWithAccess || [],
+          allAssessmentsComplete,
         };
       })
     );
+
+    // Determine if student should see tier information
+    // If student already has a tier, show it directly
+    // Otherwise, all products must have all assessments completed to show tier
+    let displayTier = student.job_readiness_tier;
+    let globalAllAssessmentsComplete = false;
+    
+    if (displayTier) {
+      // Student already has a tier - show it directly
+      globalAllAssessmentsComplete = true;
+      console.log(`[TIER_DISPLAY] Student ${student.id} already has tier: ${displayTier}`);
+    } else {
+      // No tier yet - check if all assessments across all products are completed
+      globalAllAssessmentsComplete = productsWithModules.length > 0 && 
+        productsWithModules.every(product => product.allAssessmentsComplete);
+      console.log(`[TIER_DISPLAY] Student ${student.id} - Global assessments complete: ${globalAllAssessmentsComplete}, Display tier: ${displayTier}`);
+    }
 
     return NextResponse.json({
       student: {
@@ -273,7 +310,7 @@ export async function GET(req: NextRequest) {
         name: student.full_name,
         email: student.email,
         job_readiness_star_level: student.job_readiness_star_level,
-        job_readiness_tier: student.job_readiness_tier,
+        job_readiness_tier: displayTier,
         job_readiness_background_type: student.job_readiness_background_type,
         job_readiness_promotion_eligible: student.job_readiness_promotion_eligible
       },

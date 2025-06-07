@@ -191,6 +191,25 @@ export async function GET(req: NextRequest) {
       .eq('product_id', productId)
       .eq('type', 'Assessment');
 
+    // Calculate completion status
+    const completedAssessmentsCount = moduleCounts?.length || 0;
+    const totalAssessmentsCount = totalCount || 0;
+    
+    // If student already has a tier, show it directly (no need to re-check assessments)
+    // Only check assessment completion when tier is null
+    let currentTier = student.job_readiness_tier;
+    let allAssessmentsComplete = false;
+    
+    if (currentTier) {
+      // Student already has a tier assigned - show it directly
+      allAssessmentsComplete = true; // Must be true if tier was assigned
+      console.log(`Student ${user.id} already has tier: ${currentTier}`);
+    } else {
+      // No tier assigned yet - check if all assessments are completed
+      allAssessmentsComplete = completedAssessmentsCount === totalAssessmentsCount && totalAssessmentsCount > 0;
+      console.log(`Assessment completion status - Student: ${user.id}, Completed: ${completedAssessmentsCount}/${totalAssessmentsCount}, All Complete: ${allAssessmentsComplete}`);
+    }
+
     return NextResponse.json({
       assessments: enhancedAssessments,
       tier_criteria: {
@@ -207,10 +226,11 @@ export async function GET(req: NextRequest) {
           max_score: tierConfig.gold_assessment_max_score
         }
       },
-      current_tier: student.job_readiness_tier,
+      current_tier: currentTier,
       current_star_level: student.job_readiness_star_level,
-      completed_assessments_count: moduleCounts?.length || 0,
-      total_assessments_count: totalCount || 0,
+      all_assessments_complete: allAssessmentsComplete,
+      completed_assessments_count: completedAssessmentsCount,
+      total_assessments_count: totalAssessmentsCount,
       product: {
         id: productData.id,
         name: productData.name,

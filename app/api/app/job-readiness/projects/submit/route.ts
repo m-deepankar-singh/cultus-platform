@@ -209,6 +209,7 @@ export async function POST(req: NextRequest) {
       submission_type,
       submission_content: finalSubmissionContent || null,
       submission_url: submission_url || null,
+      status: 'graded', // Projects are auto-graded immediately upon submission
       score: gradingResult.score,
       passed: gradingResult.passed,
       feedback: JSON.stringify({

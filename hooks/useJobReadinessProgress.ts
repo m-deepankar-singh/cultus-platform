@@ -26,7 +26,7 @@ interface JobReadinessProgressResponse {
     name: string
     email: string
     job_readiness_star_level: number
-    job_readiness_tier: 'BRONZE' | 'SILVER' | 'GOLD'
+    job_readiness_tier: 'BRONZE' | 'SILVER' | 'GOLD' | null
     job_readiness_background_type: string
     job_readiness_promotion_eligible: boolean
   }
@@ -36,7 +36,7 @@ interface JobReadinessProgressResponse {
 // Transform the API response to a more convenient format
 interface JobReadinessProgress {
   currentStars: number
-  currentTier: 'BRONZE' | 'SILVER' | 'GOLD'
+  currentTier: 'BRONZE' | 'SILVER' | 'GOLD' | null
   backgroundType: string
   promotionEligible: boolean
   products: JobReadinessProduct[]
@@ -105,7 +105,7 @@ export function useJobReadinessProgress() {
       
       return {
         currentStars,
-        currentTier: data.student.job_readiness_tier || 'BRONZE',
+        currentTier: data.student.job_readiness_tier,
         backgroundType: data.student.job_readiness_background_type || '',
         promotionEligible: data.student.job_readiness_promotion_eligible || false,
         products: data.products,

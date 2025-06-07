@@ -42,8 +42,9 @@ interface AssessmentListResponse {
     silver: { min_score: number; max_score: number }
     gold: { min_score: number; max_score: number }
   }
-  current_tier: string
+  current_tier: string | null
   current_star_level: string
+  all_assessments_complete: boolean
   completed_assessments_count: number
   total_assessments_count: number
   product: {

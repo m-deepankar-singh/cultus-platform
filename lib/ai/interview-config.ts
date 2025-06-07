@@ -125,6 +125,12 @@ export function buildQuestionGenerationPrompt(
 
 ## Question Requirements
 
+### CRITICAL TIMING CONSTRAINT
+- **Total Interview Duration**: 5 minutes maximum
+- **Questions must be answerable within 30-60 seconds each**
+- **Avoid complex multi-part questions that require lengthy explanations**
+- **Focus on concise, focused questions that allow for brief but meaningful responses**
+
 ### IMPORTANT: Generate exactly ${questionQuantity} questions - no more, no less.
 
 ### Difficulty Level (${userProfile.job_readiness_tier} Tier)
@@ -139,15 +145,24 @@ export function buildQuestionGenerationPrompt(
 4. **Professional Behavior**: Work ethic, teamwork, and professional situations
 5. **Motivation & Goals**: Career aspirations and commitment to the field
 
-### Question Format
-- Each question should be clear and specific
-- Include both behavioral ("Tell me about a time...") and situational ("How would you handle...") questions
-- Ensure questions are appropriate for someone entering the workforce
-- Make questions engaging and relevant to current industry practices
+### Question Format Guidelines
+- **Keep questions concise and focused** - avoid overly complex scenarios
+- **Design for 30-60 second responses** - candidates should be able to answer briefly but meaningfully
+- **Use clear, direct language** - avoid ambiguous or multi-layered questions
+- **Include both behavioral ("Tell me about a time...") and situational ("How would you handle...") questions**
+- **Ensure questions are appropriate for someone entering the workforce**
+- **Make questions engaging and relevant to current industry practices**
+- **Avoid questions requiring extensive technical explanations or long stories**
+
+### Time-Conscious Question Examples:
+- "What interests you most about [specific aspect of field]?" (30-45 seconds)
+- "How do you handle tight deadlines?" (45-60 seconds)
+- "Describe your strongest skill in [field area]." (30-45 seconds)
+- "What's one challenge you've overcome recently?" (45-60 seconds)
 
 ### Background-Specific Focus
 For ${background.name}, emphasize questions related to:
 ${background.focus_areas.map(area => `- ${area}`).join('\n')}
 
-Generate exactly ${questionQuantity} questions that will help assess if this candidate is ready for entry-level employment in ${background.name}.`;
+Generate exactly ${questionQuantity} questions that will help assess if this candidate is ready for entry-level employment in ${background.name}, ensuring each question can be answered effectively within 30-60 seconds.`;
 } 

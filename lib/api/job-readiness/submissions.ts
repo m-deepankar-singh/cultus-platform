@@ -28,8 +28,6 @@ export interface SubmissionFilters {
   offset?: number
 }
 
-export const SUBMISSION_TYPES = ["project"] as const
-
 export interface JrSubmissionsFilters {
   productId?: string
   clientId?: string
@@ -38,6 +36,18 @@ export interface JrSubmissionsFilters {
   search?: string
   page?: number
   pageSize?: number
+  // Interview-specific filters
+  status?: string
+  aiVerdict?: string
+  confidenceScore?: string
+  backgroundType?: string
+  tierWhenSubmitted?: string
+  dateFrom?: string
+  dateTo?: string
+  // Project-specific filters
+  projectType?: string
+  scoreRange?: string
+  contentSize?: string
 }
 
 export interface JrSubmissionsResponse {
@@ -50,15 +60,12 @@ export interface JrSubmissionsResponse {
   }
 }
 
-export interface ManualReviewRequest {
-  status: "approved" | "rejected"
-  admin_feedback: string
-}
-
-// Submission type and status enums
+// Define constants for validation
+export const SUBMISSION_TYPES = ["project", "assessment", "interview"] as const
 export const AI_GRADE_STATUSES = ["pending", "completed", "failed"] as const
 export const MANUAL_REVIEW_STATUSES = ["pending", "approved", "rejected", "not_required"] as const
 
+export type SubmissionType = typeof SUBMISSION_TYPES[number]
 export type AiGradeStatus = typeof AI_GRADE_STATUSES[number]
 export type ManualReviewStatus = typeof MANUAL_REVIEW_STATUSES[number]
 
@@ -89,8 +96,90 @@ async function handleApiResponse<T>(response: Response): Promise<T> {
   return response.json()
 }
 
-// Get submissions with filtering and pagination
+// NEW: Get interview submissions specifically
+export async function getInterviewSubmissions(filters: JrSubmissionsFilters = {}): Promise<JrSubmissionsResponse> {
+  try {
+    const searchParams = new URLSearchParams()
+    
+    if (filters.clientId) searchParams.append("client_id", filters.clientId)
+    if (filters.search) searchParams.append("search", filters.search)
+    if (filters.page) searchParams.append("page", filters.page.toString())
+    if (filters.pageSize) searchParams.append("pageSize", filters.pageSize.toString())
+    
+    // Interview-specific filters
+    if (filters.status && filters.status !== "all") searchParams.append("status", filters.status)
+    if (filters.aiVerdict && filters.aiVerdict !== "all") searchParams.append("aiVerdict", filters.aiVerdict)
+    if (filters.confidenceScore) searchParams.append("confidenceScore", filters.confidenceScore)
+    if (filters.backgroundType) searchParams.append("backgroundType", filters.backgroundType)
+    if (filters.tierWhenSubmitted) searchParams.append("tierWhenSubmitted", filters.tierWhenSubmitted)
+    if (filters.dateFrom) searchParams.append("dateFrom", filters.dateFrom)
+    if (filters.dateTo) searchParams.append("dateTo", filters.dateTo)
+
+    // Add cache-busting parameter to ensure fresh data
+    searchParams.append("_t", Date.now().toString())
+
+    const url = `/api/admin/job-readiness/interviews${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      },
+    })
+    
+    return await handleApiResponse<JrSubmissionsResponse>(response)
+  } catch (error) {
+    console.error("Failed to fetch interview submissions:", error)
+    throw error
+  }
+}
+
+// NEW: Get project submissions specifically
+export async function getProjectSubmissions(filters: JrSubmissionsFilters = {}): Promise<JrSubmissionsResponse> {
+  try {
+    const searchParams = new URLSearchParams()
+    
+    if (filters.productId) searchParams.append("productId", filters.productId)
+    if (filters.clientId) searchParams.append("clientId", filters.clientId)
+    if (filters.search) searchParams.append("search", filters.search)
+    if (filters.page) searchParams.append("page", filters.page.toString())
+    if (filters.pageSize) searchParams.append("pageSize", filters.pageSize.toString())
+    
+    // Project-specific filters
+    if (filters.projectType) searchParams.append("projectType", filters.projectType)
+    if (filters.scoreRange) searchParams.append("scoreRange", filters.scoreRange)
+    if (filters.contentSize) searchParams.append("contentSize", filters.contentSize)
+    if (filters.backgroundType) searchParams.append("backgroundType", filters.backgroundType)
+
+    // Add cache-busting parameter to ensure fresh data
+    searchParams.append("_t", Date.now().toString())
+
+    const url = `/api/admin/job-readiness/projects${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      },
+    })
+    
+    return await handleApiResponse<JrSubmissionsResponse>(response)
+  } catch (error) {
+    console.error("Failed to fetch project submissions:", error)
+    throw error
+  }
+}
+
+// DEPRECATED: Get submissions with filtering and pagination (use getInterviewSubmissions or getProjectSubmissions instead)
 export async function getJrSubmissions(filters: JrSubmissionsFilters = {}): Promise<JrSubmissionsResponse> {
+  console.warn("DEPRECATED: getJrSubmissions is deprecated. Use getInterviewSubmissions or getProjectSubmissions instead.")
+  
   try {
     const searchParams = new URLSearchParams()
     
@@ -215,6 +304,54 @@ export function isJrSubmission(submission: any): submission is JrSubmission {
     AI_GRADE_STATUSES.includes(submission.ai_grade_status) &&
     MANUAL_REVIEW_STATUSES.includes(submission.manual_review_status)
   )
+}
+
+// Date formatting helper
+export function formatSubmissionDate(dateString: string): string {
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return 'Invalid Date'
+  }
+}
+
+// Submission type helpers
+export function getSubmissionTypeLabel(type: string): string {
+  return SUBMISSION_TYPE_LABELS[type] || type
+}
+
+export function getSubmissionTypeColor(type: string): string {
+  return SUBMISSION_TYPE_COLORS[type] || "bg-gray-100 text-gray-800 border-gray-300"
+}
+
+// AI grade status helpers
+export function getAiGradeStatusLabel(status: string): string {
+  return AI_GRADE_STATUS_LABELS[status] || status
+}
+
+export function getAiGradeStatusColor(status: string): string {
+  return AI_GRADE_STATUS_COLORS[status] || "bg-gray-100 text-gray-800 border-gray-300"
+}
+
+// Manual review status helpers
+export function getManualReviewStatusLabel(status: string): string {
+  return MANUAL_REVIEW_STATUS_LABELS[status] || status
+}
+
+export function getManualReviewStatusColor(status: string): string {
+  return MANUAL_REVIEW_STATUS_COLORS[status] || "bg-gray-100 text-gray-800 border-gray-300"
+}
+
+// Interview submission helpers
+export function isInterviewSubmission(submission: any): boolean {
+  return submission?.submission_type === "interview" || !!submission?.video_storage_path
 }
 
 export { JrSubmissionsApiError } 

@@ -193,51 +193,51 @@ function getDefaultQuestions(
   const baseQuestions: InterviewQuestion[] = [
     {
       id: "default_1",
-      question_text: `Tell me about your interest in ${background.name} and what motivated you to pursue this field.`
+      question_text: `What interests you most about ${background.name}?`
     },
     {
       id: "default_2", 
-      question_text: "Describe a challenging situation you've faced and how you overcame it."
+      question_text: "How do you handle challenging situations at work or school?"
     },
     {
       id: "default_3",
-      question_text: "How do you stay current with developments in your field?"
+      question_text: "What's your strongest skill in this field?"
     },
     {
       id: "default_4",
-      question_text: "Tell me about a time when you had to work as part of a team."
+      question_text: "Describe your experience working in teams."
     },
     {
       id: "default_5",
-      question_text: "Where do you see yourself in your career in 3-5 years?"
+      question_text: "What are your career goals for the next few years?"
     },
     {
       id: "default_6",
-      question_text: "How do you handle feedback and criticism?"
+      question_text: "How do you respond to feedback?"
     },
     {
       id: "default_7",
-      question_text: "Describe a time when you had to learn something new quickly."
+      question_text: "Tell me about a time you learned something new quickly."
     },
     {
       id: "default_8",
-      question_text: "What do you think are the most important skills for success in this field?"
+      question_text: "What skills do you think are most important for success in this field?"
     },
     {
       id: "default_9",
-      question_text: "Tell me about a project you're particularly proud of."
+      question_text: "What's a recent accomplishment you're proud of?"
     },
     {
       id: "default_10",
-      question_text: "How do you prioritize tasks when you have multiple deadlines?"
+      question_text: "How do you manage multiple tasks with deadlines?"
     },
     {
       id: "default_11",
-      question_text: "What interests you most about this particular role or field?"
+      question_text: "Why are you interested in this particular field?"
     },
     {
       id: "default_12",
-      question_text: "Describe a time when you had to solve a complex problem."
+      question_text: "How do you approach problem-solving?"
     }
   ];
   

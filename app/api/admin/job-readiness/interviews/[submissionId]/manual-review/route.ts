@@ -99,25 +99,9 @@ export async function PATCH(
       );
     }
 
-    // Log the manual review action
-    const { error: logError } = await supabase
-      .from('admin_action_logs')
-      .insert({
-        admin_id: user.id,
-        action_type: 'interview_manual_review',
-        entity_id: submissionId,
-        details: {
-          status,
-          admin_feedback,
-          student_id: submission.student_id,
-          previous_status: submission.status
-        }
-      });
-
-    if (logError) {
-      console.error('Error logging admin action:', logError);
-      // Continue despite logging error, as the main action succeeded
-    }
+    // Note: Admin action logging would go here if admin_action_logs table existed
+    // For now, the action is logged in the analysis_result field
+    console.log(`Admin ${user.id} manually reviewed submission ${submissionId} with status ${status}`);
 
     // If the status is 'Approved', trigger tier promotion if applicable
     if (status === 'Approved') {
