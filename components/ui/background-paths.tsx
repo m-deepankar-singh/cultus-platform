@@ -94,7 +94,7 @@ export function BackgroundPaths({
                     if (isAuthenticated) {
                         router.push('/app/dashboard');
                     } else {
-                        router.push('/login');
+                        router.push('/app/login');
                     }
                 }
             });
