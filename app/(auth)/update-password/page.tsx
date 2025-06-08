@@ -1,4 +1,3 @@
-import { UpdatePasswordForm } from "@/components/auth/update-password-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function UpdatePasswordPage() {
@@ -11,11 +10,13 @@ export default function UpdatePasswordPage() {
 				<CardHeader className="text-center">
 					<CardTitle className="text-2xl font-bold">Update Your Password</CardTitle>
 					<CardDescription>
-						Enter and confirm your new password below.
+						This feature is not yet implemented. Please contact your administrator for password reset assistance.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<UpdatePasswordForm />
+					<div className="text-center text-sm text-muted-foreground">
+						Password update functionality will be available in a future update.
+					</div>
 				</CardContent>
 			</Card>
 		</div>
