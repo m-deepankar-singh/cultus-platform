@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { createClient } from "@/lib/supabase/client";
 import gsap from 'gsap';
 
 function FloatingPaths({ position }: { position: number }) {
@@ -61,6 +62,25 @@ export function BackgroundPaths({
     const words = title.split(" ");
     const router = useRouter();
     const containerRef = useRef<HTMLDivElement>(null);
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+    const supabase = createClient();
+
+    useEffect(() => {
+        // Check if user is already authenticated
+        const checkAuth = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setIsAuthenticated(!!user);
+        };
+
+        checkAuth();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            setIsAuthenticated(!!session?.user);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [supabase.auth]);
 
     const handleStartLearningClick = () => {
         if (containerRef.current) {
@@ -70,7 +90,12 @@ export function BackgroundPaths({
                 duration: 0.5,
                 ease: "power2.inOut",
                 onComplete: () => {
-                    router.push('/app/dashboard');
+                    // Route based on authentication status
+                    if (isAuthenticated) {
+                        router.push('/app/dashboard');
+                    } else {
+                        router.push('/login');
+                    }
                 }
             });
         }
