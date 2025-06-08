@@ -132,7 +132,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   // --- 3. Define Public and Protected Routes --- 
-  const publicPaths = ['/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback', '/api/app/auth/login', '/api/admin/auth/login']; // Add any other public paths
+  const publicPaths = ['/', '/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback', '/api/app/auth/login', '/api/admin/auth/login']; // Add any other public paths
   
   // Check if route is protected
   const isAdminRoute = pathname.startsWith('/admin') && !pathname.startsWith('/admin/login');
