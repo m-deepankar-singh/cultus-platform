@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -427,7 +427,8 @@ const StructuredFeedback = ({ analysisResult }: { analysisResult: AnalysisResult
   );
 };
 
-export default function InterviewSubmittedPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function InterviewSubmittedContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const submissionId = searchParams.get('submissionId');
@@ -779,5 +780,28 @@ export default function InterviewSubmittedPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function InterviewSubmittedFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl">
+        <CardContent className="p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold mb-2">Loading Interview Status...</h2>
+          <p className="text-gray-600">Please wait while we load your submission details.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function InterviewSubmittedPage() {
+  return (
+    <Suspense fallback={<InterviewSubmittedFallback />}>
+      <InterviewSubmittedContent />
+    </Suspense>
   );
 }
