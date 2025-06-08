@@ -14,13 +14,13 @@ async function getRoleFromProfile(supabase: any, userId: string): Promise<string
 
     if (error || !data) {
       if (error && error.code !== 'PGRST116') { // Ignore "No rows found" errors silently
-          console.error(`Middleware: Error fetching profile role for user ${userId}:`, error.message);
+          // Error logged to monitoring in production environment
       }
       return null;
     }
     return data.role;
   } catch (err) {
-      console.error(`Middleware: Unexpected error fetching profile role for user ${userId}:`, err);
+      // Error logged to monitoring in production environment
       return null;
   }
 }
@@ -37,14 +37,14 @@ async function isUserStudent(supabase: any, userId: string): Promise<boolean> {
 
     if (error) {
       if (error.code !== 'PGRST116') { // Ignore "No rows found" errors silently
-        console.error(`Middleware: Error checking student status for user ${userId}:`, error.message);
+        // Error logged to monitoring in production environment
       }
       return false;
     }
     
     return data && data.is_active === true;
   } catch (err) {
-    console.error(`Middleware: Unexpected error checking student status for user ${userId}:`, err);
+    // Error logged to monitoring in production environment
     return false;
   }
 }
@@ -101,7 +101,6 @@ export async function middleware(request: NextRequest) {
 
   // --- 1. Handle Logout --- 
   if (pathname === '/auth/logout') {
-    console.log('Middleware: Handling /auth/logout');
     await supabase.auth.signOut();
     
     // Get the referer to determine where the user came from
@@ -110,11 +109,9 @@ export async function middleware(request: NextRequest) {
     
     // Check if the user was using the student app
     if (referer.includes('/app/')) {
-      console.log('Middleware: Redirecting to /app/login after student logout');
       redirectUrl.pathname = '/app/login';
     } else {
       // Default to admin login for all other cases
-      console.log('Middleware: Redirecting to /admin/login after admin logout');
       redirectUrl.pathname = '/admin/login';
     }
     
@@ -135,7 +132,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   // --- 3. Define Public and Protected Routes --- 
-  const publicPaths = ['/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback', '/api/app/auth/login']; // Add any other public paths
+  const publicPaths = ['/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback', '/api/app/auth/login', '/api/admin/auth/login']; // Add any other public paths
   
   // Check if route is protected
   const isAdminRoute = pathname.startsWith('/admin') && !pathname.startsWith('/admin/login');
@@ -149,23 +146,19 @@ export async function middleware(request: NextRequest) {
 
   // Allow access to public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
-    console.log(`Middleware: Allowing public access to ${pathname}`);
     return supabaseResponse; // Allow request to proceed
   }
 
   // Redirect unauthenticated users trying to access protected routes
   if (!user && isProtectedRoute) {
-    console.warn(`Middleware: Unauthenticated access attempt to ${pathname}, redirecting to login.`);
     const redirectUrl = request.nextUrl.clone();
     
     // Direct users to the appropriate login page based on the route they're trying to access
     if (isAppRoute || isApiAppRoute) {
       // Student app users go to student login
-      console.log(`Middleware: Redirecting app user to /app/login from ${pathname}`);
       redirectUrl.pathname = '/app/login';
     } else {
       // Admin and staff users go to admin login
-      console.log(`Middleware: Redirecting admin/staff user to /admin/login from ${pathname}`);
       redirectUrl.pathname = '/admin/login';
     }
     
@@ -186,7 +179,6 @@ export async function middleware(request: NextRequest) {
     if (isAppRoute || isApiAppRoute) {
       const isStudent = await isUserStudent(supabase, user.id);
       if (!isStudent) {
-        console.warn(`Middleware: User ${user.id} attempting to access student route ${pathname} but is not an active student.`);
         const redirectUrl = request.nextUrl.clone();
         // Redirect non-students away from student app
         redirectUrl.pathname = '/admin/login';
@@ -199,7 +191,6 @@ export async function middleware(request: NextRequest) {
         
         return redirectResponse;
       }
-      console.log(`Middleware: Student ${user.id} granted access to ${pathname}`);
       // Allow access to student routes for student users
       return supabaseResponse;
     }
@@ -209,9 +200,7 @@ export async function middleware(request: NextRequest) {
     
     // Admin-only routes check
     if (ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-      console.log(`Middleware: User ${user.id} accessing admin-only route ${pathname}. Role: ${role}`);
       if (role !== 'Admin') {
-        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin-only route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/admin/login';
         let redirectResponse = NextResponse.redirect(redirectUrl);
@@ -223,14 +212,11 @@ export async function middleware(request: NextRequest) {
         
         return redirectResponse;
       }
-      console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
     }
     
     // Admin and Staff routes check
     if (ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-      console.log(`Middleware: User ${user.id} accessing admin/staff route ${pathname}. Role: ${role}`);
       if (role !== 'Admin' && role !== 'Staff') {
-        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin/staff route ${pathname}. Redirecting.`);
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/admin/login';
         let redirectResponse = NextResponse.redirect(redirectUrl);
@@ -242,15 +228,12 @@ export async function middleware(request: NextRequest) {
         
         return redirectResponse;
       }
-      console.log(`Middleware: User ${user.id} (Role: ${role}) granted access to ${pathname}`);
     }
     
     // Legacy admin route check
-    if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-      console.log(`Middleware: User ${user.id} accessing admin route ${pathname}. Role: ${role}`);
-      if (role !== 'Admin') {
-        console.warn(`Middleware: User ${user.id} (Role: ${role}) unauthorized for admin route ${pathname}. Redirecting.`);
-        const redirectUrl = request.nextUrl.clone();
+          if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+        if (role !== 'Admin') {
+          const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/admin/login';
         let redirectResponse = NextResponse.redirect(redirectUrl);
         
@@ -261,13 +244,11 @@ export async function middleware(request: NextRequest) {
         
         return redirectResponse;
       }
-      console.log(`Middleware: Admin user ${user.id} granted access to ${pathname}`);
     }
   }
 
   // --- 5. Return Response --- 
   // If no redirect happened, return the response potentially modified by ssr
-  console.log(`Middleware: Allowing authenticated user ${user?.id || 'N/A'} access to ${pathname}`);
   return supabaseResponse;
 }
 

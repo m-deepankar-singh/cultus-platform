@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { AppLoginSchema } from '@/lib/schemas/auth';
+import { createClient } from '@/lib/supabase/server';
+import { AdminLoginSchema } from '@/lib/schemas/auth';
 // Using the proper @supabase/ssr package per project requirements
 
 export async function POST(request: Request) {
   try {
-    // Create Supabase client
-    const supabase = await createClient();
-
-    // Parse and validate request body
+    // Parse request body first
     const body = await request.json();
-    const validationResult = AppLoginSchema.safeParse(body);
+
+    // Validate with schema
+    const validationResult = AdminLoginSchema.safeParse(body);
 
     // Handle validation errors
     if (!validationResult.success) {
@@ -27,6 +26,9 @@ export async function POST(request: Request) {
     const { email: rawEmail, password, rememberMe } = validationResult.data;
     const email = rawEmail.trim(); // Explicitly trim the email
 
+    // Create Supabase client
+    const supabase = await createClient();
+    
     // FIRST: Attempt to sign in with Supabase Auth directly
     // This is a more reliable way to check credentials first
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
@@ -53,36 +55,45 @@ export async function POST(request: Request) {
     // Get user ID from successful auth
     const userId = authData.user.id;
     
-    // SECOND: Now check if this user ID exists in the students table
+    // SECOND: Now check if this user ID exists in the profiles table with admin/staff role
     // This bypasses any email case-sensitivity issues by using the UUID directly
-    const serviceClient = await createServiceClient();
-    const { data: student, error: studentError } = await serviceClient
-      .from('students')
-      .select('id, email, client_id, is_active, full_name')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, role, full_name, is_active')
       .eq('id', userId)
       .single();
     
-    if (studentError) {
-      // Sign out since auth succeeded but student lookup failed
+    if (profileError) {
+      // Sign out since auth succeeded but profile lookup failed
       await supabase.auth.signOut();
       return NextResponse.json(
-        { error: 'Error verifying student record' },
+        { error: 'Error verifying admin profile' },
         { status: 500 }
       );
     }
     
-    if (!student) {
-      // Sign out since auth succeeded but no student record exists
+    if (!profile) {
+      // Sign out since auth succeeded but no profile record exists
       await supabase.auth.signOut();
       return NextResponse.json(
-        { error: 'User authenticated but no student record found. Please contact your administrator.' },
+        { error: 'User authenticated but no admin profile found. Please contact your administrator.' },
         { status: 403 }
       );
     }
     
-    // Check if student is active
-    if (!student.is_active) {
-      // Sign out since student is inactive
+    // Check if user has admin or staff role
+    if (!profile.role || !['Admin', 'Staff'].includes(profile.role)) {
+      // Sign out since user doesn't have admin/staff permissions
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: 'Access denied. Admin or Staff role required.' },
+        { status: 403 }
+      );
+    }
+    
+    // Check if profile is active
+    if (!profile.is_active) {
+      // Sign out since profile is inactive
       await supabase.auth.signOut();
       return NextResponse.json(
         { error: 'Your account is inactive. Please contact your administrator.' },
@@ -90,9 +101,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update the last_login_at timestamp
+    // Update the last_login_at timestamp in profiles table
     const { error: updateError } = await supabase
-      .from('students')
+      .from('profiles')
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', userId);
 
@@ -100,15 +111,15 @@ export async function POST(request: Request) {
       // Continue anyway as this is not critical
     }
     
-    // Return success response with remember me preference
+    // Return success response with user info and remember me preference
     return NextResponse.json(
       { 
         message: 'Login successful',
         user: {
           id: userId,
-          email: student.email,
-          client_id: student.client_id,
-          full_name: student.full_name
+          email: authData.user.email,
+          role: profile.role,
+          full_name: profile.full_name
         },
         rememberMe: rememberMe,
         accessToken: authData.session?.access_token 
@@ -116,19 +127,19 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    // Top-level error handling - NO console.log for production safety
-    
     // Try to sign the user out in case they were authenticated
     try {
       const supabase = await createClient();
       await supabase.auth.signOut();
     } catch (signOutError) {
-      // Silent fail - don't expose errors
+      // Silent error handling for production
     }
     
     return NextResponse.json(
-      { error: 'An unexpected error occurred' }, 
+      { 
+        error: 'An unexpected error occurred'
+      }, 
       { status: 500 }
     );
   }
-}
+} 

@@ -3,7 +3,6 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -16,16 +15,12 @@ import {
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, AlertCircle, ShieldX } from "lucide-react";
+import { AppLoginSchema, type AppLoginFormValues } from "@/lib/schemas/auth";
+import { SessionService } from "@/lib/auth/session-service";
+import { Loader2, AlertCircle, ShieldX, GraduationCap } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-const formSchema = z.object({
-	email: z.string().email({ message: "Invalid email address." }),
-	password: z.string().min(1, { message: "Password is required." }),
-});
-
-type AppLoginFormValues = z.infer<typeof formSchema>;
 
 export function AppLoginForm() {
 	const [isLoading, setIsLoading] = React.useState(false);
@@ -35,11 +30,15 @@ export function AppLoginForm() {
 	const router = useRouter();
 	const { toast } = useToast();
 
+	// Load remember me preference from localStorage
+	const [rememberMeDefault] = React.useState(() => SessionService.getRememberMe());
+
 	const form = useForm<AppLoginFormValues>({
-		resolver: zodResolver(formSchema),
+		resolver: zodResolver(AppLoginSchema),
 		defaultValues: {
 			email: "",
 			password: "",
+			rememberMe: rememberMeDefault
 		},
 	});
 
@@ -48,6 +47,7 @@ export function AppLoginForm() {
 		setShowTempPasswordAlert(false);
 		setSubmissionError(null);
 		setIsInvalidCredentials(false);
+		
 		try {
 			const response = await fetch("/api/app/auth/login", {
 				method: "POST",
@@ -60,9 +60,7 @@ export function AppLoginForm() {
 			// Handle non-JSON responses
 			const contentType = response.headers.get("content-type");
 			if (!contentType || !contentType.includes("application/json")) {
-				// If not JSON, get the text and log it for debugging
 				const text = await response.text();
-				console.error("Non-JSON response received:", text);
 				throw new Error("Server returned an invalid response format. Please try again later.");
 			}
 
@@ -78,14 +76,20 @@ export function AppLoginForm() {
 				throw new Error(errorMessage);
 			}
 
+			// Configure session preferences  
+			SessionService.configureSession(values.rememberMe, 'student');
+
+			// Success toast
+			toast({
+				title: "Login Successful",
+				description: "Welcome back! Redirecting to your dashboard...",
+			});
+
 			// Redirect to the app dashboard on successful login
 			router.push("/app/dashboard");
-			// Optionally show a success toast
-			// toast({ title: "Login Successful", description: "Redirecting..." });
 
 		} catch (error: any) {
 			const generalErrorMessage = error.message || "An unexpected error occurred. Please try again.";
-			console.error("Login failed:", error);
 			if (!showTempPasswordAlert) {
 				setSubmissionError(generalErrorMessage);
 			}
@@ -102,8 +106,15 @@ export function AppLoginForm() {
 	return (
 		<>
 			<div className="text-center mb-8">
-				<h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-600 dark:from-white dark:to-neutral-400">Student Login</h1>
-				<p className="text-neutral-600 dark:text-neutral-300">Enter your credentials to access your learning dashboard</p>
+				<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+					<GraduationCap className="w-6 h-6 text-green-600 dark:text-green-400" />
+				</div>
+				<h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-900 to-green-600 dark:from-green-400 dark:to-green-200">
+					Student Login
+				</h1>
+				<p className="text-neutral-600 dark:text-neutral-300">
+					Enter your credentials to access your learning dashboard
+				</p>
 			</div>
 			
 			{isInvalidCredentials && (
@@ -117,7 +128,7 @@ export function AppLoginForm() {
 			)}
 			
 			{submissionError && !isInvalidCredentials && (
-				<Alert variant="destructive" className="mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm">
+				<Alert variant="destructive" className="mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
 					<AlertCircle className="h-4 w-4" />
 					<AlertTitle>Login Error</AlertTitle>
 					<AlertDescription>{submissionError}</AlertDescription>
@@ -178,13 +189,35 @@ export function AppLoginForm() {
 							</FormItem>
 						)}
 					/>
+
+					<FormField
+						control={form.control}
+						name="rememberMe"
+						render={({ field }) => (
+							<FormItem className="flex flex-row items-start space-x-3 space-y-0">
+								<FormControl>
+									<Checkbox
+										checked={field.value}
+										onCheckedChange={field.onChange}
+										disabled={isLoading}
+									/>
+								</FormControl>
+								<div className="space-y-1 leading-none">
+									<FormLabel className="text-sm font-normal text-neutral-700 dark:text-neutral-300 cursor-pointer">
+										Remember me for future sessions
+									</FormLabel>
+								</div>
+							</FormItem>
+						)}
+					/>
+
 					<Button 
 						type="submit" 
-						className="w-full bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 mt-2"
+						className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 dark:from-green-500 dark:to-green-600 dark:hover:from-green-600 dark:hover:to-green-700 text-white shadow-lg mt-2"
 						disabled={isLoading}
 					>
 						{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-						Sign In
+						{isLoading ? "Signing in..." : "Sign In"}
 					</Button>
 				</form>
 			</Form>
