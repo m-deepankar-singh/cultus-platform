@@ -9,7 +9,7 @@ import { QueryProvider } from "@/components/providers/query-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Upskilling Platform",
+  title: "Cultus Platform",
   description: "Platform for upskilling learners",
   generator: 'v0.dev'
 }
