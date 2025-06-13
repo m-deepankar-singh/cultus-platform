@@ -28,6 +28,13 @@ const supabaseAdmin: SupabaseClient<any, "public", any> = createClient(
       // It's recommended to set detectSessionInUrl to false for admin clients
       detectSessionInUrl: false 
     },
+    realtime: {
+      // Disable realtime for admin client to reduce warnings and bundle size
+      // Enable only if realtime subscriptions are needed for admin functionality
+      params: {
+        eventsPerSecond: 0,
+      },
+    },
   }
 );
 

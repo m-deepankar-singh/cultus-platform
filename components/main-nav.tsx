@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useLogout } from "@/hooks/use-logout"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ import {
 
 export function MainNav() {
   const pathname = usePathname()
+  const { logout } = useLogout()
 
   const routes = [
     {
@@ -119,8 +121,8 @@ export function MainNav() {
                 <span>Help Center</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Link href="/">Log out</Link>
+              <DropdownMenuItem onClick={() => logout()}>
+                Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

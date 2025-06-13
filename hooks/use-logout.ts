@@ -20,11 +20,16 @@ export function useLogout() {
       // Clear session preferences first
       SessionService.clearAllPreferences();
 
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
+      // Call logout API endpoint
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Logout API failed');
       }
 
       // Show success message
@@ -33,24 +38,21 @@ export function useLogout() {
         description: "You have been securely logged out.",
       });
 
-      // Redirect to appropriate login page
-      if (userType === 'student') {
-        router.push("/app/login");
-      } else if (userType === 'admin') {
-        router.push("/admin/login");
-      } else {
-        // Auto-detect based on current path or stored user type
-        const storedUserType = SessionService.getUserType();
-        if (storedUserType === 'student') {
-          router.push("/app/login");
-        } else {
-          router.push("/admin/login");
-        }
-      }
+      // Redirect based on user type or to homepage
+      const redirectPath = userType === 'admin' ? '/admin/login' : 
+                          userType === 'student' ? '/app/login' : '/';
+      router.push(redirectPath);
 
     } catch (error: any) {
       // Even if logout fails, clear preferences and redirect
       SessionService.clearAllPreferences();
+      
+      // Fallback: try direct Supabase logout
+      try {
+        await supabase.auth.signOut();
+      } catch (fallbackError) {
+        // Silent fail on fallback
+      }
       
       toast({
         variant: "destructive",
@@ -58,12 +60,10 @@ export function useLogout() {
         description: "There was an issue logging out. You have been redirected to login.",
       });
 
-      // Fallback redirect
-      if (userType === 'student') {
-        router.push("/app/login");
-      } else {
-        router.push("/admin/login");
-      }
+      // Fallback redirect based on user type or to homepage
+      const redirectPath = userType === 'admin' ? '/admin/login' : 
+                          userType === 'student' ? '/app/login' : '/';
+      router.push(redirectPath);
     }
   };
 

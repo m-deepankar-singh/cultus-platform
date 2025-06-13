@@ -237,7 +237,7 @@ export async function GET(
         .select('saved_answers, started_at, remaining_time_seconds')
         .eq('student_id', studentId)
         .eq('module_id', validModuleId)
-        .eq('submitted_at', null) // Only get attempts that haven't been submitted
+        .is('submitted_at', null) // Only get attempts that haven't been submitted
         .maybeSingle();
 
       if (savedProgressError && savedProgressError.code !== 'PGRST116') {
@@ -248,7 +248,7 @@ export async function GET(
       if (savedProgressData) {
         inProgressAttempt = {
           saved_answers: savedProgressData.saved_answers || {},
-          start_time: savedProgressData.started_at === "null" ? null : savedProgressData.started_at,
+          start_time: savedProgressData.started_at,
           remaining_time_seconds: savedProgressData.remaining_time_seconds
         };
       }

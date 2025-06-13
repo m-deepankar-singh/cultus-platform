@@ -23,14 +23,11 @@ export interface UseVideoRecordingResult {
   
   // Status
   error: string | null;
-  isFileSizeNearLimit: boolean;
-  isFileSizeOverLimit: boolean;
-  compressionLevel: number;
 }
 
 /**
- * Custom hook for managing WebM video recording with automatic compression
- * and file size monitoring for interview recordings
+ * Custom hook for managing WebM video recording with NO file size limits
+ * Raw, uncompressed video recording for interview analysis
  */
 export function useVideoRecording(): UseVideoRecordingResult {
   // Recording state
@@ -49,15 +46,8 @@ export function useVideoRecording(): UseVideoRecordingResult {
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sizeMonitorIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Constants
-  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
-  const WARNING_THRESHOLD = 0.8; // 80% of max size
-
   // Calculated values
   const fileSizeMB = fileSizeBytes / (1024 * 1024);
-  const isFileSizeNearLimit = fileSizeBytes > MAX_FILE_SIZE_BYTES * WARNING_THRESHOLD;
-  const isFileSizeOverLimit = fileSizeBytes > MAX_FILE_SIZE_BYTES;
-  const compressionLevel = Math.min(fileSizeBytes / MAX_FILE_SIZE_BYTES, 1);
 
   // Start recording duration and size monitoring
   const startMonitoring = useCallback(() => {
@@ -71,7 +61,7 @@ export function useVideoRecording(): UseVideoRecordingResult {
       }
     }, 1000);
 
-    // Size monitoring
+    // Size monitoring (for display purposes only)
     sizeMonitorIntervalRef.current = setInterval(() => {
       if (recorderRef.current) {
         const currentSize = recorderRef.current.getCurrentSize();
@@ -97,10 +87,10 @@ export function useVideoRecording(): UseVideoRecordingResult {
     try {
       setError(null);
       
-      // Create new recorder instance with event handlers
+      // Create new recorder instance with event handlers - NO SIZE LIMITS
       const recorder = new WebMVideoRecorder({
         onDataAvailable: (blob: Blob) => {
-          // Update size as data becomes available
+          // Update size as data becomes available (for display only)
           if (recorderRef.current) {
             const currentSize = recorderRef.current.getCurrentSize();
             setFileSizeBytes(currentSize);
@@ -110,6 +100,8 @@ export function useVideoRecording(): UseVideoRecordingResult {
           setVideoBlob(result.blob);
           setFileSizeBytes(result.sizeBytes);
           setRecordingDuration(Math.floor(result.durationMs / 1000));
+          
+          console.log(`🎥 Raw recording completed: ${result.sizeBytes} bytes (${(result.sizeBytes / 1024 / 1024).toFixed(2)} MB)`);
           
           // Create URL for preview
           const url = URL.createObjectURL(result.blob);
@@ -128,10 +120,6 @@ export function useVideoRecording(): UseVideoRecordingResult {
           setIsPaused(false);
           stopMonitoring();
           console.error('Recording error:', error);
-        },
-        onSizeWarning: (currentSize: number, maxSize: number) => {
-          console.warn(`Recording approaching size limit: ${currentSize}/${maxSize} bytes`);
-          setFileSizeBytes(currentSize);
         }
       });
       
@@ -259,14 +247,6 @@ export function useVideoRecording(): UseVideoRecordingResult {
     };
   }, [stopMonitoring, videoURL]);
 
-  // Auto-pause when approaching size limit
-  useEffect(() => {
-    if (isFileSizeOverLimit && isRecording && !isPaused) {
-      console.warn('File size limit reached, auto-pausing recording');
-      pauseRecording();
-    }
-  }, [isFileSizeOverLimit, isRecording, isPaused, pauseRecording]);
-
   return {
     // Recording state
     isRecording,
@@ -288,8 +268,5 @@ export function useVideoRecording(): UseVideoRecordingResult {
     
     // Status
     error,
-    isFileSizeNearLimit,
-    isFileSizeOverLimit,
-    compressionLevel,
   };
 } 

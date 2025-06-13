@@ -16,11 +16,13 @@ import {
 import { NotificationCenter } from "@/components/notification-center"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useTheme } from "next-themes"
+import { useLogout } from "@/hooks/use-logout"
 
 export function DashboardHeader() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+  const { logout } = useLogout()
 
   // useEffect only runs on the client, so we only show the theme toggle after mounting
   useEffect(() => {
@@ -78,10 +80,8 @@ export function DashboardHeader() {
             </DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Link href="/auth/logout" className="flex w-full">
-                Log out
-              </Link>
+            <DropdownMenuItem onClick={() => logout('admin')}>
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

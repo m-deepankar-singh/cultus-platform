@@ -37,6 +37,18 @@ const nextConfig = {
       bodySizeLimit: '100mb', // Allow larger uploads for video files
     },
   },
+  webpack: (config) => {
+    // Suppress the Supabase realtime-js critical dependency warning
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /node_modules\/@supabase\/realtime-js/,
+        message: /Critical dependency: the request of a dependency is an expression/,
+      },
+    ];
+
+    return config;
+  },
 }
 
 if (userConfig) {

@@ -12,7 +12,14 @@ export function createClient() {
         flowType: 'pkce',
         persistSession: true,
         detectSessionInUrl: true
-      }
+      },
+      realtime: {
+        // Reduce realtime warnings by limiting event rate
+        // Can be increased if realtime subscriptions are needed
+        params: {
+          eventsPerSecond: 2,
+        },
+      },
     }
   );
 } 

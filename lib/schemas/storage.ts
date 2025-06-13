@@ -2,21 +2,29 @@ import { z } from 'zod';
 
 // --- File Validation Schema ---
 
-const MAX_FILE_SIZE_MB = 1000;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const ALLOWED_FILE_TYPES = ['video/mp4']; // Currently only allowing MP4 as per plan
+// 🔥 REMOVED: File size limits for raw video uploads
+const ALLOWED_FILE_TYPES = ['video/webm', 'video/mp4']; // Support WebM and MP4
 
 export const UploadFileSchema = z.instanceof(File)
   .refine((file) => file.size > 0, {
     message: 'File cannot be empty.',
   })
-  .refine((file) => file.size <= MAX_FILE_SIZE_BYTES, {
-    message: `File size exceeds the maximum limit of ${MAX_FILE_SIZE_MB}MB.`,
-  })
   .refine((file) => ALLOWED_FILE_TYPES.includes(file.type), {
     message: `Invalid file type. Only ${ALLOWED_FILE_TYPES.join(', ')} allowed.`,
   });
 
+// For backward compatibility, export a validation function
+export function validateVideoFile(file: File): { valid: boolean; error?: string } {
+  try {
+    UploadFileSchema.parse(file);
+    return { valid: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { valid: false, error: error.errors[0].message };
+    }
+    return { valid: false, error: 'Unknown validation error' };
+  }
+}
 
 // --- Optional Metadata Schema (as shown in plan) ---
 

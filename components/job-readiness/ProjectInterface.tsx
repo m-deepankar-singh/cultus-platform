@@ -55,10 +55,10 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
     refetch: refetchProject 
   } = useProjectGeneration(actualProductId || '')
 
-  // Check if projects module is unlocked
-  const isUnlocked = progressData?.modules?.projects?.unlocked || false
+  // Check if projects module is unlocked - use star level instead of API response
   const currentStars = progressData?.currentStars || 0
   const requiredStars = 3
+  const isUnlocked = currentStars >= requiredStars
 
   if (progressLoading) {
     return (

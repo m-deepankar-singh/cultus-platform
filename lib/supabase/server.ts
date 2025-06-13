@@ -33,7 +33,13 @@ export async function createClient() {
         flowType: 'pkce',
         persistSession: true,
         detectSessionInUrl: true
-      }
+      },
+      realtime: {
+        // Disable realtime for server client to reduce warnings
+        params: {
+          eventsPerSecond: 0,
+        },
+      },
     }
   );
 }
@@ -61,6 +67,12 @@ export async function createServiceClient() {
             // This can be ignored if you have middleware refreshing
             // user sessions.
           }
+        },
+      },
+      realtime: {
+        // Disable realtime for service client to reduce warnings
+        params: {
+          eventsPerSecond: 0,
         },
       },
     }

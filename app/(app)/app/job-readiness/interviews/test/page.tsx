@@ -16,31 +16,6 @@ import { useLiveInterviewContext } from '@/components/job-readiness/contexts/Liv
 const TEST_BACKGROUND_ID = 'df8e996e-df6f-43f0-9bfa-c308a7604624'; // Real Computer Science background ID
 const TEST_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
-// Bridge component that connects InterviewSessionProvider data to LiveInterviewProvider
-function ConnectedLiveInterviewProvider({ 
-  children, 
-  backgroundId, 
-  apiKey 
-}: { 
-  children: ReactNode; 
-  backgroundId: string; 
-  apiKey: string; 
-}) {
-  const { questions, background, studentProfile } = useInterviewSession();
-  
-  return (
-    <LiveInterviewProvider
-      backgroundId={backgroundId}
-      apiKey={apiKey}
-      questions={questions}
-      background={background || undefined}
-      studentProfile={studentProfile || undefined}
-    >
-      {children}
-    </LiveInterviewProvider>
-  );
-}
-
 function TestInterviewFlow() {
   const [currentStep, setCurrentStep] = useState<'info' | 'setup' | 'interview'>('info');
   const { sessionState, questionsLoading, questionsError, background, questions } = useInterviewSession();
@@ -223,12 +198,12 @@ export default function InterviewTestPage() {
       showProgress={false}
     >
       <InterviewSessionProvider backgroundId={TEST_BACKGROUND_ID}>
-        <ConnectedLiveInterviewProvider 
+        <LiveInterviewProvider 
           backgroundId={TEST_BACKGROUND_ID}
           apiKey={apiKey}
         >
           <TestInterviewFlow />
-        </ConnectedLiveInterviewProvider>
+        </LiveInterviewProvider>
       </InterviewSessionProvider>
     </JobReadinessLayout>
   );

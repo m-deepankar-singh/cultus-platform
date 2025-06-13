@@ -103,17 +103,10 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/auth/logout') {
     await supabase.auth.signOut();
     
-    // Get the referer to determine where the user came from
-    const referer = request.headers.get('referer') || '';
     const redirectUrl = request.nextUrl.clone();
     
-    // Check if the user was using the student app
-    if (referer.includes('/app/')) {
-      redirectUrl.pathname = '/app/login';
-    } else {
-      // Default to admin login for all other cases
-      redirectUrl.pathname = '/admin/login';
-    }
+    // Redirect to homepage after logout
+    redirectUrl.pathname = '/';
     
     redirectUrl.search = ''; // Clear any query params
     // Ensure response cookies reflect the signOut operation

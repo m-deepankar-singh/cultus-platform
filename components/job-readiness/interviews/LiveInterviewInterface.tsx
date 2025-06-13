@@ -143,7 +143,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     if (interviewStarted && videoRef.current) {
       navigator.mediaDevices.getUserMedia({
         video: videoEnabled,
-        audio: true // Always enable audio for the display video
+        audio: false // 🔥 FIX: Don't request audio for display video - this prevents feedback loop
       }).then(stream => {
         // Store stream reference for cleanup
         displayStreamRef.current = stream;
@@ -314,7 +314,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         ref={videoRef}
         autoPlay
         playsInline
-        muted
+        muted={true} // 🔥 FIX: Explicitly mute display video to prevent audio feedback
         className="absolute inset-0 w-full h-full object-cover"
       />
       

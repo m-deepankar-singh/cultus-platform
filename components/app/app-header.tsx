@@ -12,6 +12,7 @@ import { AnimatedButton } from "@/components/ui/animated-button"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import gsap from "gsap"
+import { useLogout } from "@/hooks/use-logout"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ export function AppHeader() {
   const pathname = usePathname()
   const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const { logout } = useLogout()
   
   useEffect(() => {
     setMounted(true)
@@ -163,8 +165,8 @@ export function AppHeader() {
                 <span>Help Center</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/auth/logout">Log out</Link>
+              <DropdownMenuItem onClick={() => logout('student')}>
+                Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
