@@ -35,10 +35,9 @@ import { EditLearnerDialog } from "./edit-learner-dialog"
 import { DataPagination } from "@/components/ui/data-pagination"
 import { BulkUploadDialog } from "./bulk-upload-dialog"
 import { ExportLearnersButton } from "./export-learners-button"
-
 interface LearnersTableClientProps {
   initialLearners: Learner[]
-  uniqueClients: string[]
+  clientOptions: Array<{ id: string; name: string }>
 }
 
 interface Client {
@@ -59,10 +58,9 @@ interface PaginatedResponse {
 // Constants
 const ITEMS_PER_PAGE = 20;
 
-export function LearnersTableClient({ initialLearners, uniqueClients }: LearnersTableClientProps) {
+export function LearnersTableClient({ initialLearners, clientOptions }: LearnersTableClientProps) {
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState("")
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [clientFilter, setClientFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
@@ -87,8 +85,21 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
   const [learnerToDelete, setLearnerToDelete] = useState<Learner | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   
+  // Debounced search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  
   const router = useRouter()
   const { toast } = useToast()
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1) // Reset to first page when search changes
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   // Fetch learners with pagination and filters
   const fetchLearners = async () => {
@@ -142,16 +153,6 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
     fetchLearners()
   }, [currentPage, debouncedSearchTerm, clientFilter, statusFilter])
   
-  // Debounce search term to avoid too many API calls
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm)
-      setCurrentPage(1) // Reset to first page when search changes
-    }, 500)
-    
-    return () => clearTimeout(timer)
-  }, [searchTerm])
-
   // Fetch all clients for the edit dialog
   useEffect(() => {
     const fetchAllClients = async () => {
@@ -312,8 +313,8 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Clients</SelectItem>
-                  {uniqueClients.map(client => (
-                    <SelectItem key={client} value={client}>{client}</SelectItem>
+                  {clientOptions.map(client => (
+                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

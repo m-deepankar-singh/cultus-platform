@@ -39,7 +39,13 @@ export interface Learner {
   }
 }
 
-// Server Component to fetch uniqueClients data
+// Type for client objects
+export interface ClientOption {
+  id: string
+  name: string
+}
+
+// Server Component to fetch client options for filtering
 async function LearnersTableServer() {
   const supabase = await createClient()
   
@@ -53,21 +59,21 @@ async function LearnersTableServer() {
     throw new Error(`Failed to fetch clients: ${clientsError.message}`)
   }
   
-  // Get unique client names for filter dropdown
-  const uniqueClients = Array.from(new Set((clientsData || []).map(c => c.name)))
+  // Return client objects with both id and name for filter dropdown
+  const clientOptions = (clientsData || []).map(c => ({ id: c.id, name: c.name }))
   
   // Return empty initial learners array (will be fetched client-side with pagination)
-  // and the uniqueClients list for filters
-  return { learners: [], uniqueClients }
+  // and the client options list for filters
+  return { learners: [], clientOptions }
 }
 
 // Main component using Suspense for data loading
 export async function LearnersTable() {
-  const { learners, uniqueClients } = await LearnersTableServer()
+  const { learners, clientOptions } = await LearnersTableServer()
   
   return (
     <Card>
-      <LearnersTableClient initialLearners={learners} uniqueClients={uniqueClients} />
+      <LearnersTableClient initialLearners={learners} clientOptions={clientOptions} />
     </Card>
   )
 }
