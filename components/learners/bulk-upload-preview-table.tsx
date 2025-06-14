@@ -21,6 +21,7 @@ interface LearnerUploadData {
   client_id: string
   client_name?: string // Add this for display in the table
   is_active: boolean
+  job_readiness_background_type: string
   _errors?: Record<string, string>
 }
 
@@ -52,6 +53,7 @@ export function BulkUploadPreviewTable({ learners }: BulkUploadPreviewTableProps
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
             <TableHead>Client</TableHead>
+            <TableHead>Background</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Validation</TableHead>
           </TableRow>
@@ -63,6 +65,7 @@ export function BulkUploadPreviewTable({ learners }: BulkUploadPreviewTableProps
               <TableCell>{learner.email}</TableCell>
               <TableCell>{learner.phone_number || "—"}</TableCell>
               <TableCell>{learner.client_name || "Unknown"}</TableCell>
+              <TableCell>{learner.job_readiness_background_type || "Missing"}</TableCell>
               <TableCell>
                 <Badge variant={learner.is_active ? "success" : "secondary"}>
                   {learner.is_active ? "Active" : "Inactive"}
@@ -101,7 +104,7 @@ export function BulkUploadPreviewTable({ learners }: BulkUploadPreviewTableProps
           {/* Show empty rows if current page isn't full to maintain layout */}
           {displayLearners.length < pageSize && Array.from({ length: pageSize - displayLearners.length }).map((_, i) => (
             <TableRow key={`empty-${i}`}>
-              <TableCell colSpan={6} className="h-10"></TableCell>
+              <TableCell colSpan={7} className="h-10"></TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -156,14 +156,18 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
   useEffect(() => {
     const fetchAllClients = async () => {
       try {
-        const response = await fetch("/api/admin/clients")
+        const response = await fetch("/api/admin/clients?pageSize=100") // Get more clients
         if (!response.ok) {
           throw new Error("Failed to fetch clients")
         }
-        const data = await response.json()
-        setAllClients(data)
+        const result = await response.json()
+        
+        // Handle paginated response format
+        const clientsData = Array.isArray(result) ? result : (result.data || [])
+        setAllClients(clientsData)
       } catch (error) {
         console.error("Error fetching clients:", error)
+        setAllClients([]) // Ensure it's always an array
         toast({
           variant: "destructive",
           title: "Error",
@@ -346,6 +350,7 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
               <TableHead>Temporary Password</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Client</TableHead>
+              <TableHead>Background</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Enrolled</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -354,13 +359,13 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   Loading learners...
                 </TableCell>
               </TableRow>
             ) : learners.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   No learners found.
                 </TableCell>
               </TableRow>
@@ -398,6 +403,15 @@ export function LearnersTableClient({ initialLearners, uniqueClients }: Learners
                     </TableCell>
                     <TableCell>{learner.phone_number || "—"}</TableCell>
                     <TableCell>{learner.client.name}</TableCell>
+                    <TableCell>
+                      {learner.job_readiness_background_type ? (
+                        <span className="text-sm">
+                          {learner.job_readiness_background_type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={learner.is_active ? "success" : "secondary"}>
                         {learner.is_active ? "Active" : "Inactive"}

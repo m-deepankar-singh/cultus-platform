@@ -46,6 +46,16 @@ const editLearnerSchema = z.object({
   phone_number: z.string().optional(),
   client_id: z.string().uuid(),
   is_active: z.boolean().default(true),
+  job_readiness_background_type: z.enum([
+    'none',
+    'ECONOMICS', 
+    'COMPUTER_SCIENCE', 
+    'MARKETING', 
+    'DESIGN', 
+    'HUMANITIES', 
+    'BUSINESS', 
+    'ENGINEERING'
+  ]).optional(),
 })
 
 type EditLearnerFormValues = z.infer<typeof editLearnerSchema>
@@ -62,7 +72,7 @@ export function EditLearnerDialog({
   isOpen,
   onClose,
   learner,
-  clients,
+  clients = [],
   onLearnerUpdated,
 }: EditLearnerDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -75,6 +85,7 @@ export function EditLearnerDialog({
     phone_number: learner.phone_number || "",
     client_id: learner.client_id,
     is_active: learner.is_active,
+    job_readiness_background_type: (learner.job_readiness_background_type as 'none' | 'ECONOMICS' | 'COMPUTER_SCIENCE' | 'MARKETING' | 'DESIGN' | 'HUMANITIES' | 'BUSINESS' | 'ENGINEERING' | undefined) || "none",
   }
   
   const form = useForm<EditLearnerFormValues>({
@@ -88,6 +99,11 @@ export function EditLearnerDialog({
     try {
       // Exclude email from the payload since it cannot be changed
       const { email, ...updateData } = data;
+      
+      // Handle the "none" value for background type
+      if (updateData.job_readiness_background_type === "none") {
+        updateData.job_readiness_background_type = undefined;
+      }
       
       const response = await fetch(`/api/admin/learners/${learner.id}`, {
         method: "PATCH",
@@ -197,13 +213,44 @@ export function EditLearnerDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {clients
+                      {(Array.isArray(clients) ? clients : [])
                         .filter(client => client.id && client.id.trim() !== '')
                         .map(client => (
                           <SelectItem key={client.id} value={client.id}>
                             {client.name}
                           </SelectItem>
                         ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="job_readiness_background_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Background Type (optional)</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select background type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="ECONOMICS">Economics</SelectItem>
+                      <SelectItem value="COMPUTER_SCIENCE">Computer Science</SelectItem>
+                      <SelectItem value="MARKETING">Marketing</SelectItem>
+                      <SelectItem value="DESIGN">Design</SelectItem>
+                      <SelectItem value="HUMANITIES">Humanities</SelectItem>
+                      <SelectItem value="BUSINESS">Business</SelectItem>
+                      <SelectItem value="ENGINEERING">Engineering</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

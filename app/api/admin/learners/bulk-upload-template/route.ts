@@ -54,14 +54,16 @@ export async function GET(request: Request) {
         email: 'john.doe@example.com',
         phone_number: '1234567890',
         client_id: clients && clients.length > 0 ? clients[0]?.id : '',
-        is_active: true
+        is_active: true,
+        job_readiness_background_type: 'COMPUTER_SCIENCE'
       },
       {
         full_name: 'Jane Smith',
         email: 'jane.smith@example.com',
         phone_number: '', // Example of optional field
         client_id: clients && clients.length > 0 ? clients[0]?.id : '',
-        is_active: true
+        is_active: true,
+        job_readiness_background_type: 'BUSINESS'
       }
     ];
     
@@ -77,14 +79,28 @@ export async function GET(request: Request) {
     const clientsSheet = utils.json_to_sheet(clientsReferenceData);
     utils.book_append_sheet(wb, clientsSheet, 'Clients Reference');
     
+    // Add background types reference sheet
+    const backgroundTypesData = [
+      { background_type: 'ECONOMICS', description: 'Economics background' },
+      { background_type: 'COMPUTER_SCIENCE', description: 'Computer Science background' },
+      { background_type: 'MARKETING', description: 'Marketing background' },
+      { background_type: 'DESIGN', description: 'Design background' },
+      { background_type: 'HUMANITIES', description: 'Humanities background' },
+      { background_type: 'BUSINESS', description: 'Business background' },
+      { background_type: 'ENGINEERING', description: 'Engineering background' }
+    ];
+    
+    const backgroundTypesSheet = utils.json_to_sheet(backgroundTypesData);
+    utils.book_append_sheet(wb, backgroundTypesSheet, 'Background Types');
+    
     // Add instructions sheet
     const instructionsData = [
-      { field: 'Field', description: 'Description', required: 'Required', example: 'Example' },
       { field: 'full_name', description: 'Full name of the learner', required: 'Yes', example: 'John Doe' },
-      { field: 'email', description: 'Email address of the learner', required: 'Yes', example: 'john.doe@example.com' },
+      { field: 'email', description: 'Email address of the learner', required: 'Yes', example: 'johndoe@example.com' },
       { field: 'phone_number', description: 'Phone number of the learner (no + prefix)', required: 'No', example: '1234567890' },
       { field: 'client_id', description: 'ID of the client (see Clients Reference sheet)', required: 'Yes', example: clients && clients.length > 0 ? clients[0]?.id : 'provide-a-valid-uuid' },
-      { field: 'is_active', description: 'Whether the learner is active (true/false)', required: 'Yes', example: 'true' }
+      { field: 'is_active', description: 'Whether the learner is active (true/false)', required: 'Yes', example: 'true' },
+      { field: 'job_readiness_background_type', description: 'Job readiness background type (see Background Types sheet)', required: 'Yes', example: 'COMPUTER_SCIENCE or BUSINESS' }
     ];
     
     const instructionsSheet = utils.json_to_sheet(instructionsData);

@@ -36,6 +36,15 @@ const formSchema = z.object({
   phone_number: z.string().optional(),
   client_id: z.string().uuid({ message: "Please select a client." }),
   is_active: z.boolean().default(true),
+  job_readiness_background_type: z.enum([
+    'ECONOMICS', 
+    'COMPUTER_SCIENCE', 
+    'MARKETING', 
+    'DESIGN', 
+    'HUMANITIES', 
+    'BUSINESS', 
+    'ENGINEERING'
+  ], { message: "Please select a background type." }),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -275,6 +284,32 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
                           No clients available
                         </SelectItem>
                       )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="job_readiness_background_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Background Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select background type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ECONOMICS">Economics</SelectItem>
+                      <SelectItem value="COMPUTER_SCIENCE">Computer Science</SelectItem>
+                      <SelectItem value="MARKETING">Marketing</SelectItem>
+                      <SelectItem value="DESIGN">Design</SelectItem>
+                      <SelectItem value="HUMANITIES">Humanities</SelectItem>
+                      <SelectItem value="BUSINESS">Business</SelectItem>
+                      <SelectItem value="ENGINEERING">Engineering</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

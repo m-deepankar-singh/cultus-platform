@@ -21,6 +21,15 @@ const LearnerSchema = z.object({
     z.string().transform(val => val.toLowerCase() === 'true').pipe(z.boolean()),
     z.number().transform(val => val === 1).pipe(z.boolean()),
   ]).default(true),
+  job_readiness_background_type: z.enum([
+    'ECONOMICS', 
+    'COMPUTER_SCIENCE', 
+    'MARKETING', 
+    'DESIGN', 
+    'HUMANITIES', 
+    'BUSINESS', 
+    'ENGINEERING'
+  ]),
 });
 
 type LearnerSchemaType = z.infer<typeof LearnerSchema>;
@@ -258,6 +267,7 @@ export async function PUT(request: Request) {
               client_id: finalLearnerData.client_id,
               is_active: finalLearnerData.is_active,
               temporary_password: randomPassword,
+              job_readiness_background_type: finalLearnerData.job_readiness_background_type,
             })
             .select('id, full_name, email') // Select only necessary fields for response
             .single();

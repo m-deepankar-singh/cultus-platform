@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     // 4. Build Supabase Query for paginated data
     let query = supabase
       .from('students')
-      .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, temporary_password, client:clients(id, name)');
+      .select('id, created_at, updated_at, client_id, is_active, full_name, email, phone_number, star_rating, last_login_at, temporary_password, job_readiness_background_type, client:clients(id, name)');
       
     // Apply search filter (case-insensitive on full_name and email)
     if (search) {
@@ -157,6 +157,15 @@ const CreateLearnerSchema = z.object({
   phone_number: z.string().optional().nullable(),
   client_id: z.string().uuid(),
   is_active: z.boolean().default(true),
+  job_readiness_background_type: z.enum([
+    'ECONOMICS', 
+    'COMPUTER_SCIENCE', 
+    'MARKETING', 
+    'DESIGN', 
+    'HUMANITIES', 
+    'BUSINESS', 
+    'ENGINEERING'
+  ]),
 })
 
 /**
@@ -254,7 +263,8 @@ export async function POST(request: Request) {
         phone_number: learnerData.phone_number,
         client_id: learnerData.client_id,
         is_active: learnerData.is_active,
-        temporary_password: randomPassword // Store the temporary password in the database
+        temporary_password: randomPassword, // Store the temporary password in the database
+        job_readiness_background_type: learnerData.job_readiness_background_type,
       })
       .select()
       .single()

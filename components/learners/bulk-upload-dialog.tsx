@@ -29,6 +29,7 @@ interface LearnerUploadData {
   phone_number?: string
   client_id: string
   is_active: boolean
+  job_readiness_background_type: string
   client_name?: string
   // Track validation errors for display
   _errors?: Record<string, string>

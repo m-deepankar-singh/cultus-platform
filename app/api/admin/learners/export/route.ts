@@ -145,7 +145,7 @@ export async function GET(request: Request) {
       // Fetch a batch of students with pagination
       let studentsQuery = supabase
         .from('students')
-        .select('id, full_name, email, phone_number, is_active, client_id, created_at, last_login_at')
+        .select('id, full_name, email, phone_number, is_active, client_id, created_at, last_login_at, job_readiness_background_type')
         .order('id', { ascending: true }) // Consistent ordering for pagination
         .range(offset, offset + BATCH_SIZE - 1); // Zero-based ranges
       
@@ -175,7 +175,8 @@ export async function GET(request: Request) {
         'Client Name': clientMap[student.client_id] || 'Unknown',
         'Learner Active Status': student.is_active ? 'Active' : 'Inactive',
         'Enrollment Date': student.created_at ? new Date(student.created_at).toLocaleDateString() : '',
-        'Last Login Date': student.last_login_at ? new Date(student.last_login_at).toLocaleDateString() : 'Never'
+        'Last Login Date': student.last_login_at ? new Date(student.last_login_at).toLocaleDateString() : 'Never',
+        'Job Readiness Background Type': student.job_readiness_background_type || 'Unknown'
       }));
       
       // Add this batch to our results
@@ -201,7 +202,8 @@ export async function GET(request: Request) {
       { field: 'Client Name', description: 'Name of the client the learner belongs to' },
       { field: 'Learner Active Status', description: 'Whether the learner is active (Active/Inactive)' },
       { field: 'Enrollment Date', description: 'Date the learner was enrolled in the system' },
-      { field: 'Last Login Date', description: 'Date the learner last logged in' }
+      { field: 'Last Login Date', description: 'Date the learner last logged in' },
+      { field: 'Job Readiness Background Type', description: 'Type of job readiness background' }
     ];
     
     const infoSheet = utils.json_to_sheet(infoData);

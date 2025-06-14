@@ -32,6 +32,7 @@ export interface Learner {
   star_rating: number | null
   last_login_at: string | null
   temporary_password: string | null
+  job_readiness_background_type: string | null
   client: {
     id: string
     name: string

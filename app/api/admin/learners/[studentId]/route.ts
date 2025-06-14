@@ -56,7 +56,7 @@ export async function GET(
     // 3. Fetch Learner Profile
     const { data: learnerProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('*, client:clients(id, name)')
+      .select('*, client:clients(id, name), job_readiness_background_type')
       .eq('id', studentId)
       .eq('role', 'Student' as UserRole) // Ensure it's a student profile
       .single();
@@ -138,6 +138,15 @@ const UpdateLearnerSchema = z.object({
   phone_number: z.string().optional().nullable(),
   client_id: z.string().uuid().optional(),
   is_active: z.boolean().optional(),
+  job_readiness_background_type: z.enum([
+    'ECONOMICS', 
+    'COMPUTER_SCIENCE', 
+    'MARKETING', 
+    'DESIGN', 
+    'HUMANITIES', 
+    'BUSINESS', 
+    'ENGINEERING'
+  ]).optional(),
 });
 
 /**

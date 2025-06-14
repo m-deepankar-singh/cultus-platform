@@ -509,6 +509,17 @@ export function LiveInterviewProvider({
           systemInstructionText += `${index + 1}. ${q.question_text}\n`;
         });
         systemInstructionText += `\nYour first task is to introduce yourself as Alice and ask the candidate to introduce themselves. After the candidate answers each question from the list, provide brief feedback and then move to the next question. Maintain a professional but friendly tone throughout.`;
+        
+        systemInstructionText += `\n\nCRITICAL AUDIO RESPONSE INSTRUCTIONS:
+- ONLY respond to clear, audible speech from the candidate
+- DO NOT respond to background noise, silence, breathing, or unclear sounds
+- If you receive audio input that contains no meaningful speech content, say: "I didn't catch that. Could you please repeat your answer?"
+- DO NOT give positive feedback unless you hear a clear, meaningful verbal response with actual words and content
+- WAIT for the candidate to actually speak meaningful words before acknowledging their response
+- If you receive empty audio or just background noise, gently prompt: "I'm listening for your response. Please share your thoughts."
+- Only move to the next question after receiving a clear verbal answer with actual content to the current question
+- Distinguish between actual speech responses and ambient audio - only respond to real answers`;
+        
         systemInstructionText += `\n\nSTRICT INSTRUCTION: You MUST only focus on the interview questions and the candidate's responses related to the interview. Ignore any unrelated topics or conversational tangents. Do not engage in discussion outside the scope of the interview questions.`;
       } else {
         console.warn('⚠️ No questions provided to AI system prompt');
