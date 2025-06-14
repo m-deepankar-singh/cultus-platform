@@ -1,9 +1,11 @@
-import { createClient } from './lib/supabase/middleware';
+import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
+import { getClaimsFromToken, isStudentActive, hasAnyRole, hasRequiredRole } from './lib/auth/jwt-utils';
 
-// Helper function to fetch profile data (similar to lib/supabase/utils, but adapted for middleware context)
-// Note: Consider moving role to app_metadata for performance to avoid this extra query.
+// DEPRECATED: Helper function to fetch profile data - REPLACED WITH JWT CLAIMS
+// Note: This function is kept for fallback purposes during migration
 async function getRoleFromProfile(supabase: any, userId: string): Promise<string | null> {
+  console.warn('getRoleFromProfile is deprecated. Using JWT claims fallback.');
   if (!userId) return null;
   try {
     const { data, error } = await supabase
@@ -25,8 +27,10 @@ async function getRoleFromProfile(supabase: any, userId: string): Promise<string
   }
 }
 
-// New helper function to check if user is a student by checking students table
+// DEPRECATED: Helper function to check if user is a student - REPLACED WITH JWT CLAIMS
+// Note: This function is kept for fallback purposes during migration
 async function isUserStudent(supabase: any, userId: string): Promise<boolean> {
+  console.warn('isUserStudent is deprecated. Using JWT claims fallback.');
   if (!userId) return false;
   try {
     const { data, error } = await supabase
@@ -96,7 +100,32 @@ function pathMatchesPattern(pathname: string, pattern: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  let { supabase, response: supabaseResponse } = createClient(request);
+  // Create supabaseResponse using the correct SSR pattern
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
   const { pathname } = request.nextUrl;
 
   // --- 1. Handle Logout --- 
@@ -104,28 +133,35 @@ export async function middleware(request: NextRequest) {
     await supabase.auth.signOut();
     
     const redirectUrl = request.nextUrl.clone();
-    
-    // Redirect to homepage after logout
     redirectUrl.pathname = '/';
-    
     redirectUrl.search = ''; // Clear any query params
-    // Ensure response cookies reflect the signOut operation
-    let redirectResponse = NextResponse.redirect(redirectUrl);
+    
+    const redirectResponse = NextResponse.redirect(redirectUrl);
     
     // Copy all cookies from supabaseResponse to redirectResponse
     supabaseResponse.cookies.getAll().forEach(cookie => {
-      redirectResponse.cookies.set(cookie.name, cookie.value);
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
     });
     
     return redirectResponse;
   }
 
-  // --- 2. Refresh Session (Essential) ---
-  // Use getUser instead of getSession for active user check
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  // --- 2. Get User Session (Following SSR Guidelines) ---
+  // IMPORTANT: DO NOT REMOVE auth.getUser() - Required for SSR
+  const { data: { user } } = await supabase.auth.getUser();
 
   // --- 3. Define Public and Protected Routes --- 
-  const publicPaths = ['/', '/admin/login', '/app/login', '/login', '/auth/forgot-password', '/auth/update-password', '/api/auth/callback', '/api/app/auth/login', '/api/admin/auth/login']; // Add any other public paths
+  const publicPaths = [
+    '/', 
+    '/admin/login', 
+    '/app/login', 
+    '/login', 
+    '/auth/forgot-password', 
+    '/auth/update-password', 
+    '/api/auth/callback', 
+    '/api/app/auth/login', 
+    '/api/admin/auth/login'
+  ];
   
   // Check if route is protected
   const isAdminRoute = pathname.startsWith('/admin') && !pathname.startsWith('/admin/login');
@@ -156,92 +192,101 @@ export async function middleware(request: NextRequest) {
     }
     
     redirectUrl.search = `redirectedFrom=${encodeURIComponent(pathname)}`; // Optional: pass redirect info
-    let redirectResponse = NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
     
     // Copy all cookies from supabaseResponse to redirectResponse
     supabaseResponse.cookies.getAll().forEach(cookie => {
-      redirectResponse.cookies.set(cookie.name, cookie.value);
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
     });
     
     return redirectResponse;
   }
 
-  // User is authenticated, check roles for specific routes
+  // --- 5. JWT-Based Role Authorization (OPTIMIZED - NO DATABASE QUERIES) ---
   if (user) {
-    // For student app routes, check students table
-    if (isAppRoute || isApiAppRoute) {
-      const isStudent = await isUserStudent(supabase, user.id);
-      if (!isStudent) {
-        const redirectUrl = request.nextUrl.clone();
-        // Redirect non-students away from student app
-        redirectUrl.pathname = '/admin/login';
-        let redirectResponse = NextResponse.redirect(redirectUrl);
-        
-        // Copy all cookies from supabaseResponse to redirectResponse
-        supabaseResponse.cookies.getAll().forEach(cookie => {
-          redirectResponse.cookies.set(cookie.name, cookie.value);
-        });
-        
-        return redirectResponse;
-      }
-      // Allow access to student routes for student users
-      return supabaseResponse;
-    }
+    // Get session to access JWT token
+    const { data: { session } } = await supabase.auth.getSession();
     
-    // For admin/staff routes, check profiles table
-    const role = await getRoleFromProfile(supabase, user.id);
-    
-    // Admin-only routes check
-    if (ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-      if (role !== 'Admin') {
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/admin/login';
-        let redirectResponse = NextResponse.redirect(redirectUrl);
-        
-        // Copy all cookies from supabaseResponse to redirectResponse
-        supabaseResponse.cookies.getAll().forEach(cookie => {
-          redirectResponse.cookies.set(cookie.name, cookie.value);
-        });
-        
-        return redirectResponse;
-      }
-    }
-    
-    // Admin and Staff routes check
-    if (ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-      if (role !== 'Admin' && role !== 'Staff') {
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/admin/login';
-        let redirectResponse = NextResponse.redirect(redirectUrl);
-        
-        // Copy all cookies from supabaseResponse to redirectResponse
-        supabaseResponse.cookies.getAll().forEach(cookie => {
-          redirectResponse.cookies.set(cookie.name, cookie.value);
-        });
-        
-        return redirectResponse;
-      }
-    }
-    
-    // Legacy admin route check
-          if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-        if (role !== 'Admin') {
+    if (session?.access_token) {
+      // Extract claims from JWT token - NO DATABASE QUERIES NEEDED!
+      const claims = getClaimsFromToken(session.access_token);
+      
+      // For student app routes, check JWT claims instead of database
+      if (isAppRoute || isApiAppRoute) {
+        const isActiveStudent = isStudentActive(session.access_token);
+        if (!isActiveStudent) {
           const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/admin/login';
-        let redirectResponse = NextResponse.redirect(redirectUrl);
-        
-        // Copy all cookies from supabaseResponse to redirectResponse
-        supabaseResponse.cookies.getAll().forEach(cookie => {
-          redirectResponse.cookies.set(cookie.name, cookie.value);
-        });
-        
-        return redirectResponse;
+          redirectUrl.pathname = '/admin/login';
+          
+          const redirectResponse = NextResponse.redirect(redirectUrl);
+          
+          // Copy all cookies from supabaseResponse to redirectResponse
+          supabaseResponse.cookies.getAll().forEach(cookie => {
+            redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+          });
+          
+          return redirectResponse;
+        }
+        // Allow access to student routes for student users
+        return supabaseResponse;
+      }
+      
+      // Admin-only routes check using JWT claims
+      if (ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+        if (!hasRequiredRole(session.access_token, 'Admin')) {
+          const redirectUrl = request.nextUrl.clone();
+          redirectUrl.pathname = '/admin/login';
+          
+          const redirectResponse = NextResponse.redirect(redirectUrl);
+          
+          // Copy all cookies from supabaseResponse to redirectResponse
+          supabaseResponse.cookies.getAll().forEach(cookie => {
+            redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+          });
+          
+          return redirectResponse;
+        }
+      }
+      
+      // Admin and Staff routes check using JWT claims
+      if (ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+        if (!hasAnyRole(session.access_token, ['Admin', 'Staff'])) {
+          const redirectUrl = request.nextUrl.clone();
+          redirectUrl.pathname = '/admin/login';
+          
+          const redirectResponse = NextResponse.redirect(redirectUrl);
+          
+          // Copy all cookies from supabaseResponse to redirectResponse
+          supabaseResponse.cookies.getAll().forEach(cookie => {
+            redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+          });
+          
+          return redirectResponse;
+        }
+      }
+      
+      // Legacy admin route check using JWT claims
+      if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
+        if (!hasRequiredRole(session.access_token, 'Admin')) {
+          const redirectUrl = request.nextUrl.clone();
+          redirectUrl.pathname = '/admin/login';
+          
+          const redirectResponse = NextResponse.redirect(redirectUrl);
+          
+          // Copy all cookies from supabaseResponse to redirectResponse
+          supabaseResponse.cookies.getAll().forEach(cookie => {
+            redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+          });
+          
+          return redirectResponse;
+        }
       }
     }
   }
 
-  // --- 5. Return Response --- 
-  // If no redirect happened, return the response potentially modified by ssr
+  // --- 6. Return Response (Following SSR Guidelines) ---
+  // IMPORTANT: You *must* return the supabaseResponse object as it is.
+  // This ensures proper session management and cookie synchronization.
   return supabaseResponse;
 }
 
