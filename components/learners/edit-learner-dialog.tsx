@@ -53,8 +53,11 @@ const editLearnerSchema = z.object({
     'MARKETING', 
     'DESIGN', 
     'HUMANITIES', 
-    'BUSINESS', 
-    'ENGINEERING'
+    'BUSINESS_ADMINISTRATION', 
+    'DATA_SCIENCE',
+    'ENGINEERING',
+    'HEALTHCARE',
+    'OTHER'
   ]).optional(),
 })
 
@@ -85,7 +88,7 @@ export function EditLearnerDialog({
     phone_number: learner.phone_number || "",
     client_id: learner.client_id,
     is_active: learner.is_active,
-    job_readiness_background_type: (learner.job_readiness_background_type as 'none' | 'ECONOMICS' | 'COMPUTER_SCIENCE' | 'MARKETING' | 'DESIGN' | 'HUMANITIES' | 'BUSINESS' | 'ENGINEERING' | undefined) || "none",
+    job_readiness_background_type: (learner.job_readiness_background_type as 'none' | 'ECONOMICS' | 'COMPUTER_SCIENCE' | 'MARKETING' | 'DESIGN' | 'HUMANITIES' | 'BUSINESS_ADMINISTRATION' | 'DATA_SCIENCE' | 'ENGINEERING' | 'HEALTHCARE' | 'OTHER' | undefined) || "none",
   }
   
   const form = useForm<EditLearnerFormValues>({
@@ -249,8 +252,11 @@ export function EditLearnerDialog({
                       <SelectItem value="MARKETING">Marketing</SelectItem>
                       <SelectItem value="DESIGN">Design</SelectItem>
                       <SelectItem value="HUMANITIES">Humanities</SelectItem>
-                      <SelectItem value="BUSINESS">Business</SelectItem>
+                      <SelectItem value="BUSINESS_ADMINISTRATION">Business Administration</SelectItem>
+                      <SelectItem value="DATA_SCIENCE">Data Science</SelectItem>
                       <SelectItem value="ENGINEERING">Engineering</SelectItem>
+                      <SelectItem value="HEALTHCARE">Healthcare</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

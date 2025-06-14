@@ -42,8 +42,11 @@ const formSchema = z.object({
     'MARKETING', 
     'DESIGN', 
     'HUMANITIES', 
-    'BUSINESS', 
-    'ENGINEERING'
+    'BUSINESS_ADMINISTRATION', 
+    'DATA_SCIENCE',
+    'ENGINEERING',
+    'HEALTHCARE',
+    'OTHER'
   ], { message: "Please select a background type." }),
 })
 
@@ -308,8 +311,11 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
                       <SelectItem value="MARKETING">Marketing</SelectItem>
                       <SelectItem value="DESIGN">Design</SelectItem>
                       <SelectItem value="HUMANITIES">Humanities</SelectItem>
-                      <SelectItem value="BUSINESS">Business</SelectItem>
+                      <SelectItem value="BUSINESS_ADMINISTRATION">Business Administration</SelectItem>
+                      <SelectItem value="DATA_SCIENCE">Data Science</SelectItem>
                       <SelectItem value="ENGINEERING">Engineering</SelectItem>
+                      <SelectItem value="HEALTHCARE">Healthcare</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

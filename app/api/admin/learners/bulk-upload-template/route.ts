@@ -63,7 +63,7 @@ export async function GET(request: Request) {
         phone_number: '', // Example of optional field
         client_id: clients && clients.length > 0 ? clients[0]?.id : '',
         is_active: true,
-        job_readiness_background_type: 'BUSINESS'
+        job_readiness_background_type: 'BUSINESS_ADMINISTRATION'
       }
     ];
     
@@ -86,8 +86,11 @@ export async function GET(request: Request) {
       { background_type: 'MARKETING', description: 'Marketing background' },
       { background_type: 'DESIGN', description: 'Design background' },
       { background_type: 'HUMANITIES', description: 'Humanities background' },
-      { background_type: 'BUSINESS', description: 'Business background' },
-      { background_type: 'ENGINEERING', description: 'Engineering background' }
+      { background_type: 'BUSINESS_ADMINISTRATION', description: 'Business Administration background' },
+      { background_type: 'DATA_SCIENCE', description: 'Data Science background' },
+      { background_type: 'ENGINEERING', description: 'Engineering background' },
+      { background_type: 'HEALTHCARE', description: 'Healthcare background' },
+      { background_type: 'OTHER', description: 'Other background' }
     ];
     
     const backgroundTypesSheet = utils.json_to_sheet(backgroundTypesData);
@@ -100,7 +103,7 @@ export async function GET(request: Request) {
       { field: 'phone_number', description: 'Phone number of the learner (no + prefix)', required: 'No', example: '1234567890' },
       { field: 'client_id', description: 'ID of the client (see Clients Reference sheet)', required: 'Yes', example: clients && clients.length > 0 ? clients[0]?.id : 'provide-a-valid-uuid' },
       { field: 'is_active', description: 'Whether the learner is active (true/false)', required: 'Yes', example: 'true' },
-      { field: 'job_readiness_background_type', description: 'Job readiness background type (see Background Types sheet)', required: 'Yes', example: 'COMPUTER_SCIENCE or BUSINESS' }
+      { field: 'job_readiness_background_type', description: 'Job readiness background type (see Background Types sheet)', required: 'Yes', example: 'COMPUTER_SCIENCE or BUSINESS_ADMINISTRATION' }
     ];
     
     const instructionsSheet = utils.json_to_sheet(instructionsData);

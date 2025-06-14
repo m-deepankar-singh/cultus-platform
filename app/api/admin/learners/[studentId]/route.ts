@@ -144,8 +144,11 @@ const UpdateLearnerSchema = z.object({
     'MARKETING', 
     'DESIGN', 
     'HUMANITIES', 
-    'BUSINESS', 
-    'ENGINEERING'
+    'BUSINESS_ADMINISTRATION', 
+    'DATA_SCIENCE',
+    'ENGINEERING',
+    'HEALTHCARE',
+    'OTHER'
   ]).optional(),
 });
 
