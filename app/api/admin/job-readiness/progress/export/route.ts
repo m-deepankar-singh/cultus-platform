@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/progress/export
@@ -7,34 +8,19 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
     const url = new URL(req.url);
     
     // Extract query parameters for filtering
     const productId = url.searchParams.get('productId');
     const clientId = url.searchParams.get('clientId');
     const format = url.searchParams.get('format') || 'csv'; // csv or xlsx
-    
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role - use case insensitive comparison
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
 
     // Build the query to get all student data for export (no pagination)
     let query = supabase

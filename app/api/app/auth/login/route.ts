@@ -1,3 +1,5 @@
+// This login route is intentionally left as-is since it's the endpoint that creates the JWT authentication session
+// No JWT authentication optimization needed here as this endpoint handles the login process itself
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { AppLoginSchema } from '@/lib/schemas/auth';

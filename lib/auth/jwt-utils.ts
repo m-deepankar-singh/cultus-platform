@@ -5,7 +5,7 @@
  * for database queries in middleware and components.
  */
 
-interface CustomJWTClaims {
+export interface CustomJWTClaims {
   // From profiles table
   user_role?: 'Admin' | 'Staff' | 'Client Staff' | 'student';
   client_id?: string;

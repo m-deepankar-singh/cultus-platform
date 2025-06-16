@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define the expected structure of the client data
 interface Client {
@@ -27,19 +27,15 @@ export async function GET(
   request: Request,
   context: { params: { productId: string } }
 ) {
+  // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+  const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+  const { user, claims, supabase } = authResult;
+
   // Properly await the params object
   const params = await context.params;
-  const { profile, role, error: authError } = await getUserSessionAndRole();
-
-  if (authError || !profile || !role) {
-    console.error('GET /api/admin/products/[productId]/clients Auth Error:', authError?.message);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Admins and Staff are allowed
-  if (!['Admin', 'Staff'].includes(role)) {
-    return NextResponse.json({ error: 'Forbidden: Access denied for this role.' }, { status: 403 });
-  }
 
   // Validate productId
   const productIdSchema = z.object({
@@ -59,9 +55,6 @@ export async function GET(
 
   // Admin or authorized Staff can proceed
   try {
-    // Create supabase client for this request
-    const supabase = await createClient();
-
     // Query to fetch clients assigned to this product via client_product_assignments
     const { data: assignments, error: dbError } = await supabase
       .from('client_product_assignments')

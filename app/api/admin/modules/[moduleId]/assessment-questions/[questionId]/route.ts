@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema } from '@/lib/schemas/module';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Create a QuestionIdSchema directly following the same pattern as ModuleIdSchema
 const QuestionIdSchema = z.object({
@@ -22,21 +23,13 @@ export async function DELETE(
     // Await params to ensure moduleId and questionId are available
     const { moduleId: rawModuleId, questionId: rawQuestionId } = await params;
     
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, message: 'Authentication required' }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Validate route parameters
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });

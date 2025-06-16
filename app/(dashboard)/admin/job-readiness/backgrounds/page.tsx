@@ -219,6 +219,7 @@ export default function JobReadinessBackgroundsPage() {
         open={isFormOpen}
         onOpenChange={handleFormClose}
         background={editingBackground}
+        existingBackgrounds={backgrounds}
         onSubmit={handleSubmit}
         isLoading={isSubmitting}
       />

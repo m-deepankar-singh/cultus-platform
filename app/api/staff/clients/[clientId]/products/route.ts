@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { ProductAssignmentSchema } from '@/lib/schemas/assignment';
 import type { Product, ClientProductAssignment } from '@/lib/types/supabase';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define the expected structure of the assignment data including the joined product
 type AssignmentWithProduct = {
@@ -23,17 +23,13 @@ export async function GET(
 ) {
   // Properly await the params object
   const params = await context.params;
-  const { profile, role, error: authError } = await getUserSessionAndRole();
 
-  if (authError || !profile || !role) {
-    console.error('GET /api/staff/clients/[clientId]/products Auth Error:', authError?.message);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // JWT-based authentication (0 database queries)
+  const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
-
-  // Admins and Staff are allowed
-  if (!['Admin', 'Staff'].includes(role)) {
-    return NextResponse.json({ error: 'Forbidden: Access denied for this role.' }, { status: 403 });
-  }
+  const { user, claims, supabase } = authResult;
 
   // Validate clientId from route params
   const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
@@ -49,9 +45,6 @@ export async function GET(
 
   // Admin or Staff can proceed
   try {
-    // Create supabase client for this request
-    const supabase = await createClient();
-
     // Verify client exists first (good practice)
     const { data: clientExists, error: clientCheckError } = await supabase
       .from('clients')
@@ -68,8 +61,7 @@ export async function GET(
     const { data: assignments, error: dbError } = await supabase
       .from('client_product_assignments')
       .select('created_at, product:products(*)')
-      .eq('client_id', validatedClientId)
-      .returns<AssignmentWithProduct[]>();
+      .eq('client_id', validatedClientId);
 
     if (dbError) {
       console.error('Error fetching client product assignments:', dbError);
@@ -101,18 +93,12 @@ export async function POST(
   // Properly await the params object
   const params = await context.params;
   
-  // Authenticate and authorize the user
-  const { profile, role, error: authError } = await getUserSessionAndRole();
-
-  if (authError || !profile || !role) {
-    console.error('POST /api/staff/clients/[clientId]/products Auth Error:', authError?.message);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // JWT-based authentication (0 database queries)
+  const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
-
-  // Only Admins and Staff are allowed
-  if (!['Admin', 'Staff'].includes(role)) {
-    return NextResponse.json({ error: 'Forbidden: Access denied for this role' }, { status: 403 });
-  }
+  const { user, claims, supabase } = authResult;
   
   // Validate clientId from route params
   const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
@@ -145,8 +131,7 @@ export async function POST(
     
     const { product_id } = bodyValidation.data;
     
-    // Create Supabase client
-    const supabase = await createClient();
+    // Supabase client already available from authResult
     
     // Verify product exists first (optional but good practice)
     const { data: productExists, error: productCheckError } = await supabase

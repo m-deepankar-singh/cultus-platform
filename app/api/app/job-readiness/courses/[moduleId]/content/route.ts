@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 // Import the actual quiz generator implementation
 import { generateQuizForLesson, transformQuestionsForClient, getFallbackQuestions } from '@/lib/ai/quiz-generator';
 
@@ -88,43 +89,35 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function GET(
   request: NextRequest,
-  context: { params: { moduleId: string } }
+  context: { params: Promise<{ moduleId: string }> }
 ) {
   try {
-    const { params } = context;
+    const params = await context.params;
     const { moduleId } = params;
     
     if (!moduleId) {
       return NextResponse.json({ error: 'Module ID is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (replaces getUser() + student record lookup)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    // Get student information including tier and authentication details
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
-      .select('id, client_id, job_readiness_tier, job_readiness_star_level, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (studentError || !studentData) {
-      console.error('Error fetching student:', studentError);
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
-    }
-
-    if (!studentData.is_active) {
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
       return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
     }
 
-    const studentTier = studentData.job_readiness_tier || 'BRONZE';
+    // Get client_id and tier from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    const studentTier = claims.job_readiness_tier || 'BRONZE';
+    
+    if (!clientId) {
+      return NextResponse.json({ error: 'Student not linked to a client' }, { status: 403 });
+    }
 
     // Fetch Course Module Details with Job Readiness verification
     const { data: moduleData, error: moduleError } = await supabase
@@ -162,7 +155,7 @@ export async function GET(
     const { count, error: assignmentError } = await supabase
       .from('client_product_assignments')
       .select('*', { count: 'exact', head: true })
-      .eq('client_id', studentData.client_id)
+      .eq('client_id', clientId)
       .eq('product_id', productData.id);
 
     if (assignmentError) {
@@ -239,7 +232,7 @@ export async function GET(
         // First, check if there are predefined quiz questions
         if (lesson.quiz_questions && Array.isArray(lesson.quiz_questions) && lesson.quiz_questions.length > 0) {
           // Use existing predefined quiz questions
-          clientQuizQuestions = lesson.quiz_questions.map(q => ({
+          clientQuizQuestions = lesson.quiz_questions.map((q: any) => ({
             id: q.id,
             question_text: q.question_text || q.text, // Handle both field name conventions
             options: q.options || [],

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema, CourseLessonSchema } from '@/lib/schemas/module';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 const LessonSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -29,11 +30,16 @@ export async function GET(
   { params }: { params: { moduleId: string } }
 ) {
   try {
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     // Await params before destructuring to fix Next.js warning
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId } = resolvedParams;
-    
-    const supabase = await createClient();
 
     // Check if the module exists and is a course
     const { data: module, error: moduleError } = await supabase
@@ -90,6 +96,13 @@ export async function POST(
   { params }: { params: { moduleId: string } }
 ) {
   try {
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     // Await params before destructuring to fix Next.js warning
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId } = resolvedParams;
@@ -107,51 +120,6 @@ export async function POST(
     
     console.log("Request body:", body);
     console.log("Module ID:", rawModuleId);
-    
-    const supabase = await createClient();
-    
-    // Get user info for debugging
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error("Error getting authenticated user:", userError);
-      return NextResponse.json(
-        { error: "Authentication error", details: userError.message },
-        { status: 401 }
-      );
-    }
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not authenticated" },
-        { status: 401 }
-      );
-    }
-    
-    console.log("Authenticated user ID:", user.id);
-    
-    // Check user role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    
-    if (profileError) {
-      console.error("Error getting user profile:", profileError);
-      return NextResponse.json(
-        { error: "Failed to verify user permissions", details: profileError.message },
-        { status: 403 }
-      );
-    }
-    
-    console.log("User role:", profile?.role);
-    
-    if (profile?.role !== 'Admin' && profile?.role !== 'admin') {
-      return NextResponse.json(
-        { error: "Insufficient permissions. Only admin users can create lessons." },
-        { status: 403 }
-      );
-    }
 
     // Validate the module exists and is a course
     const { data: module, error: moduleError } = await supabase
@@ -198,58 +166,54 @@ export async function POST(
     // Determine sequence number if not provided
     let sequence = result.data.sequence;
     if (!sequence) {
-      // Get highest sequence number and add 1
-      const { data: maxSequence, error: sequenceError } = await supabase
+      const { data: lastLesson, error: sequenceError } = await supabase
         .from("lessons")
         .select("sequence")
         .eq("module_id", rawModuleId)
         .order("sequence", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (sequenceError && sequenceError.code !== "PGRST116") {
-        // PGRST116 is "Results contain 0 rows" error, which is fine
-        console.error("Error getting max sequence:", sequenceError);
+      if (sequenceError) {
+        console.error("Error fetching last lesson sequence:", sequenceError);
         return NextResponse.json(
-          { error: "Failed to determine sequence number", details: sequenceError.message },
+          { error: "Failed to determine lesson sequence" },
           { status: 500 }
         );
       }
 
-      sequence = maxSequence ? maxSequence.sequence + 1 : 1;
+      sequence = (lastLesson?.sequence || 0) + 1;
     }
-    
-    console.log("Inserting lesson with sequence:", sequence);
 
-    // Insert the lesson
-    const { data: newLesson, error: insertError } = await supabase
+    // Create the lesson
+    const { data: createdLesson, error: createError } = await supabase
       .from("lessons")
       .insert({
-        module_id: rawModuleId,
         title: result.data.title,
         description: result.data.description,
         video_url: result.data.video_url,
-        sequence: sequence,
+        sequence,
+        module_id: rawModuleId,
         has_quiz: result.data.has_quiz || false,
-        quiz_questions: result.data.has_quiz && result.data.quiz_questions ? 
-          result.data.quiz_questions : null
+        quiz_questions: result.data.quiz_questions || []
       })
       .select()
       .single();
 
-    if (insertError) {
-      console.error("Error inserting lesson:", insertError);
+    if (createError) {
+      console.error("Error creating lesson:", createError);
       return NextResponse.json(
-        { error: "Failed to create lesson", details: insertError.message },
+        { error: "Failed to create lesson", details: createError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(newLesson, { status: 201 });
+    return NextResponse.json(createdLesson, { status: 201 });
+
   } catch (error) {
     console.error("Error creating lesson:", error);
     return NextResponse.json(
-      { error: "Failed to create lesson", details: error instanceof Error ? error.message : String(error) },
+      { error: "Failed to create lesson" },
       { status: 500 }
     );
   }

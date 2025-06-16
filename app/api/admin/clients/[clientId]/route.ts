@@ -1,32 +1,37 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
+import { createClient } from '@/lib/supabase/server';
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
-export async function GET(request: Request, { params }: { params: { clientId: string } }) {
+/**
+ * GET /api/admin/clients/[clientId]
+ * 
+ * Retrieves a specific client by ID
+ * Accessible only by users with 'Admin' role
+ * 
+ * OPTIMIZATIONS APPLIED:
+ * ✅ JWT-based authentication (eliminates 1 DB query per request)
+ * ✅ Specific column selection (reduces data transfer)
+ * ✅ Performance monitoring
+ */
+export async function GET(request: Request, context: { params: { clientId: string } }) {
+  const startTime = Date.now();
+  
   try {
-    const supabase = await createClient();
-
-    // 1. Get user session and role (Admin check)
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const { supabase } = authResult;
 
-    if (profileError || !profile || profile.role !== 'Admin') {
-        console.error('Forbidden GET [clientId] attempt or profile issue:', profileError || 'Profile not found or not Admin');
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    // 2. Await params before using
+    const params = await context.params;
 
-    // --- User is authenticated and is an Admin, proceed ---
-
-    // 2. Validate route parameter
+    // 3. Validate route parameter
     const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
     if (!validationResult.success) {
         console.error('Validation Error (clientId):', validationResult.error.errors);
@@ -34,29 +39,31 @@ export async function GET(request: Request, { params }: { params: { clientId: st
     }
     const { clientId } = validationResult.data;
 
-    // 3. Fetch client details
+    // 4. Fetch client details (OPTIMIZED - specific column selection)
     const { data: client, error: dbError } = await supabase
       .from('clients')
-      .select('*') // Adjust columns as needed
+      .select(SELECTORS.CLIENT.DETAIL) // Instead of select('*')
       .eq('id', clientId)
       .single();
 
     if (dbError) {
         // Check if the error is because the client was not found
-        if (dbError.code === 'PGRST116') { // PostgREST code for "Fetched row contains unexpected number of rows"
+        if (dbError.code === 'PGRST116') {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });
         }
-        // Otherwise, it's a different database error
         console.error('Supabase DB Error (Fetch Client):', dbError);
         return NextResponse.json({ error: 'Failed to fetch client', details: dbError.message }, { status: 500 });
     }
 
-    // Double-check if client is null even without an error (should be caught by PGRST116, but belt-and-suspenders)
     if (!client) {
         return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
 
-    // 4. Return client data
+    // 5. Performance monitoring
+    const responseTime = Date.now() - startTime;
+    console.log(`[OPTIMIZED] GET /api/admin/clients/${clientId} completed in ${responseTime}ms (JWT auth + selective fields)`);
+
+    // 6. Return client data
     return NextResponse.json(client, { status: 200 });
 
   } catch (error) {
@@ -65,31 +72,34 @@ export async function GET(request: Request, { params }: { params: { clientId: st
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { clientId: string } }) {
+/**
+ * PUT /api/admin/clients/[clientId]
+ * 
+ * Updates a specific client by ID
+ * Accessible only by users with 'Admin' role
+ * 
+ * OPTIMIZATIONS APPLIED:
+ * ✅ JWT-based authentication (eliminates 1 DB query per request)
+ * ✅ Specific column selection for response
+ * ✅ Performance monitoring
+ */
+export async function PUT(request: Request, context: { params: { clientId: string } }) {
+    const startTime = Date.now();
+    
     try {
-        const supabase = await createClient();
-
-        // 1. Get user session and role (Admin check)
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
+        const authResult = await authenticateApiRequest(['Admin']);
+        
+        if ('error' in authResult) {
+          return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
 
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        const { supabase } = authResult;
 
-        if (profileError || !profile || profile.role !== 'Admin') {
-            console.error('Forbidden PUT [clientId] attempt or profile issue:', profileError || 'Profile not found or not Admin');
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
+        // 2. Await params before using
+        const params = await context.params;
 
-        // --- User is authenticated and is an Admin, proceed ---
-
-        // 2. Validate route parameter
+        // 3. Validate route parameter
         const paramValidation = ClientIdSchema.safeParse({ clientId: params.clientId });
         if (!paramValidation.success) {
             console.error('Validation Error (clientId):', paramValidation.error.errors);
@@ -97,7 +107,7 @@ export async function PUT(request: Request, { params }: { params: { clientId: st
         }
         const { clientId } = paramValidation.data;
 
-        // 3. Parse and validate request body
+        // 4. Parse and validate request body
         let body;
         try {
             body = await request.json();
@@ -118,30 +128,31 @@ export async function PUT(request: Request, { params }: { params: { clientId: st
              return NextResponse.json({ error: 'No update data provided' }, { status: 400 });
         }
 
-        // 4. Update client in database
+        // 5. Update client in database (OPTIMIZED - specific column selection)
         const { data: updatedClient, error: dbError } = await supabase
             .from('clients')
             .update(updateData)
             .eq('id', clientId)
-            .select()
+            .select(SELECTORS.CLIENT.DETAIL) // Instead of select()
             .single();
 
         if (dbError) {
-            // Check if the error is because the client was not found to update
-            if (dbError.code === 'PGRST116') { // Should catch if .eq finds 0 rows
+            if (dbError.code === 'PGRST116') {
                 return NextResponse.json({ error: 'Client not found' }, { status: 404 });
             }
-            // Other database errors (e.g., constraints)
             console.error('Supabase DB Error (Update Client):', dbError);
             return NextResponse.json({ error: 'Failed to update client', details: dbError.message }, { status: 500 });
         }
 
-        // If Supabase returns null even without error (though PGRST116 should cover this)
         if (!updatedClient) {
              return NextResponse.json({ error: 'Client not found after update attempt' }, { status: 404 });
         }
 
-        // 5. Return the updated client
+        // 6. Performance monitoring
+        const responseTime = Date.now() - startTime;
+        console.log(`[OPTIMIZED] PUT /api/admin/clients/${clientId} completed in ${responseTime}ms (JWT auth + selective fields)`);
+
+        // 7. Return the updated client
         return NextResponse.json(updatedClient, { status: 200 });
 
     } catch (error) {
@@ -150,31 +161,33 @@ export async function PUT(request: Request, { params }: { params: { clientId: st
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: { clientId: string } }) {
+/**
+ * DELETE /api/admin/clients/[clientId]
+ * 
+ * Deletes a specific client by ID
+ * Accessible only by users with 'Admin' role
+ * 
+ * OPTIMIZATIONS APPLIED:
+ * ✅ JWT-based authentication (eliminates 1 DB query per request)
+ * ✅ Performance monitoring
+ */
+export async function DELETE(request: Request, context: { params: { clientId: string } }) {
+    const startTime = Date.now();
+    
     try {
-        const supabase = await createClient();
-
-        // 1. Get user session and role (Admin check)
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
+        const authResult = await authenticateApiRequest(['Admin']);
+        
+        if ('error' in authResult) {
+          return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
 
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        const { supabase } = authResult;
 
-        if (profileError || !profile || profile.role !== 'Admin') {
-            console.error('Forbidden DELETE [clientId] attempt or profile issue:', profileError || 'Profile not found or not Admin');
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
+        // 2. Await params before using
+        const params = await context.params;
 
-        // --- User is authenticated and is an Admin, proceed ---
-
-        // 2. Validate route parameter
+        // 3. Validate route parameter
         const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
         if (!validationResult.success) {
             console.error('Validation Error (clientId):', validationResult.error.errors);
@@ -182,28 +195,22 @@ export async function DELETE(request: Request, { params }: { params: { clientId:
         }
         const { clientId } = validationResult.data;
 
-        // 3. Perform deletion
-        // Note: Dependencies (users, assignments etc.) should ideally be handled
-        // by database constraints (ON DELETE CASCADE/SET NULL) or specific cleanup logic elsewhere.
-        // This handler only attempts to delete the client record itself.
+        // 4. Perform deletion
         const { error: dbError } = await supabase
             .from('clients')
             .delete()
             .eq('id', clientId);
 
         if (dbError) {
-            // We don't typically expect a 404 equivalent on DELETE unless checking existence first.
-            // Supabase delete doesn't error if the row doesn't exist, it just affects 0 rows.
-            // Handle potential foreign key constraint errors or other DB issues.
             console.error('Supabase DB Error (Delete Client):', dbError);
-            // Check for specific constraint violation codes if needed
-            // if (dbError.code === '23503') { // foreign_key_violation
-            //     return NextResponse.json({ error: 'Cannot delete client due to existing dependencies.', details: dbError.message }, { status: 409 }); // 409 Conflict
-            // }
             return NextResponse.json({ error: 'Failed to delete client', details: dbError.message }, { status: 500 });
         }
 
-        // 4. Return success (204 No Content)
+        // 5. Performance monitoring
+        const responseTime = Date.now() - startTime;
+        console.log(`[OPTIMIZED] DELETE /api/admin/clients/${clientId} completed in ${responseTime}ms (JWT auth)`);
+
+        // 6. Return success (204 No Content)
         return new Response(null, { status: 204 });
 
     } catch (error) {

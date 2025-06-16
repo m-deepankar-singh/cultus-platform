@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authenticateApiRequest } from "@/lib/auth/api-auth";
 
 // Simulated database query - replace with actual database query in production
 async function fetchAnalyticsData() {
@@ -132,9 +133,17 @@ async function fetchAnalyticsData() {
 
 export async function GET() {
   try {
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
+    
     // In a real implementation, we'd:
-    // 1. Check user authentication and authorization (Admin/Staff/Viewer roles)
-    // 2. Query the database for real analytics data
+    // 1. ✅ User authentication and authorization completed (Admin/Staff roles verified)
+    // 2. Query the database for real analytics data based on user permissions
     // 3. Process and aggregate the data as needed
     
     const analyticsData = await fetchAnalyticsData();

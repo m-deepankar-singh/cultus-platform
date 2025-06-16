@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema, UpdateModuleSchema } from '@/lib/schemas/module';
 import { ModuleSchema } from "@/lib/schemas/module";
 import { z } from "zod";
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/modules/[moduleId]
@@ -15,23 +16,14 @@ export async function GET(
   { params }: { params: { moduleId: string } }
 ) {
   try {
-    const supabase = await createClient();
-    const paramsObj = await params;
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    const paramsObj = await params;
 
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
@@ -75,23 +67,14 @@ export async function PUT(
   { params }: { params: { moduleId: string } }
 ) {
   try {
-    const supabase = await createClient();
-    const paramsObj = await params;
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    const paramsObj = await params;
 
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
@@ -178,23 +161,14 @@ export async function PATCH(
   { params }: { params: { moduleId: string } }
 ) {
   try {
-    const supabase = await createClient();
-    const paramsObj = await params;
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    const paramsObj = await params;
 
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
@@ -227,24 +201,24 @@ export async function PATCH(
       );
     }
     
-    const moduleValidation = ModuleSchema.partial().safeParse(body);
-    if (!moduleValidation.success) {
+    const updateValidation = UpdateModuleSchema.safeParse(body);
+    if (!updateValidation.success) {
       return NextResponse.json(
         { 
           error: "Bad Request", 
-          message: "Invalid module data",
-          details: moduleValidation.error.format() 
+          message: "Invalid update data",
+          details: updateValidation.error.format() 
         },
         { status: 400 }
       );
     }
 
-    const validatedModuleData = moduleValidation.data;
+    const validatedUpdateData = updateValidation.data;
 
     const { data: updatedModule, error: updateError } = await supabase
       .from("modules")
       .update({
-        ...validatedModuleData,
+        ...validatedUpdateData,
         updated_at: new Date().toISOString()
       })
       .eq("id", paramsObj.moduleId)
@@ -281,23 +255,14 @@ export async function DELETE(
   { params }: { params: { moduleId: string } }
 ) {
   try {
-    const supabase = await createClient();
-    const paramsObj = await params;
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    const paramsObj = await params;
 
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: paramsObj.moduleId });
     if (!moduleIdValidation.success) {
@@ -307,54 +272,29 @@ export async function DELETE(
       );
     }
 
-    const { data: assessmentQuestions, error: assessmentError } = await supabase
-      .from("assessment_module_questions")
-      .select("module_id")
-      .eq("module_id", paramsObj.moduleId)
-      .limit(1);
+    // Check if module exists
+    const { data: existingModule, error: checkError } = await supabase
+      .from("modules")
+      .select("id")
+      .eq("id", paramsObj.moduleId)
+      .single();
       
-    if (assessmentError) {
-      console.error("Error checking assessment module questions:", assessmentError);
+    if (checkError) {
+      if (checkError.code === "PGRST116") {
+        return NextResponse.json(
+          { error: "Not Found", message: "Module not found" },
+          { status: 404 }
+        );
+      }
+      
+      console.error("Error checking module existence:", checkError);
       return NextResponse.json(
-        { error: "Server Error", message: "Error checking related data" },
+        { error: "Server Error", message: "Error checking if module exists" },
         { status: 500 }
       );
     }
-    
-    if (assessmentQuestions && assessmentQuestions.length > 0) {
-      return NextResponse.json(
-        { 
-          error: "Conflict", 
-          message: "Cannot delete module with existing assessment questions. Remove the questions first." 
-        },
-        { status: 409 }
-      );
-    }
-    
-    const { data: studentProgress, error: progressError } = await supabase
-      .from("student_module_progress")
-      .select("module_id")
-      .eq("module_id", paramsObj.moduleId)
-      .limit(1);
 
-    if (progressError) {
-      console.error("Error checking student module progress:", progressError);
-      return NextResponse.json(
-        { error: "Server Error", message: "Error checking student progress" },
-        { status: 500 }
-      );
-    }
-    
-    if (studentProgress && studentProgress.length > 0) {
-      return NextResponse.json(
-        { 
-          error: "Conflict", 
-          message: "Cannot delete module that has student progress data." 
-        },
-        { status: 409 }
-      );
-    }
-    
+    // Delete the module
     const { error: deleteError } = await supabase
       .from("modules")
       .delete()
@@ -368,10 +308,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json(
-      { message: "Module deleted successfully" },
-      { status: 200 }
-    );
+    return NextResponse.json({ message: "Module deleted successfully" });
 
   } catch (error) {
     console.error("Unexpected error in DELETE module:", error);

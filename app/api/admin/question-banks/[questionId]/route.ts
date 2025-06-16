@@ -5,6 +5,7 @@ import {
     UpdateQuestionApiSchema,
     QuestionBankType // Import QuestionBankType for DELETE query param validation
 } from '@/lib/schemas/question';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 interface RouteParams {
     params: {
@@ -15,9 +16,14 @@ interface RouteParams {
 // --- GET Handler (Get Question Details) ---
 export async function GET(request: Request, { params }: RouteParams) {
     try {
-        const supabase = await createClient();
+        // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+        const authResult = await authenticateApiRequest(['Admin']);
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+        }
+        const { user, claims, supabase } = authResult;
 
-        // 1. Validate the question ID
+        // Validate the question ID
         const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
         if (!validationResult.success) {
             return NextResponse.json(
@@ -26,31 +32,7 @@ export async function GET(request: Request, { params }: RouteParams) {
             );
         }
 
-        // 2. Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        // 3. Fetch user role
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-
-        if (profileError || !profile) {
-            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-        }
-
-        const userRole = profile.role;
-
-        // 4. Check if user has appropriate role
-        if (userRole !== 'Admin') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        // 5. Fetch the question (try assessment_questions first)
+        // Fetch the question (try assessment_questions first)
         const { data: question, error: questionError } = await supabase
             .from('assessment_questions')
             .select('*')
@@ -75,12 +57,17 @@ export async function GET(request: Request, { params }: RouteParams) {
 // --- PUT Handler (Update Question - Step 5) ---
 export async function PUT(request: Request, { params }: RouteParams) {
     try {
-        const supabase = await createClient();
+        // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+        const authResult = await authenticateApiRequest(['Admin']);
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+        }
+        const { user, claims, supabase } = authResult;
 
-        // 1. Get params asynchronously
+        // Get params asynchronously
         const { questionId } = await params;
         
-        // 2. Validate the question ID
+        // Validate the question ID
         const validationResult = QuestionIdSchema.safeParse({ questionId });
         if (!validationResult.success) {
             return NextResponse.json(
@@ -90,31 +77,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         }
         // We already have the validated questionId
 
-        // 2. Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        // 3. Fetch user role
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-
-        if (profileError || !profile) {
-            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-        }
-
-        const userRole = profile.role;
-
-        // 4. Check if user has appropriate role
-        if (userRole !== 'Admin') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        // 5. Validate request body
+        // Validate request body
         const body = await request.json();
         const bodyValidation = UpdateQuestionApiSchema.safeParse(body);
         if (!bodyValidation.success) {
@@ -124,13 +87,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
             );
         }
 
-        // 6. Extract and prepare data for update
+        // Extract and prepare data for update
         const { bank_type, ...questionData } = bodyValidation.data;
 
         // Always use assessment_questions table
         const tableName = 'assessment_questions';
 
-        // 7. Check if question exists
+        // Check if question exists
         const { data: existingQuestion, error: checkError } = await supabase
             .from(tableName)
             .select('id')
@@ -144,7 +107,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
             return NextResponse.json({ error: 'Database error', details: checkError.message }, { status: 500 });
         }
 
-        // 8. Update the question
+        // Update the question
         const { data: updatedQuestion, error: updateError } = await supabase
             .from(tableName)
             .update(questionData)
@@ -166,12 +129,17 @@ export async function PUT(request: Request, { params }: RouteParams) {
 // --- DELETE Handler (Delete Question - Step 6) ---
 export async function DELETE(request: Request, { params }: RouteParams) {
      try {
-        const supabase = await createClient();
+        // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+        const authResult = await authenticateApiRequest(['Admin']);
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+        }
+        const { user, claims, supabase } = authResult;
 
-        // 1. Get params asynchronously
+        // Get params asynchronously
         const { questionId } = await params;
         
-        // 2. Validate the question ID
+        // Validate the question ID
         const validationResult = QuestionIdSchema.safeParse({ questionId });
         if (!validationResult.success) {
             return NextResponse.json(
@@ -181,38 +149,21 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         }
         // We already have the validated questionId
 
-        // 2. Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-         if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        const userRole = claims?.user_role;
 
-        // 3. Fetch user role
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-
-        if (profileError || !profile) {
-            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-        }
-
-        const userRole = profile.role;
-
-        // 4. Check if user has appropriate role
+        // Check if user has appropriate role
         if (userRole !== 'Admin') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // 5. Always use assessment_questions table
+        // Always use assessment_questions table  
         const tableName = 'assessment_questions';
 
-        // 6. Check if question exists
+        // Check if question exists
         const { data: existingQuestion, error: checkError } = await supabase
             .from(tableName)
             .select('id')
-            .eq('id', questionId) // Use extracted variable
+            .eq('id', questionId)
             .single();
 
         if (checkError) {
@@ -222,17 +173,17 @@ export async function DELETE(request: Request, { params }: RouteParams) {
             return NextResponse.json({ error: 'Database error', details: checkError.message }, { status: 500 });
         }
 
-        // 7. Delete the question
+        // Delete the question
         const { error: deleteError } = await supabase
             .from(tableName)
             .delete()
-            .eq('id', questionId); // Use extracted variable
+            .eq('id', questionId);
 
         if (deleteError) {
             return NextResponse.json({ error: 'Database error while deleting question', details: deleteError.message }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, message: 'Question deleted successfully' }, { status: 200 });
+        return NextResponse.json({ message: 'Question deleted successfully' }, { status: 200 });
     } catch (error) {
         console.error('DELETE /api/admin/question-banks/[questionId]: Unexpected Error', error);
         return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });

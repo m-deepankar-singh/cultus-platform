@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/app/job-readiness/expert-sessions
@@ -7,7 +8,6 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
     const url = new URL(req.url);
     const productId = url.searchParams.get('productId');
 
@@ -15,24 +15,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'productId is required' }, { status: 400 });
     }
 
-    // Verify authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get student data from JWT claims (no database query needed)
+    const clientId = claims.client_id;
+    if (!clientId) {
+      return NextResponse.json({ error: 'Student not properly enrolled' }, { status: 403 });
     }
 
-    // Get student record
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('id')
-      .eq('id', user.id)
-      .single();
+    // Verify product enrollment via client_product_assignments
+    const { count } = await supabase
+      .from('client_product_assignments')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('product_id', productId);
 
-    if (studentError || !student) {
-      return NextResponse.json({ error: 'Student record not found' }, { status: 404 });
+    if (count === 0) {
+      return NextResponse.json({ 
+        error: 'Invalid product ID or product is not assigned to your organization' 
+      }, { status: 400 });
     }
 
     // Verify product exists and is of type JOB_READINESS
@@ -73,7 +79,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Transform the data to remove the junction table structure
-    const expertSessions = sessionData?.map(session => ({
+    const expertSessions = sessionData?.map((session: any) => ({
       id: session.id,
       title: session.title,
       description: session.description,
@@ -84,7 +90,7 @@ export async function GET(req: NextRequest) {
 
     // For each session, create fresh signed URLs since the stored URLs may be expired
     const sessionsWithSignedUrls = await Promise.all(
-      (expertSessions || []).map(async (session) => {
+      (expertSessions || []).map(async (session: any) => {
         // Extract path from stored URL to create new signed URL
         const urlParts = session.video_url.split('/expert_session_videos/');
         if (urlParts.length === 2) {
@@ -118,22 +124,22 @@ export async function GET(req: NextRequest) {
         is_completed,
         completed_at
       `)
-      .eq('student_id', student.id)
+      .eq('student_id', user.id)
       .in('expert_session_id', sessionIds);
 
     if (progressError) {
       console.error('Error fetching progress data:', progressError);
       return NextResponse.json({ error: 'Failed to fetch progress data' }, { status: 500 });
-}
+    }
 
     // Create a map of progress by session ID
     const progressMap = new Map();
-    progressData?.forEach(progress => {
+    progressData?.forEach((progress: any) => {
       progressMap.set(progress.expert_session_id, progress);
     });
 
     // Combine sessions with student progress
-    const sessionsWithProgress = sessionsWithSignedUrls?.map(session => {
+    const sessionsWithProgress = sessionsWithSignedUrls?.map((session: any) => {
       const progress = progressMap.get(session.id) || {
         watch_time_seconds: 0,
         completion_percentage: 0,

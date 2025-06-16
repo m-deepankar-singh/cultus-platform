@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * PATCH /api/admin/job-readiness/students/[studentId]/override-progress
@@ -11,29 +12,13 @@ export async function PATCH(
   { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    
-    // Verify admin authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    // Check if user has admin role - use case insensitive comparison
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    // Modified to be case insensitive - check for "admin" or "Admin"
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
     
     // Get the student ID from the route parameters (await params for Next.js 15)
     const { studentId } = await params;
@@ -58,10 +43,16 @@ export async function PATCH(
       }, { status: 400 });
     }
     
+    // Handle "NONE" value by converting to null
+    let processedStarLevel = job_readiness_star_level;
+    if (job_readiness_star_level === "NONE") {
+      processedStarLevel = null;
+    }
+    
     // Validate star level if provided
-    if (job_readiness_star_level !== undefined && job_readiness_star_level !== null) {
+    if (processedStarLevel !== undefined && processedStarLevel !== null) {
       const validStarLevels = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'];
-      if (!validStarLevels.includes(job_readiness_star_level)) {
+      if (!validStarLevels.includes(processedStarLevel)) {
         return NextResponse.json({ 
           error: `Invalid star level. Must be one of: ${validStarLevels.join(', ')} or null` 
         }, { status: 400 });
@@ -86,7 +77,7 @@ export async function PATCH(
     };
     
     if (job_readiness_star_level !== undefined) {
-      updateData.job_readiness_star_level = job_readiness_star_level;
+      updateData.job_readiness_star_level = processedStarLevel;
     }
     
     if (job_readiness_tier) {
@@ -125,7 +116,7 @@ export async function PATCH(
         tier: updatedStudent.job_readiness_tier
       },
       new_values: {
-        job_readiness_star_level: job_readiness_star_level || updatedStudent.job_readiness_star_level,
+        job_readiness_star_level: processedStarLevel || updatedStudent.job_readiness_star_level,
         job_readiness_tier: job_readiness_tier || updatedStudent.job_readiness_tier
       },
       override_reason: override_reason,
@@ -138,7 +129,7 @@ export async function PATCH(
       student: updatedStudent,
       note: 'The student\'s progress has been updated. Any client app should refresh their current state after this operation. Changes will be reflected in subsequent API calls.',
       updated_values: {
-        job_readiness_star_level: job_readiness_star_level || updatedStudent.job_readiness_star_level,
+        job_readiness_star_level: processedStarLevel || updatedStudent.job_readiness_star_level,
         job_readiness_tier: job_readiness_tier || updatedStudent.job_readiness_tier,
         override_reason: override_reason
       }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { utils, write } from 'xlsx';
 import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define types for the data we're working with
 interface Student {
@@ -50,30 +51,22 @@ export async function GET(request: Request) {
   const timeoutId = setTimeout(() => controller.abort(), EXPORT_TIMEOUT);
   
   try {
-    // 1. Authentication & Authorization (reused from bulk-upload endpoints)
-    const { user, profile, role, error: sessionError } = await getUserSessionAndRole();
-
-    if (sessionError || !user || !profile) {
-      const status = sessionError?.message.includes('No active user session') ? 401 : 403;
-      return new NextResponse(JSON.stringify({ error: sessionError?.message || 'Unauthorized or profile missing' }), {
-        status,
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
-
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Parse query parameters
     const url = new URL(request.url);
     const clientId = url.searchParams.get('clientId');
     
-    // 3. Initialize Supabase client (reused pattern)
-    const supabase = await createClient();
+    // 3. Supabase client from authResult
     
     // 4. First count the total number of students to export
     let countQuery = supabase
@@ -125,7 +118,7 @@ export async function GET(request: Request) {
     }
     
     // Create a map of client IDs to client names
-    const clientMap = (clients || []).reduce((map, client) => {
+    const clientMap = (clients || []).reduce((map: any, client: any) => {
       map[client.id] = client.name;
       return map;
     }, {} as Record<string, string>);
@@ -168,7 +161,7 @@ export async function GET(request: Request) {
       }
       
       // Transform this batch for Excel export
-      const batchExportRows = students.map(student => ({
+      const batchExportRows = students.map((student: any) => ({
         'Learner Full Name': student.full_name,
         'Learner Email': student.email,
         'Learner Phone Number': student.phone_number || '',

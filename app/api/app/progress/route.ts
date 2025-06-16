@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/app/progress
@@ -7,51 +8,32 @@ import { NextResponse } from 'next/server';
  */
 export async function GET(request: Request) {
   try {
-    // 1. Authentication & Authorization
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 1. 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    // Fetch student record from 'students' table
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('client_id, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError) {
-      console.error('Student Fetch Error:', studentFetchError);
-      if (studentFetchError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Forbidden: Student record not found' },
-          { status: 403 },
-        );
-      }
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
       return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch student record' },
-        { status: 500 },
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 }
       );
     }
 
-    // Check if student is active
-    if (!studentRecord.is_active) {
-        return NextResponse.json(
-            { error: 'Forbidden: Student account is inactive' },
-            { status: 403 },
-        );
-    }
-
-    // Check if student is linked to a client
-    if (!studentRecord.client_id) {
-      console.error(`Student ${user.id} has no assigned client_id in students table.`);
-      return NextResponse.json({ error: 'Forbidden: Student not linked to a client' }, { status: 403 });
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
+      console.error(`Student ${user.id} has no assigned client_id in JWT claims.`);
+      return NextResponse.json(
+        { error: 'Forbidden: Student not linked to a client' },
+        { status: 403 }
+      );
     }
 
     const studentId = user.id;
-    const clientId = studentRecord.client_id; // Use client_id from student record
 
     // 2. Fetch Assigned Products
     const { data: assignedProducts, error: assignmentError } = await supabase
@@ -74,7 +56,7 @@ export async function GET(request: Request) {
 
     // 2.1 Extract unique product details, handling potential array wrapping from Supabase
     const products = assignedProducts
-      .map(assignment => {
+      .map((assignment: any) => {
         // Supabase might return the related record as an array [{...}] or an object {...}
         // Check if it's a non-empty array and grab the first element
         if (Array.isArray(assignment.products) && assignment.products.length > 0) {
@@ -86,11 +68,11 @@ export async function GET(request: Request) {
         }
         return null; // No valid product object found for this assignment
       })
-      .filter(product => product !== null) as // Filter out assignments that didn't yield a product
+      .filter((product: any) => product !== null) as // Filter out assignments that didn't yield a product
         // Assert the type of the items remaining in the array
         { id: string; name: string; description: string | null }[];
 
-    const productIds = products.map(p => p.id);
+    const productIds = products.map((p: any) => p.id);
 
     if (productIds.length === 0) {
       // Should not happen if assignedProducts had non-null products, but good to check
@@ -119,7 +101,7 @@ export async function GET(request: Request) {
        return NextResponse.json(productDataOnly, { status: 200 });
     }
 
-    const moduleIds = modules.map(m => m.id);
+    const moduleIds = modules.map((m: any) => m.id);
 
     // 4. Fetch Student's Module Progress for these Modules
     const { data: moduleProgressData, error: moduleProgressError } = await supabase
@@ -135,7 +117,7 @@ export async function GET(request: Request) {
     }
 
     // 5. Fetch Student's Assessment Attempts for relevant Modules
-    const assessmentModuleIds = modules.filter(m => m.type === 'Assessment').map(m => m.id);
+    const assessmentModuleIds = modules.filter((m: any) => m.type === 'Assessment').map((m: any) => m.id);
     let assessmentAttempts: any[] = []; // Initialize as empty array
     if (assessmentModuleIds.length > 0) {
       const { data: attemptsData, error: attemptsError } = await supabase
@@ -154,11 +136,11 @@ export async function GET(request: Request) {
 
     // 6. Prepare Data Structures for Combining
     const moduleProgressMap = new Map(
-      moduleProgressData?.map(p => [p.module_id, p]) || []
+      moduleProgressData?.map((p: any) => [p.module_id, p]) || []
     );
     // Map latest assessment attempt by assessment_module_id
     const assessmentAttemptsMap = new Map();
-    assessmentAttempts.forEach(attempt => {
+    assessmentAttempts.forEach((attempt: any) => {
       // Only store the latest attempt if multiple exist
       const existing = assessmentAttemptsMap.get(attempt.module_id); // Use module_id as key
       if (!existing || new Date(attempt.submitted_at) > new Date(existing.submitted_at)) {
@@ -167,7 +149,7 @@ export async function GET(request: Request) {
     });
 
     // Map modules by product_id
-    const modulesByProduct = modules.reduce((acc, module) => {
+    const modulesByProduct = modules.reduce((acc: any, module: any) => {
       const productId = module.product_id; // Use variable for clarity
       if (!acc[productId]) {
         acc[productId] = [];
@@ -177,11 +159,11 @@ export async function GET(request: Request) {
     }, {} as Record<string, typeof modules>);
 
     // 7. Combine Data into Final Structure
-    const combinedData = products.map(product => {
+    const combinedData = products.map((product: any) => {
       const productModules = modulesByProduct[product.id] || [];
 
-      const modulesWithProgress = productModules.map(module => {
-        const progress = moduleProgressMap.get(module.id);
+      const modulesWithProgress = productModules.map((module: any) => {
+        const progress: any = moduleProgressMap.get(module.id);
         const assessmentAttempt = module.type === 'Assessment' ? assessmentAttemptsMap.get(module.id) : null;
 
         return {

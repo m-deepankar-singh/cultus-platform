@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/progress
@@ -7,7 +8,13 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
     const url = new URL(req.url);
     
     // Extract query parameters for filtering
@@ -16,27 +23,6 @@ export async function GET(req: NextRequest) {
     const page = parseInt(url.searchParams.get('page') || '1');
     const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
     const search = url.searchParams.get('search') || '';
-    
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role - use case insensitive comparison
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
 
     // Use a simpler approach: query students with their clients and join with products
     let baseQuery = supabase
@@ -82,7 +68,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get client IDs for the products query
-    const clientIds = [...new Set(allStudents.map(s => s.client_id))];
+    const clientIds = [...new Set(allStudents.map((s: any) => s.client_id))];
 
     // Get client product assignments for job readiness products
     let productQuery = supabase
@@ -111,14 +97,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Filter students to only those whose clients have job readiness products
-    const clientsWithProducts = new Set(clientProducts?.map(cp => cp.client_id) || []);
-    const studentsWithAccess = allStudents.filter(student => 
+    const clientsWithProducts = new Set(clientProducts?.map((cp: any) => cp.client_id) || []);
+    const studentsWithAccess = allStudents.filter((student: any) => 
       clientsWithProducts.has(student.client_id)
     );
 
     // Create a map of client products for easy lookup
     const clientProductMap = new Map();
-    clientProducts?.forEach(cp => {
+    clientProducts?.forEach((cp: any) => {
       if (!clientProductMap.has(cp.client_id)) {
         clientProductMap.set(cp.client_id, []);
       }
@@ -126,7 +112,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Transform students to match frontend expectations
-    const transformedStudents = studentsWithAccess.map(student => {
+    const transformedStudents = studentsWithAccess.map((student: any) => {
       const products = clientProductMap.get(student.client_id) || [];
       const primaryProduct = products[0]; // Use first product, or handle multiple products differently
       

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 const manualReviewSchema = z.object({
   status: z.enum(['Approved', 'Rejected']),
@@ -24,28 +25,13 @@ export async function PATCH(
       );
     }
 
-    // Validate admin role (simplified for now, implement actual role check)
-    // In a real implementation, check if the user has admin role
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    
-    if (profileError || !profile || profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can perform this action' },
-        { status: 403 }
-      );
-    }
+    const { user, claims, supabase } = authResult;
 
     // Parse and validate request body
     const body = await req.json();

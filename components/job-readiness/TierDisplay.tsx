@@ -57,6 +57,13 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
   const hasAssessments = total_assessments_count > 0
   const progressPercentage = hasAssessments ? Math.round((completed_assessments_count / total_assessments_count) * 100) : 0
 
+  // Provide fallback for tier_criteria if it's undefined or null
+  const safeTierCriteria = tier_criteria || {
+    bronze: { min_score: 0, max_score: 60 },
+    silver: { min_score: 61, max_score: 80 },
+    gold: { min_score: 81, max_score: 100 }
+  }
+
   return (
     <Card className="border-gray-200 dark:border-gray-700">
       <CardHeader>
@@ -124,7 +131,7 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
 
           {/* Tier Criteria - Show as goals when no tier assigned */}
           <div className="grid md:grid-cols-3 gap-4">
-            {Object.entries(tier_criteria).map(([tier, criteria]) => {
+            {Object.entries(safeTierCriteria).map(([tier, criteria]) => {
               const tierName = tier.toUpperCase() as keyof typeof tierColors
               const isCurrentTier = all_assessments_complete && current_tier === tierName
               

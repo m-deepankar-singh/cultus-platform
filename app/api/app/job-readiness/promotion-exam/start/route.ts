@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define types for type safety when working with backgrounds and tiers
 type BackgroundType = 'COMPUTER_SCIENCE' | 'ECONOMICS' | 'DEFAULT';
@@ -12,7 +13,13 @@ type DifficultyTier = 'BRONZE' | 'SILVER' | 'GOLD';
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     const body = await req.json();
     
     // Validate request body
@@ -22,16 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
 
-    // Verify authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Get student profile for the current user
+    // Get student profile for the current user - specific fields only
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select(`

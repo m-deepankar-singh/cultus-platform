@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema } from '@/lib/schemas/module';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 const AssessmentQuestionsSchema = z.object({
   questions: z.array(
@@ -39,29 +40,13 @@ export async function GET(
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId } = resolvedParams;
     
-    const supabase = await createClient();
-
-    // Authenticate the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Check user role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Failed to verify user permissions' }, { status: 403 });
-    }
-
-    if (profile.role !== 'Admin' && profile.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Validate the module ID format
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
@@ -128,7 +113,7 @@ export async function GET(
     }
 
     // Transform the data structure to flatten it
-    const formattedQuestions = (questions || []).map(q => ({
+    const formattedQuestions = (questions || []).map((q: any) => ({
       id: q.question_id,
       sequence: q.sequence,
       ...(q.assessment_questions || {}),
@@ -163,29 +148,13 @@ export async function PUT(
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId } = resolvedParams;
     
-    const supabase = await createClient();
-
-    // Authenticate the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Check user role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Failed to verify user permissions' }, { status: 403 });
-    }
-
-    if (profile.role !== 'Admin' && profile.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Validate the module ID format
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
@@ -292,7 +261,7 @@ export async function PUT(
       }
       
       // Then, insert the new associations
-      const associations = questions.map(q => ({
+      const associations = questions.map((q: any) => ({
         module_id: moduleId,
         question_id: q.id,
         sequence: q.sequence
@@ -342,7 +311,7 @@ export async function PUT(
     }
 
     // Transform the data structure to flatten it
-    const formattedQuestions = (updatedQuestions || []).map(q => ({
+    const formattedQuestions = (updatedQuestions || []).map((q: any) => ({
       id: q.question_id,
       sequence: q.sequence,
       ...(q.assessment_questions || {}),

@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 const ProductIdQuerySchema = z.object({
   productId: z.string().uuid(),
@@ -28,15 +29,12 @@ interface CourseModuleOutput {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (replaces getUser() + student record lookup)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const productId = searchParams.get('productId');
@@ -51,26 +49,18 @@ export async function GET(request: NextRequest) {
 
     const validProductId = queryValidation.data.productId;
 
-    // Get student profile for access control and tier information
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select(`
-        id,
-        client_id,
-        job_readiness_star_level,
-        job_readiness_tier,
-        is_active
-      `)
-      .eq('id', user.id)
-      .single();
-
-    if (studentError || !student) {
-      console.error('Error fetching student:', studentError);
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
+      return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
     }
 
-    if (!student.is_active) {
-      return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
+    // Get client_id and tier information from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    const currentTier = claims.job_readiness_tier || 'BRONZE';
+    const currentStarLevel = claims.job_readiness_star_level || 'NONE';
+    
+    if (!clientId) {
+      return NextResponse.json({ error: 'Student not linked to a client' }, { status: 403 });
     }
 
     // Verify the product is a Job Readiness product assigned to student's client
@@ -88,7 +78,7 @@ export async function GET(request: NextRequest) {
     const { data: clientProduct, error: clientProductError } = await supabase
       .from('client_product_assignments')
       .select('client_id, product_id')
-      .eq('client_id', student.client_id)
+      .eq('client_id', clientId)
       .eq('product_id', validProductId)
       .maybeSingle();
 
@@ -126,7 +116,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('product_id', validProductId)
       .eq('type', 'Course')
-      .eq('student_module_progress.student_id', student.id)
+      .eq('student_module_progress.student_id', user.id)
       .order('sequence', { ascending: true });
 
     if (coursesError) {
@@ -135,7 +125,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Enhanced courses with progress data and Job Readiness specific information
-    const enhancedCourses: CourseModuleOutput[] = (courses || []).map(course => {
+    const enhancedCourses: CourseModuleOutput[] = (courses || []).map((course: any) => {
       const progress = course.student_module_progress?.[0] || null;
       const totalLessons = course.lessons?.length || 0;
       
@@ -195,19 +185,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       courses: enhancedCourses,
-      current_tier: student.job_readiness_tier,
-      current_star_level: student.job_readiness_star_level,
+      current_tier: currentTier,
+      current_star_level: currentStarLevel,
       completed_courses_count: completedCourses?.length || 0,
       total_courses_count: totalCount || 0,
-      product: {
-        id: productData.id,
-        name: productData.name,
-        type: productData.type
-      }
     });
 
   } catch (error) {
-    console.error('Unexpected error in job-readiness courses GET:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Unexpected error in Job Readiness courses API:', error);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred', details: (error as Error).message },
+      { status: 500 }
+    );
   }
 } 

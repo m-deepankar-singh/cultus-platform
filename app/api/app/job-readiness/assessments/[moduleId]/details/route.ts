@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define schemas for validation
 const ModuleIdSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -73,45 +74,25 @@ export async function GET(
     }
     const validModuleId = moduleIdValidation.data;
 
-    // 2. Authentication
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 2. JWT-based authentication (replaces getUser() + student record lookup)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    // 3. Get student information
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('client_id, is_active, job_readiness_tier, job_readiness_star_level')
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError) {
-      console.error('Student Fetch Error:', studentFetchError);
-      if (studentFetchError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Forbidden: Student record not found' },
-          { status: 403 },
-        );
-      }
-      return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch student record' },
-        { status: 500 },
-      );
-    }
-
-    if (!studentRecord.is_active) {
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
       return NextResponse.json(
         { error: 'Forbidden: Student account is inactive' },
-        { status: 403 },
+        { status: 403 }
       );
     }
 
-    if (!studentRecord.client_id) {
-      console.error(`Student ${user.id} has no assigned client_id in students table.`);
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
+      console.error(`Student ${user.id} has no assigned client_id in JWT claims.`);
       return NextResponse.json(
         { error: 'Forbidden: Student not linked to a client' },
         { status: 403 }
@@ -119,7 +100,6 @@ export async function GET(
     }
 
     const studentId = user.id;
-    const clientId = studentRecord.client_id;
 
     // 4. Fetch Assessment Module Details (must be Job Readiness assessment)
     const { data: moduleData, error: moduleError } = await supabase
@@ -181,6 +161,10 @@ export async function GET(
       );
     }
 
+    // Get student tier and star level from JWT claims instead of database query
+    const currentStudentTier = claims.job_readiness_tier || null;
+    const currentStarLevel = claims.job_readiness_star_level || null;
+
     // 7. Get Job Readiness tier configuration
     const { data: tierConfig, error: tierConfigError } = await supabase
       .from('job_readiness_products')
@@ -202,109 +186,113 @@ export async function GET(
       gold_assessment_max_score: 100
     };
 
-    const finalTierConfig = tierConfig || defaultTierConfig;
-
-    // 8. Extract assessment configuration details
-    const config = moduleData.configuration || {};
-    const timeLimit = config.timeLimitMinutes || config.time_limit_minutes || null;
-    const passingThreshold = config.passThreshold || config.passing_threshold || 60; // Default to 60%
-    const instructions = config.instructions || null;
-
-    // 9. Check if assessment has been submitted (check student_module_progress for Job Readiness)
-    const { data: submissionData, error: submissionError } = await supabase
-      .from('student_module_progress')
-      .select('status, progress_percentage, completed_at, progress_details')
-      .eq('student_id', studentId)
-      .eq('module_id', validModuleId)
-      .maybeSingle();
-
-    if (submissionError && submissionError.code !== 'PGRST116') {
-      console.error(`Error checking assessment submission for module ${validModuleId}:`, submissionError);
-      // Continue - we'll assume not submitted
-    }
-
-    const isSubmitted = submissionData?.status === 'Completed';
-    const retakesAllowed = config.retakesAllowed || config.retakes_allowed || true; // Default to true for Job Readiness
-
-    // 10. Fetch Assessment Questions
-    const { data: questionData, error: questionError } = await supabase
+    // 8. Get assessment questions for this module WITHOUT correct answers for security
+    const { data: questionsData, error: questionsError } = await supabase
       .from('assessment_module_questions')
       .select(`
         question_id,
+        sequence,
         assessment_questions (
-          id, 
-          question_text, 
-          question_type, 
+          id,
+          question_text,
+          question_type,
           options
         )
       `)
       .eq('module_id', validModuleId)
-      .returns<QuestionData[]>();
+      .order('sequence', { ascending: true });
 
-    if (questionError) {
-      console.error(`Error fetching questions for module ${validModuleId}:`, questionError);
+    if (questionsError) {
+      console.error(`Error fetching questions for assessment ${validModuleId}:`, questionsError);
       return NextResponse.json(
-        { error: 'Failed to fetch assessment questions', details: questionError.message },
+        { error: 'Failed to fetch assessment questions', details: questionsError.message },
         { status: 500 }
       );
     }
 
-    // Process questions, removing any null joins and formatting
-    const questions: AssessmentQuestionOutput[] = questionData
-      .filter(q => q.assessment_questions !== null)
-      .map(q => {
-        const aq = q.assessment_questions!; // Non-null assertion since we filtered nulls
+    // Filter out questions where assessment_questions is null and map to expected format
+    const formattedQuestions: AssessmentQuestionOutput[] = (questionsData || [])
+      .filter((q: QuestionData) => q.assessment_questions !== null)
+      .map((q: QuestionData) => {
+        const question = q.assessment_questions!;
         return {
-          id: q.question_id,
-          question_text: aq.question_text,
-          question_type: aq.question_type,
-          options: aq.options || []
+          id: question.id,
+          question_text: question.question_text,
+          question_type: question.question_type,
+          options: Array.isArray(question.options) ? question.options : [],
+          // Note: We deliberately exclude correct_answer for security
         };
       });
 
-    // 11. Fetch In-Progress Attempt if not submitted (use student_module_progress for Job Readiness)
-    let inProgressAttempt: InProgressAttemptDetails | null = null;
+    // 9. Check if assessment has been submitted and get in-progress details
+    const { data: progressData, error: progressError } = await supabase
+      .from('student_module_progress')
+      .select('status, progress_percentage, progress_details, completed_at')
+      .eq('student_id', studentId)
+      .eq('module_id', validModuleId)
+      .maybeSingle();
 
-    if (!isSubmitted && submissionData?.progress_details) {
+    if (progressError && progressError.code !== 'PGRST116') {
+      console.error('Error checking assessment progress:', progressError);
+      // Continue with default (not submitted) state
+    }
+
+    const isSubmitted = progressData?.status === 'Completed';
+
+    // Extract configuration values
+    const config = moduleData.configuration || {};
+    const instructions = config.instructions || null;
+    const timeLimitMinutes = config.time_limit_minutes || config.timeLimitMinutes || null;
+    const passingThreshold = config.passing_threshold || config.passingThreshold || null;
+    const retakesAllowed = config.retakes_allowed || config.retakesAllowed !== false; // Default to true
+
+    // Create tier assessment config
+    const finalTierConfig = tierConfig || defaultTierConfig;
+    const tierAssessmentConfig = {
+      bronze_min_score: finalTierConfig.bronze_assessment_min_score,
+      bronze_max_score: finalTierConfig.bronze_assessment_max_score,
+      silver_min_score: finalTierConfig.silver_assessment_min_score,
+      silver_max_score: finalTierConfig.silver_assessment_max_score,
+      gold_min_score: finalTierConfig.gold_assessment_min_score,
+      gold_max_score: finalTierConfig.gold_assessment_max_score,
+    };
+
+    // Prepare in-progress attempt details
+    let inProgressAttempt: InProgressAttemptDetails | null = null;
+    if (progressData?.status === 'InProgress' && progressData.progress_details) {
+      const details = progressData.progress_details as any;
       inProgressAttempt = {
-        saved_answers: submissionData.progress_details.saved_answers || {},
-        start_time: submissionData.progress_details.started_at || null,
-        remaining_time_seconds: submissionData.progress_details.remaining_time_seconds || null
+        saved_answers: details.saved_answers || {},
+        start_time: details.started_at || null,
+        remaining_time_seconds: details.remaining_time_seconds || null,
       };
     }
 
-    // 12. Build and return response
-    const responsePayload: JobReadinessAssessmentPageDataResponse = {
-      assessment: {
-        id: moduleData.id,
-        name: moduleData.name,
-        instructions,
-        time_limit_minutes: timeLimit,
-        passing_threshold: passingThreshold,
-        questions,
-        is_submitted: isSubmitted,
-        retakes_allowed: retakesAllowed,
-        tier_assessment_config: {
-          bronze_min_score: finalTierConfig.bronze_assessment_min_score,
-          bronze_max_score: finalTierConfig.bronze_assessment_max_score,
-          silver_min_score: finalTierConfig.silver_assessment_min_score,
-          silver_max_score: finalTierConfig.silver_assessment_max_score,
-          gold_min_score: finalTierConfig.gold_assessment_min_score,
-          gold_max_score: finalTierConfig.gold_assessment_max_score,
-        },
-        current_student_tier: studentRecord.job_readiness_tier,
-        current_star_level: studentRecord.job_readiness_star_level,
-      },
-      in_progress_attempt: inProgressAttempt
+    const assessmentDetails: JobReadinessAssessmentDetailsOutput = {
+      id: moduleData.id,
+      name: moduleData.name,
+      instructions,
+      time_limit_minutes: timeLimitMinutes,
+      passing_threshold: passingThreshold,
+      questions: formattedQuestions,
+      is_submitted: isSubmitted,
+      retakes_allowed: retakesAllowed,
+      tier_assessment_config: tierAssessmentConfig,
+      current_student_tier: currentStudentTier,
+      current_star_level: currentStarLevel,
     };
 
-    return NextResponse.json(responsePayload);
+    const response: JobReadinessAssessmentPageDataResponse = {
+      assessment: assessmentDetails,
+      in_progress_attempt: inProgressAttempt,
+    };
 
-  } catch (e) {
-    const error = e as Error;
-    console.error('Unexpected error in /api/app/job-readiness/assessments/[moduleId]/details:', error);
+    return NextResponse.json(response);
+
+  } catch (error) {
+    console.error('Unexpected error in Job Readiness assessment details endpoint:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred.', details: error.message },
+      { error: 'An unexpected error occurred', details: (error as Error).message },
       { status: 500 }
     );
   }

@@ -47,7 +47,7 @@ export interface JrProgressResponse {
 }
 
 export interface OverrideProgressRequest {
-  job_readiness_star_level: "ONE" | "TWO" | "THREE" | "FOUR" | "FIVE" | null
+  job_readiness_star_level: "NONE" | "ONE" | "TWO" | "THREE" | "FOUR" | "FIVE" | null
   job_readiness_tier: "BRONZE" | "SILVER" | "GOLD"
   reason: string
 }

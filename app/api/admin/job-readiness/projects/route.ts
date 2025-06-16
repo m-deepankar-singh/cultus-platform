@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/projects
@@ -7,25 +8,13 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
     
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // Parse query parameters
     const { searchParams } = new URL(req.url);

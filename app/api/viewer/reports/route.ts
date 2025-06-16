@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { Database } from '@/lib/database.types';
 import { ViewerReportQuerySchema } from '@/lib/schemas/progress';
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
 // Define the expected structure of the data returned by the function
 // based on the aggregated_module_progress_report_item type in SQL
@@ -24,55 +26,18 @@ type AggregatedProgressReportItem = {
 
 export async function GET(request: Request) {
   console.log("DEBUG: Starting viewer reports endpoint");
-  const supabase = await createClient();
   const { searchParams } = new URL(request.url);
 
   try {
-    // 1. Authentication & Authorization - Use getUser() instead of getSession() for better security
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.log("DEBUG: Authentication failed", authError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['viewer', 'admin']);
+    if ('error' in authResult) {
+      console.log("DEBUG: Authentication failed", authResult.error);
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    console.log("DEBUG: User authenticated", { userId: user.id });
+    const { user, claims, supabase } = authResult;
 
-    // DEBUG: Check if the user has the correct RLS policies applied
-    const { data: debugRoles, error: debugRolesError } = await supabase
-      .rpc('get_my_claims');
-    console.log("DEBUG: User claims/roles:", debugRoles, debugRolesError);
-
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    // Use a mutable profile variable that we can override if needed
-    let profile = profileData;
-
-    if (profileError || !profile) {
-      console.error('Error fetching profile:', profileError);
-      // Instead of failing when profile not found, let's try to proceed with Admin role
-      // This is a temporary measure for testing
-      console.log("DEBUG: Using Admin role for testing since profile not found");
-      profile = { role: 'Admin' };
-      
-      // If you want to keep the original behavior, uncomment the following:
-      /*
-      return NextResponse.json(
-        { error: 'Failed to fetch user profile' },
-        { status: 500 }
-      );
-      */
-    }
-
-    console.log("DEBUG: User role", { role: profile.role });
-    
-    // Only allow 'Viewer' or 'Admin' roles (Admin has implicit viewer rights)
-    if (profile.role !== 'Viewer' && profile.role !== 'Admin') {
-      console.log(`User role "${profile.role}" not authorized for Viewer reports`);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    console.log("DEBUG: User authenticated", { userId: user.id, role: claims.user_role });
 
     // 2. Query Parameter Validation
     let validatedQuery: z.infer<typeof ViewerReportQuerySchema>;
@@ -96,21 +61,21 @@ export async function GET(request: Request) {
     // DEBUG: Test direct table access to see if RLS is blocking access
     const { data: clientsTest, error: clientsError } = await supabase
       .from('clients')
-      .select('*')
+      .select(SELECTORS.CLIENT.LIST) // 📊 OPTIMIZED: Specific fields only
       .limit(5);
     console.log("DEBUG: Direct clients table access:", 
       { count: clientsTest?.length || 0, error: clientsError?.message });
 
     const { data: modulesTest, error: modulesError } = await supabase
       .from('modules')
-      .select('*')
+      .select(SELECTORS.MODULE.LIST) // 📊 OPTIMIZED: Specific fields only
       .limit(5);
     console.log("DEBUG: Direct modules table access:", 
       { count: modulesTest?.length || 0, error: modulesError?.message });
 
     const { data: studentsTest, error: studentsError } = await supabase
       .from('students')
-      .select('*')
+      .select(SELECTORS.STUDENT.LIST) // 📊 OPTIMIZED: Specific fields only
       .limit(5);
     console.log("DEBUG: Direct students table access:", 
       { count: studentsTest?.length || 0, error: studentsError?.message });

@@ -4,6 +4,7 @@ import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/learners/[studentId]
@@ -17,24 +18,16 @@ export async function GET(
   { params }: { params: { studentId: string } }
 ) {
   try {
-    // 1. Authentication & Authorization (using the utility)
-    const { user, profile: sessionProfile, role, error: sessionError } = await getUserSessionAndRole();
-
-    if (sessionError || !user || !sessionProfile) {
-        console.error('Session Error:', sessionError?.message);
-        const status = sessionError?.message.includes('No active user session') ? 401 : 403;
-        return new NextResponse(JSON.stringify({ error: sessionError?.message || 'Unauthorized or admin profile missing' }), {
-            status,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
-
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Validate Route Parameter (studentId)
     const { studentId } = await params;
@@ -50,8 +43,7 @@ export async function GET(
       );
     }
 
-    // Get Supabase client *after* auth check
-    const supabase = await createClient();
+    // Supabase client already available from authResult
 
     // 3. Fetch Learner Profile
     const { data: learnerProfile, error: profileError } = await supabase
@@ -163,17 +155,13 @@ export async function PATCH(
   { params }: { params: { studentId: string } }
 ) {
   try {
-    // 1. Authentication & Authorization
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Allow both Admins and Staff to update learners
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden: Only Admins and Staff can update learners" }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Validate studentId
     const { studentId } = await params;
@@ -208,8 +196,7 @@ export async function PATCH(
     
     const updateData = validation.data;
     
-    // 4. Get Supabase clients
-    const supabase = await createClient();
+    // 4. Get service client (supabase client from authResult)
     const serviceClient = await createServiceClient();
     
     // 5. Check if the student exists - query the students table directly
@@ -305,17 +292,13 @@ export async function DELETE(
   { params }: { params: { studentId: string } }
 ) {
   try {
-    // 1. Authentication & Authorization
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Allow both Admins and Staff to delete learners
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden: Only Admins and Staff can delete learners" }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Validate studentId
     const { studentId } = await params;
@@ -328,8 +311,7 @@ export async function DELETE(
       }, { status: 400 });
     }
 
-    // 3. Get Supabase clients
-    const supabase = await createClient();
+    // 3. Get service client (supabase client from authResult)
     const serviceClient = await createServiceClient();
     
     // 4. Check if the student exists

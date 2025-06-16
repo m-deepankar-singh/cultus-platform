@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/expert-sessions
@@ -7,30 +8,16 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
+    
     const url = new URL(req.url);
     const productId = url.searchParams.get('productId');
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role - use case insensitive comparison
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
 
     // Build query to get expert sessions with associated products via junction table
     let query = supabase
@@ -112,8 +99,8 @@ export async function GET(req: NextRequest) {
 
         if (!statsError && progressStats) {
           const totalViewers = progressStats.length;
-          const completedViewers = progressStats.filter(p => p.is_completed).length;
-          const totalWatchTime = progressStats.reduce((sum, p) => sum + p.watch_time_seconds, 0);
+          const completedViewers = progressStats.filter((p: any) => p.is_completed).length;
+          const totalWatchTime = progressStats.reduce((sum: number, p: any) => sum + p.watch_time_seconds, 0);
 
           completionStats = {
             total_viewers: totalViewers,

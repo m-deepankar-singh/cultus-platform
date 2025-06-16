@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ProductIdSchema } from "@/lib/schemas/product";
 import { ModuleSchema } from "@/lib/schemas/module";
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/products/[productId]/modules
@@ -14,41 +15,14 @@ export async function GET(
   { params }: { params: { productId: string } }
 ) {
   try {
-    // Create Supabase server client
-    const supabase = await createClient();
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     const paramsObj = await params;
-
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    // Fetch user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error("Error fetching user profile:", profileError);
-      return NextResponse.json(
-        { error: "Server Error", message: "Error fetching user profile" },
-        { status: 500 }
-      );
-    }
-
-    // Verify user is an Admin or Staff
-    if (profile.role !== "Admin" && profile.role !== "Staff") {
-      return NextResponse.json(
-        { error: "Forbidden", message: "Admin or Staff role required" },
-        { status: 403 }
-      );
-    }
 
     // Validate productId parameter
     const productIdValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });
@@ -101,41 +75,14 @@ export async function POST(
   { params }: { params: { productId: string } }
 ) {
   try {
-    // Create Supabase server client
-    const supabase = await createClient();
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     const paramsObj = await params;
-
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    // Fetch user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error("Error fetching user profile:", profileError);
-      return NextResponse.json(
-        { error: "Server Error", message: "Error fetching user profile" },
-        { status: 500 }
-      );
-    }
-
-    // Verify user is an Admin
-    if (profile.role !== "Admin") {
-      return NextResponse.json(
-        { error: "Forbidden", message: "Admin role required" },
-        { status: 403 }
-      );
-    }
 
     // Validate productId parameter
     const productIdValidation = ProductIdSchema.safeParse({ productId: paramsObj.productId });

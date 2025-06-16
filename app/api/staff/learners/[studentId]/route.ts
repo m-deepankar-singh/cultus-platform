@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selectors';
 
 /**
  * GET /api/staff/learners/[studentId]
@@ -17,32 +18,16 @@ export async function GET(
   { params }: { params: { studentId: string } }
 ) {
   try {
-    // 1. Authentication & Authorization (Admin or Staff)
-    const { user, profile: sessionProfile, role, error: sessionError } = await getUserSessionAndRole();
-
-    if (sessionError || !user || !sessionProfile) {
-      console.error('Session Error:', sessionError?.message);
-      const status = sessionError?.message.includes('No active user session') ? 401 : 403;
-      return new NextResponse(
-        JSON.stringify({ error: sessionError?.message || 'Unauthorized or profile missing' }),
-        {
-          status,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    // Check if the role is allowed
-    const allowedRoles: UserRole[] = ['Admin', 'Staff'];
-    if (!allowedRoles.includes(role as UserRole)) {
-      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Store Staff's client ID for later check
-    const sessionClientId = sessionProfile.client_id;
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const sessionClientId = claims.client_id;
 
     // 2. Validate Route Parameter (studentId)
     const validationResult = UserIdSchema.safeParse({ userId: params.studentId });
@@ -59,13 +44,10 @@ export async function GET(
 
     const { userId: studentId } = validationResult.data;
 
-    // Get Supabase client
-    const supabase = await createClient();
-
     // 3. Fetch Learner Profile
     const { data: learnerProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('*, client:clients(id, name)')
+      .select(`${SELECTORS.LEARNER.DETAIL}, client:clients(${SELECTORS.CLIENT.DROPDOWN})`) // 📊 OPTIMIZED: Specific fields only
       .eq('id', studentId)
       .eq('role', 'Student' as UserRole)
       .single();
@@ -81,7 +63,7 @@ export async function GET(
     }
 
     // 4. Verify Staff Access (Crucial Step)
-    if (role === 'Staff') {
+    if (userRole === 'Staff') {
       if (!sessionClientId) {
          console.warn(`Staff user ${user.id} accessing learner ${studentId} has no client_id assigned.`);
          return new NextResponse(JSON.stringify({ error: 'Forbidden: Staff user not assigned to a client' }), {
@@ -100,22 +82,22 @@ export async function GET(
     // Admins pass through this check
 
     // 5. Fetch Progress Summary (Adapted for available tables)
-    const { data: courseProgress, error: progressError } = await supabase
-        .from('student_course_progress')
-        .select('*')
+    const { data: moduleProgress, error: progressError } = await supabase
+        .from('student_module_progress')
+        .select(STUDENT_MODULE_PROGRESS_SELECTORS.SUMMARY) // 📊 OPTIMIZED: Specific fields only
         .eq('student_id', studentId);
 
     if (progressError) {
         console.error('Progress Fetch Error:', progressError);
-        return new NextResponse(JSON.stringify({ error: 'Database error fetching course progress' }), {
+        return new NextResponse(JSON.stringify({ error: 'Database error fetching module progress' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
         });
     }
 
     const progressSummary = {
-        courses: courseProgress || [],
-        // assessments: [], // Placeholder
+        modules: moduleProgress || [],
+        // assessments: [], // Placeholder for future
     };
 
     // 6. Combine and Return Response

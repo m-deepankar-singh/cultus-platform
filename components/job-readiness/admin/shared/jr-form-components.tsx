@@ -455,7 +455,7 @@ export function TierPrompts({ form, tier, label, description }: TierPromptsProps
 
 // New schemas for progress override
 export const progressOverrideSchema = z.object({
-  job_readiness_star_level: z.enum(["ONE", "TWO", "THREE", "FOUR", "FIVE"]).nullable().optional(),
+  job_readiness_star_level: z.enum(["NONE", "ONE", "TWO", "THREE", "FOUR", "FIVE"]).nullable().optional(),
   job_readiness_tier: z.enum(["BRONZE", "SILVER", "GOLD"], {
     required_error: "Tier is required",
   }),
@@ -479,7 +479,7 @@ interface ProgressOverrideFormProps {
 
 export function ProgressOverrideForm({ form, currentStarLevel, currentTier }: ProgressOverrideFormProps) {
   const starLevelOptions = [
-    { value: "", label: "☆ No Stars" },
+    { value: "NONE", label: "☆ No Stars" },
     { value: "ONE", label: "⭐ Level 1" },
     { value: "TWO", label: "⭐⭐ Level 2" },
     { value: "THREE", label: "⭐⭐⭐ Level 3" },
@@ -523,8 +523,8 @@ export function ProgressOverrideForm({ form, currentStarLevel, currentTier }: Pr
             <FormItem>
               <FormLabel>New Star Level</FormLabel>
               <Select 
-                onValueChange={(value) => field.onChange(value === "" ? null : value)} 
-                defaultValue={field.value || ""}
+                onValueChange={(value) => field.onChange(value === "NONE" ? null : value)} 
+                defaultValue={field.value || "NONE"}
               >
                 <FormControl>
                   <SelectTrigger>

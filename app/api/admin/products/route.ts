@@ -2,47 +2,25 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Adjust path if needed
 import { ProductSchema } from '@/lib/schemas/product'; // Import ProductSchema
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-
-    // 1. Authentication & Authorization
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('Authentication error:', authError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    // Fetch the user's profile to check their role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-        console.error('Error fetching user profile or profile not found:', profileError);
-        // If the user is authenticated but has no profile, treat as unauthorized or error
-        return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
-    }
-
-    // Authorize based on role - allow Admin and Staff
-    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
-        console.warn(`User ${user.id} with role ${profile.role} attempted to access products route.`);
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // --- User is authenticated and is an Admin or Staff, proceed ---
-
-    // 2. Parse Query Parameters
+    // Parse Query Parameters
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = parseInt(searchParams.get('pageSize') || '10', 10);
 
-    // 3. Build Supabase Query for Count
+    // Build Supabase Query for Count
     let countQuery = supabase
       .from('products')
       .select('id', { count: 'exact', head: true });
@@ -65,10 +43,10 @@ export async function GET(request: Request) {
       return NextResponse.json(createPaginatedResponse([], 0, page, pageSize), { status: 200 });
     }
 
-    // 4. Build Supabase Query for Data
+    // Build Supabase Query for Data
     let dataQuery = supabase
       .from('products')
-      .select('*');
+      .select(SELECTORS.PRODUCT.LIST); // 📊 OPTIMIZED: Specific fields only (id, name, type, is_active, created_at, description)
 
     // Apply search filter to data query
     if (searchQuery) {
@@ -88,7 +66,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch products', details: dataError.message }, { status: 500 });
     }
 
-    // 5. Return paginated response
+    // Return paginated response
     return NextResponse.json(createPaginatedResponse(products || [], count || 0, page, pageSize), { status: 200 });
 
   } catch (error) {
@@ -101,32 +79,14 @@ export async function GET(request: Request) {
 // Handler for creating a new product
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-
-    // 1. Authentication & Authorization (Allow Admin and Staff)
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 });
-    }
-
-    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // --- User is authenticated and is an Admin or Staff, proceed ---
-
-    // 2. Parse & Validate Request Body
+    // Parse & Validate Request Body
     let body;
     try {
       body = await request.json();
@@ -149,7 +109,7 @@ export async function POST(request: Request) {
       image_url: productData.image_url || 'No image_url provided'
     });
 
-    // 3. Insert Product into Database
+    // Insert Product into Database
     const { data: newProduct, error: dbError } = await supabase
       .from('products')
       .insert(productData)
@@ -162,7 +122,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create product', details: dbError.message }, { status: 500 });
     }
 
-    // 4. Handle Response
+    // Handle Response
     if (!newProduct) { // Should not happen if dbError is null, but good practice to check
         console.error('Product creation failed silently after insert.');
         return NextResponse.json({ error: 'Failed to create product' }, { status: 500 });

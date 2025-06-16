@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * POST /api/app/job-readiness/promotion-exam/submit
@@ -8,7 +9,13 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     const body = await req.json();
     
     // Validate request body
@@ -26,15 +33,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         error: 'Exam session ID, product ID, questions, and answers array are required' 
       }, { status: 400 });
-    }
-
-    // Verify authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Check if this exam session has already been submitted

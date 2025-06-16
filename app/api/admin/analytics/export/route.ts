@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
+import { authenticateApiRequest } from "@/lib/auth/api-auth";
 
 export async function GET() {
   try {
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
+    
     // In a real implementation, we would:
-    // 1. Check user authentication and authorization (Admin/Staff/Viewer roles)
-    // 2. Query database for analytics data
+    // 1. ✅ User authentication and authorization completed (Admin/Staff roles verified)
+    // 2. Query database for analytics data based on user's role and permissions
     // 3. Generate an actual Excel file using a library like exceljs, xlsx, etc.
     
     // For demo purposes, we're creating a simple CSV file as a placeholder

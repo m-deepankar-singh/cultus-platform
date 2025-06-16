@@ -1,23 +1,27 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { EnrollStudentSchema } from '@/lib/schemas/enrollment';
 import { USER_ROLES } from '@/lib/schemas/user';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: Request,
   { params }: { params: { clientId: string } }
 ) {
   try {
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile) {
-      console.error('GET /students Auth Error:', authError);
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
+
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const userClientId = claims.client_id;
 
     // Await params before validation
     const awaitedParams = await params;
@@ -30,15 +34,14 @@ export async function GET(
     }
     const validatedClientId = validationResult.data.clientId;
 
-    const isAdmin = role === USER_ROLES.find(r => r === 'Admin'); 
-    const isStaffForClient = role === USER_ROLES.find(r => r === 'Staff') && profile.client_id === validatedClientId;
+    const isAdmin = userRole === 'Admin'; 
+    const isStaffForClient = userRole === 'Staff' && userClientId === validatedClientId;
 
     if (!isAdmin && !isStaffForClient) {
-      console.warn(`GET /students AuthZ Failed: User ${profile.id} (${role}) attempted access to client ${validatedClientId}`);
+      console.warn(`GET /students AuthZ Failed: User ${user.id} (${userRole}) attempted access to client ${validatedClientId}`);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const supabase = await createClient(); 
     const { data: students, error: dbError } = await supabase
       .from('students')
       .select('id, full_name, email, created_at, is_active, last_login_at') 
@@ -63,13 +66,16 @@ export async function POST(
   { params }: { params: { clientId: string } }
 ) {
   try {
-    // 1. Authentication & Authorization
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile || !role) {
-      console.error('POST /students Auth Error:', authError);
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
+        // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
+
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const userClientId = claims.client_id;
 
     // 2. Validate clientId route parameter
     // Await params before validation
@@ -84,11 +90,11 @@ export async function POST(
     const validatedClientId = clientIdValidation.data.clientId;
 
     // 3. Authorization Check: Admin or Staff associated with the client
-    const isAdmin = role === USER_ROLES.find(r => r === 'Admin');
-    const isStaffForClient = role === USER_ROLES.find(r => r === 'Staff') && profile.client_id === validatedClientId;
+    const isAdmin = userRole === 'Admin';
+    const isStaffForClient = userRole === 'Staff' && userClientId === validatedClientId;
 
     if (!isAdmin && !isStaffForClient) {
-      console.warn(`POST /students AuthZ Failed: User ${profile.id} (${role}) attempted access to client ${validatedClientId}`);
+      console.warn(`POST /students AuthZ Failed: User ${user.id} (${userRole}) attempted access to client ${validatedClientId}`);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -304,20 +310,23 @@ if (!studentIdValidation.success) {
     }
     const validatedStudentId = studentIdValidation.data;
 
-    // 2. Authentication & Authorization
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile || !role) {
-      console.error('DELETE /students Auth Error:', authError);
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
+    // 2. JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
+
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const userClientId = claims.client_id;
 
     // 3. Authorization Check: Admin or Staff associated with the client
-    const isAdmin = role === USER_ROLES.find(r => r === 'Admin');
-    const isStaffForClient = role === USER_ROLES.find(r => r === 'Staff') && profile.client_id === validatedClientId;
+    const isAdmin = userRole === 'Admin';
+    const isStaffForClient = userRole === 'Staff' && userClientId === validatedClientId;
 
     if (!isAdmin && !isStaffForClient) {
-      console.warn(`DELETE /students AuthZ Failed: User ${profile.id} (${role}) attempted to unenroll student ${validatedStudentId} from client ${validatedClientId}`);
+      console.warn(`DELETE /students AuthZ Failed: User ${user.id} (${userRole}) attempted to unenroll student ${validatedStudentId} from client ${validatedClientId}`);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -413,20 +422,23 @@ export async function PATCH(
     
     const { is_active } = bodyValidation.data;
 
-    // 2. Authentication & Authorization
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile || !role) {
-      console.error('PATCH /students Auth Error:', authError);
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
+    // 2. JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
+
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const userClientId = claims.client_id;
 
     // 3. Authorization Check: Admin or Staff associated with the client
-    const isAdmin = role === USER_ROLES.find(r => r === 'Admin');
-    const isStaffForClient = role === USER_ROLES.find(r => r === 'Staff') && profile.client_id === validatedClientId;
+    const isAdmin = userRole === 'Admin';
+    const isStaffForClient = userRole === 'Staff' && userClientId === validatedClientId;
 
     if (!isAdmin && !isStaffForClient) {
-      console.warn(`PATCH /students AuthZ Failed: User ${profile.id} (${role}) attempted to update student ${validatedStudentId} for client ${validatedClientId}`);
+      console.warn(`PATCH /students AuthZ Failed: User ${user.id} (${userRole}) attempted to update student ${validatedStudentId} for client ${validatedClientId}`);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

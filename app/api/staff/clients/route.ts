@@ -1,41 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-
-    // 1. Get user session and role
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('Auth Error:', authError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role') // Fetch role from profiles table
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-        console.error('Profile Fetch Error:', profileError);
-        return NextResponse.json({ error: 'Forbidden or Profile Not Found' }, { status: 403 });
-    }
-
-    if (!profile) {
-        console.error('Profile not found for user:', user.id);
-        return NextResponse.json({ error: 'Forbidden: User profile not found.' }, { status: 403 });
-    }
-
-    const role = profile.role;
-
-    // 2. Check if the role is allowed (Staff or Admin)
-    if (!['Staff', 'Admin'].includes(role)) {
-      console.warn(`User ${user.id} with role ${role} attempted to access staff route.`);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // --- User is authenticated and has an allowed role (Staff or Admin), proceed --- 
 
@@ -47,7 +22,7 @@ export async function GET(request: Request) {
     // 4. Build Supabase Query (RLS Enforced)
     // RLS policies will automatically scope the results based on the user's role.
     // Admins should see all clients (if RLS allows), Staff should only see their assigned clients.
-    let query = supabase.from('clients').select('*'); // Adjust columns as needed
+    let query = supabase.from('clients').select(SELECTORS.CLIENT.LIST); // 📊 OPTIMIZED: Specific fields only
 
     // Apply optional filters
     if (searchQuery) {

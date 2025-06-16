@@ -42,6 +42,7 @@ interface JrBackgroundFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   background?: JrBackground | null
+  existingBackgrounds?: JrBackground[]
   onSubmit: (data: CreateJrBackgroundRequest | UpdateJrBackgroundRequest) => Promise<void>
   isLoading?: boolean
 }
@@ -52,10 +53,27 @@ export function JrBackgroundForm({
   open,
   onOpenChange,
   background,
+  existingBackgrounds = [],
   onSubmit,
   isLoading = false,
 }: JrBackgroundFormProps) {
   const isEditing = !!background
+
+  // Check if a combination already exists (excluding current background when editing)
+  const isDuplicateCombination = (backgroundType: string, projectType: string) => {
+    if (!backgroundType || !projectType) return false
+    
+    return existingBackgrounds.some(
+      bg => bg.background_type === backgroundType && 
+            bg.project_type === projectType &&
+            (!isEditing || bg.id !== background?.id)
+    )
+  }
+
+  // Get existing combinations for display
+  const existingCombinations = existingBackgrounds.map(
+    bg => `${getBackgroundTypeLabel(bg.background_type)} → ${getProjectTypeLabel(bg.project_type)}`
+  )
 
   // Get default values
   const getDefaultValues = (): Partial<FormData> => {
@@ -106,6 +124,15 @@ export function JrBackgroundForm({
   }, [open, background])
 
   const handleSubmit = async (data: FormData) => {
+    // Check for duplicate combination before submitting
+    if (!isEditing && isDuplicateCombination(data.background_type, data.project_type)) {
+      form.setError("project_type", {
+        type: "manual",
+        message: "This background and project type combination already exists. Please choose a different combination."
+      })
+      return
+    }
+
     if (isEditing && background) {
       // Update request
       const updateData: UpdateJrBackgroundRequest = {
@@ -221,6 +248,23 @@ export function JrBackgroundForm({
               )}
             />
           </div>
+
+          {/* Display existing combinations for reference */}
+          {!isEditing && existingCombinations.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Existing Combinations:</h4>
+              <div className="text-xs text-muted-foreground space-y-1">
+                {existingCombinations.map((combo, index) => (
+                  <div key={index} className="pl-2 border-l-2 border-muted">
+                    {combo}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Please choose a different combination to avoid duplicates.
+              </p>
+            </div>
+          )}
 
           <Separator />
 

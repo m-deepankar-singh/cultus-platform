@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define schemas for validation
 const ModuleIdSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -11,6 +12,19 @@ const SubmissionSchema = z.object({
   time_spent_seconds: z.number().optional(),
   started_at: z.string().optional(),
 });
+
+// Type for question data from database
+interface QuestionData {
+  question_id: string;
+  sequence: number;
+  assessment_questions: {
+    id: string;
+    question_text: string;
+    question_type: 'MCQ' | 'MSQ' | 'TF';
+    options: { id: string; text: string }[];
+    correct_answer: any;
+  } | null;
+}
 
 interface AssessmentSubmissionResponse {
   success: boolean;
@@ -42,14 +56,12 @@ export async function POST(
     }
     const validModuleId = moduleIdValidation.data;
 
-    // 2. Authentication
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 2. JWT-based authentication (replaces getUser() + student record lookup)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
     // 3. Parse and validate request body
     let body;
@@ -76,36 +88,24 @@ export async function POST(
 
     const { answers, time_spent_seconds, started_at } = validation.data;
 
-    // 4. Get student information
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('client_id, is_active, job_readiness_tier, job_readiness_star_level')
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError) {
-      console.error('Student Fetch Error:', studentFetchError);
-      if (studentFetchError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Forbidden: Student record not found' },
-          { status: 403 },
-        );
-      }
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
       return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch student record' },
-        { status: 500 },
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 }
       );
     }
 
-    if (!studentRecord.is_active) {
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
       return NextResponse.json(
-        { error: 'Forbidden: Student account is inactive' },
-        { status: 403 },
+        { error: 'Forbidden: Student not linked to a client' },
+        { status: 403 }
       );
     }
 
     const studentId = user.id;
-    const clientId = studentRecord.client_id;
 
     // 5. Fetch Assessment Module Details (must be Job Readiness assessment)
     const { data: moduleData, error: moduleError } = await supabase
@@ -198,77 +198,78 @@ export async function POST(
       .from('assessment_module_questions')
       .select(`
         question_id,
+        sequence,
         assessment_questions (
-          id, 
-          question_text, 
-          question_type, 
+          id,
+          question_text,
+          question_type,
           options,
           correct_answer
         )
       `)
-      .eq('module_id', validModuleId);
+      .eq('module_id', validModuleId)
+      .order('sequence', { ascending: true });
 
     if (questionError) {
-      console.error(`Error fetching questions for module ${validModuleId}:`, questionError);
+      console.error(`Error fetching questions for assessment ${validModuleId}:`, questionError);
       return NextResponse.json(
         { error: 'Failed to fetch assessment questions', details: questionError.message },
         { status: 500 }
       );
     }
 
-    // 10. Calculate score
+    // Process questions and calculate score
+    const questions = (questionData || []).filter((q: QuestionData) => q.assessment_questions !== null);
     let correctAnswers = 0;
-    const totalQuestions = questionData.length;
+    const totalQuestions = questions.length;
 
-    for (const questionItem of questionData) {
-      const question = questionItem.assessment_questions;
-      if (!question) continue;
+    if (totalQuestions === 0) {
+      return NextResponse.json(
+        { error: 'No questions found for this assessment' },
+        { status: 404 }
+      );
+    }
 
-      const questionId = questionItem.question_id;
-      const userAnswer = answers[questionId];
-      
-      // Handle the correct answer structure based on question type
-      let correctAnswerIds: string[] = [];
-      if ((question as any).question_type === 'MSQ') {
-        // For MSQ, correct_answer is { answers: ["opt_a", "opt_b"] }
-        const correctAnswerData = (question as any).correct_answer;
-        correctAnswerIds = correctAnswerData?.answers || [];
-      } else {
-        // For MCQ and TF, correct_answer is just a string
-        const correctAnswerData = (question as any).correct_answer;
-        correctAnswerIds = correctAnswerData ? [correctAnswerData] : [];
-      }
+    // Calculate score
+    for (const questionEntry of questions) {
+      const question = questionEntry.assessment_questions!;
+      const studentAnswer = answers[question.id];
+      const correctAnswer = question.correct_answer;
 
-      if (!userAnswer || correctAnswerIds.length === 0) continue;
-
-      // Handle different question types
-      if ((question as any).question_type === 'MCQ' || (question as any).question_type === 'TF') {
-        // Single correct answer
-        if (typeof userAnswer === 'string' && correctAnswerIds.includes(userAnswer)) {
-          correctAnswers++;
-        }
-      } else if ((question as any).question_type === 'MSQ') {
-        // Multiple correct answers - must match exactly
-        if (Array.isArray(userAnswer)) {
-          const sortedUserAnswers = [...userAnswer].sort();
-          const sortedCorrectAnswers = [...correctAnswerIds].sort();
-          if (JSON.stringify(sortedUserAnswers) === JSON.stringify(sortedCorrectAnswers)) {
+      if (studentAnswer && correctAnswer) {
+        // Handle different question types
+        if (question.question_type === 'MCQ' || question.question_type === 'TF') {
+          // Single correct answer
+          if (studentAnswer === correctAnswer) {
+            correctAnswers++;
+          }
+        } else if (question.question_type === 'MSQ') {
+          // Multiple correct answers - compare arrays
+          const studentAnswers = Array.isArray(studentAnswer) ? studentAnswer.sort() : [studentAnswer].sort();
+          const correctAnswers_arr = Array.isArray(correctAnswer) ? correctAnswer.sort() : [correctAnswer].sort();
+          
+          if (JSON.stringify(studentAnswers) === JSON.stringify(correctAnswers_arr)) {
             correctAnswers++;
           }
         }
       }
     }
 
-    const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    const passingThreshold = config.passThreshold || config.passing_threshold || 60;
+    const percentage = Math.round((correctAnswers / totalQuestions) * 100);
+    const passingThreshold = config.passing_threshold || config.passingThreshold || 60;
     const passed = percentage >= passingThreshold;
 
-    // 11. Get Job Readiness tier configuration
+    // 10. Get Job Readiness tier configuration and determine tier
     const { data: tierConfig, error: tierConfigError } = await supabase
       .from('job_readiness_products')
       .select('*')
       .eq('product_id', productData.id)
       .maybeSingle();
+
+    if (tierConfigError && tierConfigError.code !== 'PGRST116') {
+      console.error('Error fetching tier config:', tierConfigError);
+      // Continue with default values
+    }
 
     const defaultTierConfig = {
       bronze_assessment_min_score: 0,
@@ -281,247 +282,186 @@ export async function POST(
 
     const finalTierConfig = tierConfig || defaultTierConfig;
 
-    // 12. Save submission to student_module_progress (without tier assignment for individual assessment)
-    const progressDetails = {
-      answers,
-      score: percentage,
-      correct_answers: correctAnswers,
-      total_questions: totalQuestions,
-      time_spent_seconds,
-      started_at,
-      submitted_at: new Date().toISOString(),
+    // Determine tier achieved based on score
+    let tierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' | null = null;
+    if (percentage >= finalTierConfig.gold_assessment_min_score) {
+      tierAchieved = 'GOLD';
+    } else if (percentage >= finalTierConfig.silver_assessment_min_score) {
+      tierAchieved = 'SILVER';
+    } else if (percentage >= finalTierConfig.bronze_assessment_min_score) {
+      tierAchieved = 'BRONZE';
+    }
+
+    // Get current tier from JWT claims
+    const currentTier = claims.job_readiness_tier;
+    const tierChanged = currentTier !== tierAchieved;
+
+    // 11. Create submission record in student_module_progress
+    const submissionId = crypto.randomUUID();
+    const submissionData = {
+      student_id: studentId,
+      module_id: validModuleId,
+      status: 'Completed',
+      progress_percentage: percentage,
+      completed_at: new Date().toISOString(),
+      progress_details: {
+        submission_id: submissionId,
+        answers: answers,
+        correct_answers: correctAnswers,
+        total_questions: totalQuestions,
+        score_percentage: percentage,
+        tier_achieved: tierAchieved,
+        time_spent_seconds: time_spent_seconds,
+        started_at: started_at,
+        submitted_at: new Date().toISOString(),
+      },
+      last_updated: new Date().toISOString()
     };
 
-    const { data: submissionRecord, error: submissionError } = await supabase
+    const { error: submissionError } = await supabase
       .from('student_module_progress')
-      .upsert({
-        student_id: studentId,
-        module_id: validModuleId,
-        status: 'Completed',
-        progress_percentage: percentage,
-        progress_details: progressDetails,
-        completed_at: new Date().toISOString(),
-        last_updated: new Date().toISOString(),
-      })
-      .select('student_id, module_id')
-      .single();
+      .upsert(submissionData, { 
+        onConflict: 'student_id,module_id',
+        ignoreDuplicates: false 
+      });
 
     if (submissionError) {
-      console.error('Error saving submission:', submissionError);
+      console.error('Error saving assessment submission:', submissionError);
       return NextResponse.json(
-        { error: 'Failed to save submission', details: submissionError.message },
+        { error: 'Failed to save assessment submission', details: submissionError.message },
         { status: 500 }
       );
     }
 
-    // 13. Check if ALL assessment modules are completed before assigning any tier
-    let tierChanged = false;
+    // 12. Update student tier if tier changed and it's higher
     let starLevelUnlocked = false;
-    let tierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' | null = null;
-    let allAssessmentsCompleted = false;
+    if (tierChanged && tierAchieved) {
+      // Only update if new tier is "higher" than current tier
+      const tierOrder = { 'BRONZE': 1, 'SILVER': 2, 'GOLD': 3 };
+      const currentTierOrder = currentTier ? tierOrder[currentTier as keyof typeof tierOrder] : 0;
+      const newTierOrder = tierOrder[tierAchieved];
+
+      if (newTierOrder > currentTierOrder) {
+        const { error: tierUpdateError } = await supabase
+          .from('students')
+          .update({ 
+            job_readiness_tier: tierAchieved,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', studentId);
+
+        if (tierUpdateError) {
+          console.error('Error updating student tier:', tierUpdateError);
+          // Continue - don't fail the whole submission
+        }
+      }
+    }
+
+    // 13. Check if student should get their first star (after completing ALL assessments)
+    // Check the current database state, not JWT claims which might be stale
+    const { data: currentStudentData, error: studentDataError } = await supabase
+      .from('students')
+      .select('job_readiness_star_level')
+      .eq('id', studentId)
+      .single();
+
+    if (studentDataError) {
+      console.error('Error fetching current student star level:', studentDataError);
+    }
+
+    const currentStarLevel = currentStudentData?.job_readiness_star_level;
     
-    const currentTier = studentRecord.job_readiness_tier;
-    const currentStarLevel = studentRecord.job_readiness_star_level;
+    // Only check for first star if student doesn't have one yet and assessment passed
+    if (passed && !currentStarLevel) {
+      // Check if ALL assessments for this product are now completed
+      const { data: completedAssessments, error: completedCountError } = await supabase
+        .from('modules')
+        .select(`
+          id,
+          student_module_progress!inner (
+            status
+          )
+        `)
+        .eq('product_id', productData.id)
+        .eq('type', 'Assessment')
+        .eq('student_module_progress.student_id', studentId)
+        .eq('student_module_progress.status', 'Completed');
 
-    console.log(`Tier assignment check - Student: ${studentId}, Current Star: ${currentStarLevel}, Current Tier: ${currentTier}`);
+      // Get total assessment count for this product
+      const { count: totalAssessmentCount, error: totalCountError } = await supabase
+        .from('modules')
+        .select('id', { count: 'exact' })
+        .eq('product_id', productData.id)
+        .eq('type', 'Assessment');
 
-    // Get ALL assessment modules for this product
-    const { data: allAssessmentModules, error: allModulesError } = await supabase
-      .from('modules')
-      .select('id')
-      .eq('product_id', productData.id)
-      .eq('type', 'Assessment');
-
-    if (allModulesError) {
-      console.error('Error fetching all assessment modules:', allModulesError);
-      // Continue without tier evaluation
-    } else if (allAssessmentModules && allAssessmentModules.length > 0) {
-      console.log(`Found ${allAssessmentModules.length} assessment modules for product ${productData.id}`);
-      
-      // Get completed assessment modules for this student
-      const { data: completedModules, error: completedError } = await supabase
-        .from('student_module_progress')
-        .select('module_id, progress_details')
-        .eq('student_id', studentId)
-        .eq('status', 'Completed')
-        .in('module_id', allAssessmentModules.map(m => m.id));
-
-      if (completedError) {
-        console.error('Error fetching completed modules:', completedError);
-      } else {
-        console.log(`Found ${completedModules?.length || 0} completed modules`);
+      if (!completedCountError && !totalCountError) {
+        const completedCount = completedAssessments?.length || 0;
+        const totalCount = totalAssessmentCount || 0;
         
-        // Check if ALL assessment modules are now completed (including the current one)
-        const completedModuleIds = completedModules?.map(m => m.module_id) || [];
-        const allModuleIds = allAssessmentModules.map(m => m.id);
-        allAssessmentsCompleted = allModuleIds.every(id => completedModuleIds.includes(id));
-
-        console.log(`All modules: [${allModuleIds.join(', ')}]`);
-        console.log(`Completed modules: [${completedModuleIds.join(', ')}]`);
-        console.log(`All completed: ${allAssessmentsCompleted}`);
-
-        if (allAssessmentsCompleted) {
-          console.log('All assessments completed! Calculating overall performance and assigning tier...');
+        console.log(`Assessment completion check: ${completedCount}/${totalCount} assessments completed for product ${productData.id}`);
+        
+        // Award first star if ALL assessments are completed
+        if (completedCount === totalCount && totalCount > 0) {
+          console.log(`🌟 Student ${studentId} completed all ${totalCount} assessments. Awarding first star!`);
           
-          // Calculate overall performance across all assessment modules
-          let totalScore = 0;
-          let totalModules = 0;
+          const { error: starUpdateError } = await supabase
+            .from('students')
+            .update({
+              job_readiness_star_level: 'ONE',
+              job_readiness_last_updated: new Date().toISOString(),
+            })
+            .eq('id', studentId);
 
-          for (const completedModule of completedModules) {
-            const progressDetails = completedModule.progress_details as any;
-            if (progressDetails?.score) {
-              totalScore += progressDetails.score;
-              totalModules++;
-              console.log(`Module ${completedModule.module_id}: ${progressDetails.score}%`);
-            }
-          }
-
-          // Calculate average score across all assessments
-          const averageScore = totalModules > 0 ? Math.round(totalScore / totalModules) : 0;
-          console.log(`Average score across ${totalModules} modules: ${averageScore}%`);
-
-          // Determine tier based on overall performance
-          if (averageScore >= finalTierConfig.gold_assessment_min_score) {
-            tierAchieved = 'GOLD';
-          } else if (averageScore >= finalTierConfig.silver_assessment_min_score) {
-            tierAchieved = 'SILVER';
-          } else if (averageScore >= finalTierConfig.bronze_assessment_min_score) {
-            tierAchieved = 'BRONZE';
-          }
-
-          console.log(`Overall tier achieved: ${tierAchieved}`);
-
-          // Check if this is the first star or a tier upgrade
-          if (!currentStarLevel || currentStarLevel === null) {
-            // First star unlock
+          if (!starUpdateError) {
             starLevelUnlocked = true;
-            tierChanged = true;
-            
-            console.log(`Updating student ${studentId} with tier: ${tierAchieved}, star: ONE`);
-            
-            const { error: updateStudentError } = await supabase
-              .from('students')
-              .update({
-                job_readiness_tier: tierAchieved,
-                job_readiness_star_level: 'ONE',
-                job_readiness_last_updated: new Date().toISOString(),
-              })
-              .eq('id', studentId);
-
-            if (updateStudentError) {
-              console.error('Error updating student tier and star level:', updateStudentError);
-              // Continue - don't fail the submission
-              starLevelUnlocked = false;
-              tierChanged = false;
-              tierAchieved = null;
-            } else {
-              console.log('Successfully updated student tier and star level!');
-            }
+            console.log('🎉 Successfully awarded first star for completing all assessments!');
           } else {
-            // Student already has a star, check if tier should be updated
-            const tierHierarchy = { 'BRONZE': 1, 'SILVER': 2, 'GOLD': 3 };
-            const currentTierLevel = tierHierarchy[currentTier as keyof typeof tierHierarchy] || 0;
-            const achievedTierLevel = tierAchieved ? tierHierarchy[tierAchieved] : 0;
-
-            if (achievedTierLevel > currentTierLevel) {
-              tierChanged = true;
-              
-              console.log(`Upgrading student ${studentId} tier from ${currentTier} to ${tierAchieved}`);
-              
-              const { error: updateTierError } = await supabase
-                .from('students')
-                .update({
-                  job_readiness_tier: tierAchieved,
-                  job_readiness_last_updated: new Date().toISOString(),
-                })
-                .eq('id', studentId);
-
-              if (updateTierError) {
-                console.error('Error updating student tier:', updateTierError);
-                tierChanged = false;
-                tierAchieved = currentTier; // Keep current tier if update failed
-              }
-            } else {
-              // No tier change needed, return current tier
-              tierAchieved = currentTier;
-            }
+            console.error('Error updating student star level:', starUpdateError);
           }
         } else {
-          console.log('Not all assessments completed yet. Missing modules:', 
-            allModuleIds.filter(id => !completedModuleIds.includes(id)));
-        }
-      }
-    } else {
-      console.log('No assessment modules found for this product');
-    }
-
-    // 14. Generate feedback based on new tier assignment logic
-    let feedback = `Assessment completed with ${percentage}% (${correctAnswers}/${totalQuestions} correct). `;
-    
-    if (passed) {
-      feedback += `Congratulations! You passed the assessment. `;
-      
-      if (allAssessmentsCompleted) {
-        // All assessments completed - tier has been assigned
-        if (starLevelUnlocked) {
-          feedback += `🌟 Excellent! You've completed ALL assessment modules and unlocked Star Level ONE! Your overall tier is ${tierAchieved}! `;
-        } else if (tierChanged) {
-          feedback += `Your Job Readiness tier has been upgraded to ${tierAchieved}! `;
-        } else {
-          feedback += `Your Job Readiness tier remains ${tierAchieved}. `;
+          console.log(`Student ${studentId} completed ${completedCount}/${totalCount} assessments. First star will be awarded when all are complete.`);
         }
       } else {
-        // Not all assessments completed yet - no tier assigned
-        const { data: allModules } = await supabase
-          .from('modules')
-          .select('id')
-          .eq('product_id', productData.id)
-          .eq('type', 'Assessment');
-        
-        const { data: completed } = await supabase
-          .from('student_module_progress')
-          .select('module_id', { count: 'exact' })
-          .eq('student_id', studentId)
-          .eq('status', 'Completed')
-          .in('module_id', (allModules || []).map(m => m.id));
-        
-        const totalAssessments = allModules?.length || 0;
-        const completedAssessments = completed?.length || 0;
-        
-        feedback += `Complete all ${totalAssessments} assessment modules (${completedAssessments}/${totalAssessments} done) to unlock your first star and determine your Job Readiness tier. `;
+        console.error('Error checking assessment completion:', { completedCountError, totalCountError });
       }
-    } else {
-      feedback += `You need ${passingThreshold}% to pass. `;
-      if (retakesAllowed) {
-        feedback += `You can retake this assessment to improve your score. `;
-      }
-      if (!allAssessmentsCompleted) {
-        feedback += `Remember: complete all assessment modules to determine your overall Job Readiness tier. `;
-      }
+    } else if (currentStarLevel) {
+      console.log(`Student ${studentId} already has star level ${currentStarLevel}, skipping star awarding logic.`);
     }
 
-    // 15. Return response - only include tier_achieved if all assessments are completed
+    // 14. Generate feedback
+    let feedback = '';
+    if (passed) {
+      feedback = `Congratulations! You scored ${percentage}% and passed the assessment.`;
+      if (tierAchieved) {
+        feedback += ` You have achieved ${tierAchieved} tier.`;
+      }
+      if (starLevelUnlocked) {
+        feedback += ` You have unlocked a new star level!`;
+      }
+    } else {
+      feedback = `You scored ${percentage}%. The passing threshold is ${passingThreshold}%. Please review the material and try again.`;
+    }
+
     const response: AssessmentSubmissionResponse = {
       success: true,
       score: correctAnswers,
-      percentage,
-      passed,
-      tier_achieved: allAssessmentsCompleted ? tierAchieved : null,
+      percentage: percentage,
+      passed: passed,
+      tier_achieved: tierAchieved,
       tier_changed: tierChanged,
       star_level_unlocked: starLevelUnlocked,
-      feedback,
+      feedback: feedback,
       correct_answers: correctAnswers,
       total_questions: totalQuestions,
-      submission_id: submissionRecord.student_id + '-' + submissionRecord.module_id,
+      submission_id: submissionId,
     };
 
     return NextResponse.json(response);
 
-  } catch (e) {
-    const error = e as Error;
-    console.error('Unexpected error in /api/app/job-readiness/assessments/[moduleId]/submit:', error);
+  } catch (error) {
+    console.error('Unexpected error in Job Readiness assessment submission:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred.', details: error.message },
+      { error: 'An unexpected error occurred', details: (error as Error).message },
       { status: 500 }
     );
   }

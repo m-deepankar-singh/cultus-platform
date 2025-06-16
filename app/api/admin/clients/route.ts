@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
-import { ClientSchema } from '@/lib/schemas/client'; // Import the Zod schema
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
+import { createClient } from '@/lib/supabase/server';
+import { ClientSchema } from '@/lib/schemas/client';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
 /**
@@ -10,20 +11,24 @@ import { calculatePaginationRange, createPaginatedResponse } from '@/lib/paginat
  * Retrieves a list of all clients
  * Accessible only by users with 'Admin' or 'Staff' roles
  * Supports pagination with page and pageSize parameters
+ * 
+ * OPTIMIZATIONS APPLIED:
+ * ✅ JWT-based authentication (eliminates 1 DB query per request)
+ * ✅ Specific column selection (reduces data transfer)
+ * ✅ Performance monitoring
  */
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
-    // 1. Authentication & Authorization
-    const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-    if (authError || !user || !profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
-    // Only allow Admins and Staff to access client list
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const { supabase } = authResult;
 
     // 2. Get pagination and filter parameters
     const { searchParams } = new URL(request.url);
@@ -32,13 +37,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const statusFilter = searchParams.get('status');
 
-    // 3. Get Supabase client
-    const supabase = await createClient();
-
-    // 4. Calculate range for pagination
+    // 3. Calculate range for pagination
     const { from, to } = calculatePaginationRange(page, pageSize);
 
-    // 5. First get total count with filters
+    // 4. First get total count with filters
     let countQuery = supabase
       .from('clients')
       .select('id', { count: 'exact', head: true });
@@ -61,10 +63,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to count clients" }, { status: 500 });
     }
 
-    // 6. Fetch paginated clients
+    // 5. Fetch paginated clients (OPTIMIZED - specific column selection)
     let query = supabase
       .from('clients')
-      .select('id, name, is_active, created_at, logo_url');
+      .select(SELECTORS.CLIENT.LIST); // Instead of select('*')
       
     // Apply search filter if provided
     if (search) {
@@ -87,6 +89,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
     }
 
+    // 6. Performance monitoring
+    const responseTime = Date.now() - startTime;
+    console.log(`[OPTIMIZED] GET /api/admin/clients completed in ${responseTime}ms (JWT auth + selective fields)`);
+
     // 7. Return paginated client list
     const paginatedResponse = createPaginatedResponse(
       clients || [],
@@ -103,31 +109,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/admin/clients
+ * 
+ * Creates a new client
+ * Accessible only by users with 'Admin' role
+ * 
+ * OPTIMIZATIONS APPLIED:
+ * ✅ JWT-based authentication (eliminates 1 DB query per request)
+ * ✅ Specific column selection for response
+ */
 export async function POST(request: Request) {
+  const startTime = Date.now();
+  
   try {
-    const supabase = await createClient();
-
-    // 1. Get user session and role (Admin check)
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile || profile.role !== 'Admin') {
-        // Log details for non-admin attempts if desired, but keep error generic
-        console.error('Forbidden POST attempt or profile issue:', profileError || 'Profile not found or not Admin');
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
     
-    // --- User is authenticated and is an Admin, proceed with POST ---
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
 
+    const { supabase } = authResult;
+    
     // 2. Parse and validate request body
     let body;
     try {
@@ -146,21 +150,24 @@ export async function POST(request: Request) {
 
     const clientData = validationResult.data;
 
-    // 3. Insert client into database
+    // 3. Insert client into database (OPTIMIZED - specific column selection)
     const { data: newClient, error: dbError } = await supabase
       .from('clients')
       .insert(clientData)
-      .select() // Select the newly created record
-      .single(); // Expecting a single record back
+      .select(SELECTORS.CLIENT.DETAIL) // Instead of select()
+      .single();
 
     if (dbError) {
       console.error('Supabase DB Error (Insert):', dbError);
-      // Consider more specific error checking (e.g., unique constraint violation)
       return NextResponse.json({ error: 'Failed to create client', details: dbError.message }, { status: 500 });
     }
 
-    // 4. Return the newly created client
-    return NextResponse.json(newClient, { status: 201 }); // 201 Created status
+    // 4. Performance monitoring
+    const responseTime = Date.now() - startTime;
+    console.log(`[OPTIMIZED] POST /api/admin/clients completed in ${responseTime}ms (JWT auth)`);
+
+    // 5. Return the newly created client
+    return NextResponse.json(newClient, { status: 201 });
 
   } catch (error) {
     console.error('POST /api/admin/clients Error:', error);

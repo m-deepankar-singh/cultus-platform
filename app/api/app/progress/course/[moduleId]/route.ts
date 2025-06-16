@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 // Import the correct schema for module updates
 import { ModuleProgressUpdateSchema } from '@/lib/schemas/progress';
 import type { NextRequest } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define a schema for UUID validation
 const UuidSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -34,19 +35,12 @@ export async function PATCH(
     // Parse request body
     const body: CourseProgressUpdatePayload = await request.json();
 
-    // Use the existing Supabase client
-    const supabase = await createClient(); 
-
-    // Get the authenticated user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
     // Verify the module exists and is a course
     const { data: moduleData, error: moduleError } = await supabase
@@ -168,31 +162,31 @@ export async function GET(
       );
     }
 
-    // 2. Authentication & Authorization (Similar to PATCH)
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // 2. 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
+      return NextResponse.json(
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 }
+      );
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, client_id')
-      .eq('id', user.id)
-      .single();
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Student not linked to a client' },
+        { status: 403 }
+      );
+    }
 
-    if (profileError || !profile) {
-       return NextResponse.json({ error: 'Forbidden: Profile not found' }, { status: 403 });
-    }
-    if (profile.role !== 'Student') {
-       return NextResponse.json({ error: 'Forbidden: User is not a Student' }, { status: 403 });
-    }
-    if (!profile.client_id) {
-      return NextResponse.json({ error: 'Forbidden: Student not linked to a client' }, { status: 403 });
-    }
     const studentId = user.id;
-    const clientId = profile.client_id;
 
     // 3. Verify Enrollment (Similar to PATCH)
     const { data: moduleData, error: moduleError } = await supabase

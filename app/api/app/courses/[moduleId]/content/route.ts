@@ -1,12 +1,32 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define a more specific type for quiz questions based on observed DB structure
 interface QuizQuestion {
   id: string;
   text: string; // This should match the frontend's expectation
   type: 'MCQ' | 'MSQ' | 'TF'; // This should match the frontend's expectation
+  options: { id: string; text: string }[];
+}
+
+// Type for lesson data from database
+interface LessonData {
+  id: string;
+  title: string;
+  description?: string | null;
+  video_url?: string | null;
+  sequence: number;
+  has_quiz?: boolean;
+  quiz_questions?: any[] | null; // Database quiz questions structure
+}
+
+// Type for quiz question from database
+interface DatabaseQuizQuestion {
+  id: string;
+  question_text: string;
+  question_type: 'MCQ' | 'MSQ' | 'TF';
   options: { id: string; text: string }[];
 }
 
@@ -45,23 +65,17 @@ export async function GET(
   { params }: { params: { moduleId: string } }
 ) {
   try {
+    // JWT-based authentication (replaces getUser() + profile queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     // Properly extract moduleId from params, ensure it's a string
     const moduleId = params?.moduleId;
     if (!moduleId) {
       return NextResponse.json({ error: 'Module ID is required' }, { status: 400 });
-    }
-
-    // Use the existing Supabase client from lib/supabase/server.ts
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // 1. Fetch Course Module Details
@@ -104,7 +118,7 @@ export async function GET(
     }
 
     // Ensure lessonsData is an array and cast quiz_questions if necessary
-    const lessons: LessonOutput[] = (lessonsData || []).map(lesson => {
+    const lessons: LessonOutput[] = (lessonsData || []).map((lesson: LessonData) => {
       // Process quiz questions to remove correct answers and unnecessary fields
       let processedQuizQuestions: QuizQuestion[] | null = null;
       
@@ -115,7 +129,7 @@ export async function GET(
           processedQuizQuestions = [];
         } else {
           // Process existing quiz questions
-          processedQuizQuestions = lesson.quiz_questions.map(question => {
+          processedQuizQuestions = lesson.quiz_questions.map((question: DatabaseQuizQuestion) => {
             // Convert database field names to frontend expected field names
             return {
               id: question.id,

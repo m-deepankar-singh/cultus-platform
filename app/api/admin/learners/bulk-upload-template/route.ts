@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { utils, write } from 'xlsx';
 import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/learners/bulk-upload-template
@@ -11,26 +12,18 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(request: Request) {
   try {
-    // 1. Authentication & Authorization
-    const { user, profile, role, error: sessionError } = await getUserSessionAndRole();
-
-    if (sessionError || !user || !profile) {
-      const status = sessionError?.message.includes('No active user session') ? 401 : 403;
-      return new NextResponse(JSON.stringify({ error: sessionError?.message || 'Unauthorized or profile missing' }), {
-        status,
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
-
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Get client list for the template
-    const supabase = await createClient();
     const { data: clients, error: clientsError } = await supabase
       .from('clients')
       .select('id, name')
@@ -71,7 +64,7 @@ export async function GET(request: Request) {
     utils.book_append_sheet(wb, templateSheet, 'Learners');
     
     // Add client reference sheet
-    const clientsReferenceData = clients ? clients.map((client) => ({
+    const clientsReferenceData = clients ? clients.map((client: any) => ({
       client_id: client.id,
       client_name: client.name
     })) : [];

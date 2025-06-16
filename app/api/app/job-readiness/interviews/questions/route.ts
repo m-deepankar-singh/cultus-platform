@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateInterviewQuestions } from '@/lib/ai/question-generator';
 import { Background, StudentProfile } from '@/lib/ai/interview-config';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authenticated user
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
     const url = new URL(request.url);
     const backgroundId = url.searchParams.get('backgroundId');
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get student profile
+    // Get student profile - only get specific fields needed
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, full_name, job_readiness_tier, job_readiness_star_level, job_readiness_background_type')

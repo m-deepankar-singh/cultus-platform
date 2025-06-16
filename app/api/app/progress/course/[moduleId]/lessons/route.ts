@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define a schema for UUID validation (reuse or define locally)
 const UuidSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -31,31 +32,31 @@ export async function GET(
     }
     const moduleId = moduleIdValidation.data;
 
-    // 2. Authentication & Authorization
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // 2. 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
+      return NextResponse.json(
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 }
+      );
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, client_id')
-      .eq('id', user.id)
-      .single();
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Student not linked to a client' },
+        { status: 403 }
+      );
+    }
 
-    if (profileError || !profile) {
-       return NextResponse.json({ error: 'Forbidden: Profile not found' }, { status: 403 });
-    }
-    if (profile.role !== 'Student') {
-       return NextResponse.json({ error: 'Forbidden: User is not a Student' }, { status: 403 });
-    }
-    if (!profile.client_id) {
-      return NextResponse.json({ error: 'Forbidden: Student not linked to a client' }, { status: 403 });
-    }
     const studentId = user.id;
-    const clientId = profile.client_id;
 
     // 3. Verify Enrollment (check if client is assigned to the module's product)
     const { data: moduleData, error: moduleError } = await supabase
@@ -106,7 +107,7 @@ export async function GET(
       return NextResponse.json([], { status: 200 });
     }
 
-    const lessonIds = lessons.map(lesson => lesson.id);
+    const lessonIds = lessons.map((lesson: any) => lesson.id);
 
     // 5. Fetch Student's Progress for these Lessons
     const { data: progressRecords, error: progressError } = await supabase
@@ -121,11 +122,11 @@ export async function GET(
     }
 
     // Convert progress records to a map for easy lookup
-    const progressMap = new Map(progressRecords?.map(p => [p.lesson_id, p]) || []);
+    const progressMap = new Map(progressRecords?.map((p: any) => [p.lesson_id, p]) || []);
 
     // 6. Combine Lessons and Progress
-    const combinedLessonProgress = lessons.map(lesson => {
-      const progress = progressMap.get(lesson.id);
+    const combinedLessonProgress = lessons.map((lesson: any) => {
+      const progress: any = progressMap.get(lesson.id);
 
       if (progress) {
         // Merge lesson details with existing progress

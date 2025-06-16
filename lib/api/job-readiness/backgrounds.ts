@@ -52,25 +52,31 @@ export interface JrBackgroundsResponse {
   backgrounds: JrBackground[]
 }
 
-// Background and Project type enums (based on common patterns)
+// Background and Project type enums (based on actual database enum values)
 export const BACKGROUND_TYPES = [
+  'BUSINESS_ADMINISTRATION',
   'COMPUTER_SCIENCE',
   'DATA_SCIENCE',
-  'BUSINESS',
   'DESIGN',
-  'MARKETING',
+  'ECONOMICS',
   'ENGINEERING',
+  'HEALTHCARE',
+  'HUMANITIES',
+  'MARKETING',
   'OTHER'
 ] as const
 
 export const PROJECT_TYPES = [
+  'BUSINESS_PROPOSAL',
+  'CASE_STUDY',
   'CODING_PROJECT',
+  'CONTENT_CREATION',
   'DATA_ANALYSIS',
-  'BUSINESS_CASE',
-  'DESIGN_PORTFOLIO',
-  'MARKETING_CAMPAIGN',
-  'TECHNICAL_DOCUMENTATION',
-  'RESEARCH_PROJECT'
+  'DESIGN_CONCEPT',
+  'MARKETING_PLAN',
+  'OTHER',
+  'RESEARCH_OUTLINE',
+  'TECHNICAL_DOCUMENTATION'
 ] as const
 
 export type BackgroundType = typeof BACKGROUND_TYPES[number]
@@ -95,6 +101,18 @@ async function handleApiResponse<T>(response: Response): Promise<T> {
     } catch {
       // If it's not JSON, use the text as is
       errorMessage = errorText || errorMessage
+    }
+    
+    // Provide more specific error messages for common status codes
+    if (response.status === 409) {
+      // Conflict - usually duplicate entry
+      throw new JrBackgroundsApiError(errorMessage || "This combination already exists. Please choose different values or edit the existing configuration.", response.status)
+    } else if (response.status === 400) {
+      // Bad Request - validation error
+      throw new JrBackgroundsApiError(errorMessage || "Invalid input data. Please check your form and try again.", response.status)
+    } else if (response.status === 500) {
+      // Internal Server Error
+      throw new JrBackgroundsApiError(errorMessage || "An internal server error occurred. Please try again later.", response.status)
     }
     
     throw new JrBackgroundsApiError(errorMessage, response.status)
@@ -209,12 +227,15 @@ export function validateGradingCriteria(criteria: GradingCriterion[]): string | 
 
 export function getBackgroundTypeLabel(type: string): string {
   const labels: Record<string, string> = {
+    BUSINESS_ADMINISTRATION: "Business Administration",
     COMPUTER_SCIENCE: "Computer Science",
     DATA_SCIENCE: "Data Science", 
-    BUSINESS: "Business",
     DESIGN: "Design",
-    MARKETING: "Marketing",
+    ECONOMICS: "Economics",
     ENGINEERING: "Engineering",
+    HEALTHCARE: "Healthcare",
+    HUMANITIES: "Humanities",
+    MARKETING: "Marketing",
     OTHER: "Other"
   }
   return labels[type] || type
@@ -222,13 +243,16 @@ export function getBackgroundTypeLabel(type: string): string {
 
 export function getProjectTypeLabel(type: string): string {
   const labels: Record<string, string> = {
+    BUSINESS_PROPOSAL: "Business Proposal",
+    CASE_STUDY: "Case Study",
     CODING_PROJECT: "Coding Project",
+    CONTENT_CREATION: "Content Creation",
     DATA_ANALYSIS: "Data Analysis",
-    BUSINESS_CASE: "Business Case",
-    DESIGN_PORTFOLIO: "Design Portfolio", 
-    MARKETING_CAMPAIGN: "Marketing Campaign",
-    TECHNICAL_DOCUMENTATION: "Technical Documentation",
-    RESEARCH_PROJECT: "Research Project"
+    DESIGN_CONCEPT: "Design Concept",
+    MARKETING_PLAN: "Marketing Plan",
+    OTHER: "Other",
+    RESEARCH_OUTLINE: "Research Outline",
+    TECHNICAL_DOCUMENTATION: "Technical Documentation"
   }
   return labels[type] || type
 }

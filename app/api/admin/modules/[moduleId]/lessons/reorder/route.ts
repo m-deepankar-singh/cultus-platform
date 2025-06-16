@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema } from '@/lib/schemas/module';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Debug helper function to log detailed info
 function debugLog(message: string, data: any) {
@@ -20,6 +21,13 @@ export async function PUT(
   { params }: { params: { moduleId: string } }
 ) {
   try {
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     // Await params before destructuring to fix Next.js warning
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId } = resolvedParams;
@@ -82,51 +90,7 @@ export async function PUT(
     }
     
     debugLog("Lessons array to process", body.lessons);
-    
-    const supabase = await createClient();
-    
-    // Get user info for debugging
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error("Error getting authenticated user:", userError);
-      return NextResponse.json(
-        { error: "Authentication error", details: userError.message },
-        { status: 401 }
-      );
-    }
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not authenticated" },
-        { status: 401 }
-      );
-    }
-    
     debugLog("Authenticated user", { id: user.id });
-    
-    // Check user role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    
-    if (profileError) {
-      console.error("Error getting user profile:", profileError);
-      return NextResponse.json(
-        { error: "Failed to verify user permissions", details: profileError.message },
-        { status: 403 }
-      );
-    }
-    
-    debugLog("User role", { role: profile?.role });
-    
-    if (profile?.role !== 'Admin' && profile?.role !== 'admin') {
-      return NextResponse.json(
-        { error: "Insufficient permissions. Only admin users can reorder lessons." },
-        { status: 403 }
-      );
-    }
 
     // Validate moduleId
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
@@ -198,74 +162,106 @@ export async function PUT(
       }
       
       if(lessonIds.has(lesson.id)){
-        validationErrors.push(`Duplicate lesson ID found in request: ${lesson.id}`);
+        validationErrors.push(`Lesson at index ${i} has duplicate ID: ${lesson.id}`);
+      } else {
+        lessonIds.add(lesson.id);
       }
-      lessonIds.add(lesson.id);
     }
-    
-    debugLog("Validation errors", validationErrors);
-    
+
     if (validationErrors.length > 0) {
+      debugLog("Validation errors found", validationErrors);
       return NextResponse.json(
-        { error: "Invalid lesson data", details: validationErrors.join(", ") },
+        { error: "Invalid lesson data", details: validationErrors },
         { status: 400 }
       );
     }
 
-    // Transaction: Update sequence numbers for each lesson
-    // NOTE: Using a transaction ensures all updates succeed or fail together.
-    // However, Supabase JS client doesn't directly support transactions like this
-    // without using RPC. For simplicity, we'll do individual updates.
-    // If atomicity is critical, create a Postgres function and call it via RPC.
+    // Verify that all lessons exist and belong to this module
+    const lessonIdsArray = Array.from(lessonIds);
+    debugLog("Checking lesson existence", { lessonIdsArray, moduleId });
+    
+    const { data: existingLessons, error: lessonCheckError } = await supabase
+      .from("lessons")
+      .select("id, module_id")
+      .in("id", lessonIdsArray);
 
-    const updatePromises = body.lessons.map(async (lesson: LessonOrder) => {
-      debugLog(`Updating lesson`, { id: lesson.id, sequence: lesson.sequence });
-      const { error } = await supabase
-        .from("lessons")
-        .update({ sequence: lesson.sequence })
-        .eq("id", lesson.id)
-        .eq("module_id", moduleId); // Ensure we only update lessons belonging to this module
-
-      if (error) {
-        console.error(`Error updating sequence for lesson ${lesson.id}:`, error);
-        // Return a rejected promise or object indicating failure for this specific lesson
-        return { success: false, id: lesson.id, error: error.message };
-      }
-      return { success: true, id: lesson.id };
-    });
-
-    try {
-      const results = await Promise.all(updatePromises);
-      const failures = results.filter(r => !r.success);
-
-      if (failures.length > 0) {
-         debugLog("Failed lesson updates", failures);
-         // Decide how to handle partial failure. We could try to rollback, 
-         // but that's complex without transactions. Reporting the error is usually sufficient.
-         const errorMessages = failures.map(f => `Lesson ${f.id}: ${f.error}`).join("; ");
-         return NextResponse.json(
-           { error: "Failed to update one or more lessons", details: errorMessages },
-           { status: 500 }
-         );
-      }
-      
-      debugLog("All lessons updated successfully", { count: body.lessons.length });
-    } catch (error) {
-      // This catch block might be redundant if Promise.all doesn't throw with the current setup
-      // but good practice to keep it.
-      console.error("Unexpected error during batch update:", error);
+    if (lessonCheckError) {
+      console.error("Error checking lesson existence:", lessonCheckError);
       return NextResponse.json(
-        { error: "Failed to update lessons due to an unexpected error", details: error instanceof Error ? error.message : String(error) },
+        { error: "Failed to verify lesson existence", details: lessonCheckError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    // Check if all lessons exist
+    if (!existingLessons || existingLessons.length !== lessonIdsArray.length) {
+      const foundIds = new Set(existingLessons?.map((l: any) => l.id) || []);
+      const missingIds = lessonIdsArray.filter(id => !foundIds.has(id));
+      debugLog("Missing lesson IDs", missingIds);
+      return NextResponse.json(
+        { error: "Some lessons do not exist", details: { missingIds } },
+        { status: 404 }
+      );
+    }
+
+    // Check if all lessons belong to the specified module
+    const invalidModuleLessons = existingLessons.filter((lesson: any) => lesson.module_id !== moduleId);
+    if (invalidModuleLessons.length > 0) {
+      debugLog("Lessons from wrong module", invalidModuleLessons);
+      return NextResponse.json(
+        { error: "Some lessons do not belong to the specified module", 
+          details: { invalidLessons: invalidModuleLessons.map((l: any) => l.id) } },
+        { status: 400 }
+      );
+    }
+
+    // If we get here, all lessons are valid. Now perform the updates.
+    debugLog("Starting lesson sequence updates", { lessonCount: body.lessons.length });
+
+    // Perform the updates in a transaction-like manner
+    const updatePromises = body.lessons.map(async (lesson: LessonOrder) => {
+      debugLog(`Updating lesson ${lesson.id} to sequence ${lesson.sequence}`, { lesson });
+      
+      const { data, error } = await supabase
+        .from("lessons")
+        .update({ 
+          sequence: lesson.sequence,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", lesson.id)
+        .select("id, sequence");
+
+      if (error) {
+        console.error(`Error updating lesson ${lesson.id}:`, error);
+        throw new Error(`Failed to update lesson ${lesson.id}: ${error.message}`);
+      }
+
+      debugLog(`Successfully updated lesson ${lesson.id}`, data);
+      return data;
+    });
+
+    try {
+      const updateResults = await Promise.all(updatePromises);
+      debugLog("All lesson updates completed", updateResults);
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: `Successfully updated ${body.lessons.length} lesson sequences`,
+        updatedLessons: updateResults.filter((result: any, index: number) => result != null)
+      });
+      
+    } catch (updateError) {
+      console.error("Error during batch lesson updates:", updateError);
+      return NextResponse.json(
+        { error: "Failed to update lesson sequences", details: String(updateError) },
+        { status: 500 }
+      );
+    }
+
   } catch (error) {
-    // Catch errors from outside the main try block (e.g., params resolution)
-    console.error("Error reordering lessons (outer catch):", error);
+    console.error("Unexpected error in lesson reorder:", error);
     return NextResponse.json(
-      { error: "Failed to reorder lessons", details: error instanceof Error ? error.message : String(error) },
+      { error: "An unexpected error occurred", details: String(error) },
       { status: 500 }
     );
   }

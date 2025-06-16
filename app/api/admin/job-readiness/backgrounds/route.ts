@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/backgrounds
@@ -7,29 +8,13 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Check if user has admin role - use case insensitive comparison
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    // Modified to be case insensitive - check for "admin" or "Admin"
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Get all background types and their project mappings
     const { data: backgrounds, error } = await supabase
@@ -54,7 +39,13 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
     
     // Parse JSON with better error handling
     let body;
@@ -63,27 +54,6 @@ export async function POST(req: NextRequest) {
     } catch (jsonError) {
       console.error('Invalid JSON in request body:', jsonError);
       return NextResponse.json({ error: 'Invalid JSON format in request body' }, { status: 400 });
-    }
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Validate request body
@@ -102,6 +72,25 @@ export async function POST(req: NextRequest) {
 
     if (!background_type || !project_type) {
       return NextResponse.json({ error: 'Background type and project type are required' }, { status: 400 });
+    }
+
+    // Check if this combination already exists
+    const { data: existingBackground, error: checkError } = await supabase
+      .from('job_readiness_background_project_types')
+      .select('id')
+      .eq('background_type', background_type)
+      .eq('project_type', project_type)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('Error checking for existing background project type:', checkError);
+      return NextResponse.json({ error: 'Failed to validate background project type' }, { status: 500 });
+    }
+
+    if (existingBackground) {
+      return NextResponse.json({ 
+        error: `A configuration for ${background_type} background with ${project_type} project type already exists. Please choose a different combination or edit the existing configuration.` 
+      }, { status: 409 });
     }
 
     // Create the background project type mapping
@@ -124,6 +113,14 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error creating background project type:', error);
+      
+      // Handle specific constraint violation errors
+      if (error.code === '23505') {
+        return NextResponse.json({ 
+          error: `A configuration for ${background_type} background with ${project_type} project type already exists. Please choose a different combination or edit the existing configuration.` 
+        }, { status: 409 });
+      }
+      
       return NextResponse.json({ error: 'Failed to create background project type' }, { status: 500 });
     }
 
@@ -140,7 +137,13 @@ export async function POST(req: NextRequest) {
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
     
     // Parse JSON with better error handling
     let body;
@@ -149,27 +152,6 @@ export async function PATCH(req: NextRequest) {
     } catch (jsonError) {
       console.error('Invalid JSON in request body:', jsonError);
       return NextResponse.json({ error: 'Invalid JSON format in request body' }, { status: 400 });
-    }
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Validate request body
@@ -226,33 +208,19 @@ export async function PATCH(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    
+    const { user, claims, supabase } = authResult;
+    
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
 
     if (!id) {
       return NextResponse.json({ error: 'Background project type ID is required' }, { status: 400 });
-    }
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user has admin role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Delete the background project type mapping

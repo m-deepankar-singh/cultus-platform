@@ -6,6 +6,7 @@ import { UserRole } from '@/lib/schemas/user';
 import { z } from "zod"
 import { sendLearnerWelcomeEmail } from '@/lib/email/service'; // Import our email service
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/learners
@@ -17,24 +18,16 @@ import { calculatePaginationRange, createPaginatedResponse } from '@/lib/paginat
  */
 export async function GET(request: NextRequest) {
   try {
-    // 1. Authentication & Authorization (using the utility)
-    const { user, profile, role, error: sessionError } = await getUserSessionAndRole();
-
-    if (sessionError || !user || !profile) {
-        console.error('Session Error:', sessionError?.message);
-        const status = sessionError?.message.includes('No active user session') ? 401 : 403;
-        return new NextResponse(JSON.stringify({ error: sessionError?.message || 'Unauthorized or profile missing' }), {
-            status,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
-
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Parse & Validate Query Parameters
     const { searchParams } = new URL(request.url);
@@ -58,8 +51,7 @@ export async function GET(request: NextRequest) {
 
     const { search, clientId, isActive } = validationResult.data;
 
-    // Get Supabase client *after* auth check
-    const supabase = await createClient();
+    // Supabase client already available from authResult
 
     // Calculate pagination range for Supabase
     const { from, to } = calculatePaginationRange(page, pageSize);
@@ -178,18 +170,13 @@ const CreateLearnerSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    
-    // Authenticate user and check role
-    const { profile, role, user, error: authError } = await getUserSessionAndRole()
-    
-    if (authError || !profile || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
+    const { user, claims, supabase } = authResult;
     
     // Parse and validate request body
     const body = await request.json()

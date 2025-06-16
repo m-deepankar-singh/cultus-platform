@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Schema for question mapping
 const QuestionMappingSchema = z.object({
@@ -26,30 +27,13 @@ export async function GET(
       return NextResponse.json({ error: 'Module ID and Lesson ID are required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
     
-    // Verify authentication and authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-    }
-
-    const userRole = profile.role;
-    if (userRole !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // Verify the lesson belongs to the module
     const { data: lessonData, error: lessonError } = await supabase
@@ -105,30 +89,13 @@ export async function POST(
       return NextResponse.json({ error: 'Module ID and Lesson ID are required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
     
-    // Verify authentication and authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-    }
-
-    const userRole = profile.role;
-    if (userRole !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // Verify the lesson belongs to the module
     const { data: lessonData, error: lessonError } = await supabase
@@ -215,30 +182,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Module ID and Lesson ID are required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
     
-    // Verify authentication and authorization
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-    }
-
-    const userRole = profile.role;
-    if (userRole !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // Verify the lesson belongs to the module
     const { data: lessonData, error: lessonError } = await supabase

@@ -1,41 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(request: Request, { params }: { params: { clientId: string } }) {
   try {
-    const supabase = await createClient();
-
-    // 1. Get user session and role
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role') // Fetch role from profiles table
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-        console.error('Profile Fetch Error:', profileError);
-        return NextResponse.json({ error: 'Forbidden or Profile Not Found' }, { status: 403 });
-    }
-
-    if (!profile) {
-        console.error('Profile not found for user:', user.id);
-        return NextResponse.json({ error: 'Forbidden: User profile not found.' }, { status: 403 });
-    }
-
-    const role = profile.role;
-
-    // 2. Check if the role is allowed (Staff or Admin)
-    if (!['Staff', 'Admin'].includes(role)) {
-      console.warn(`User ${user.id} with role ${role} attempted to access staff route for client ${params.clientId}.`);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // --- User is authenticated and has an allowed role (Staff or Admin), proceed ---
 
@@ -52,7 +28,7 @@ export async function GET(request: Request, { params }: { params: { clientId: st
     // This will result in either an error or null data, which is handled as 404 Not Found.
     const { data: client, error: dbError } = await supabase
       .from('clients')
-      .select('*') // Adjust columns as needed
+      .select(SELECTORS.CLIENT.DETAIL) // 📊 OPTIMIZED: Specific fields only
       .eq('id', clientId)
       .single();
 
@@ -84,38 +60,12 @@ export async function GET(request: Request, { params }: { params: { clientId: st
 
 export async function PUT(request: Request, { params }: { params: { clientId: string } }) {
   try {
-    const supabase = await createClient();
-
-    // 1. Get user session and role
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role') // Fetch role from profiles table
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-        console.error('Profile Fetch Error:', profileError);
-        return NextResponse.json({ error: 'Forbidden or Profile Not Found' }, { status: 403 });
-    }
-
-    if (!profile) {
-        console.error('Profile not found for user:', user.id);
-        return NextResponse.json({ error: 'Forbidden: User profile not found.' }, { status: 403 });
-    }
-
-    const role = profile.role;
-
-    // 2. Check if the role is allowed (Staff or Admin)
-    if (!['Staff', 'Admin'].includes(role)) {
-      console.warn(`User ${user.id} with role ${role} attempted to PUT staff route for client ${params.clientId}.`);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { user, claims, supabase } = authResult;
 
     // --- User is authenticated and has an allowed role (Staff or Admin), proceed ---
 
@@ -157,7 +107,7 @@ export async function PUT(request: Request, { params }: { params: { clientId: st
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
-        .select()
+        .select(SELECTORS.CLIENT.DETAIL) // 📊 OPTIMIZED: Specific fields only
         .single();
 
     if (dbError) {

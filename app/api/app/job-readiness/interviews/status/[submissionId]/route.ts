@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -18,17 +19,15 @@ export async function GET(
       );
     }
 
-    // Get authenticated user
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, supabase } = authResult;
     
     console.log('👤 User:', user?.id);
     console.log('🔍 Looking for submission:', submissionId, 'owned by:', user?.id);
-
-    if (userError || !user) {
-      console.log('❌ Unauthorized:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     // Get submission from database - TEMPORARILY REMOVE USER CHECK
     const { data: submission, error: submissionError } = await supabase

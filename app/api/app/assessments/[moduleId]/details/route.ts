@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define schemas for validation
 const ModuleIdSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -52,7 +53,7 @@ export async function GET(
   context: { params: { moduleId: string } }
 ) {
   try {
-    // 1. Validate moduleId
+    // Validate moduleId
     const { moduleId } = await context.params;
     const moduleIdValidation = ModuleIdSchema.safeParse(moduleId);
     if (!moduleIdValidation.success) {
@@ -63,45 +64,26 @@ export async function GET(
     }
     const validModuleId = moduleIdValidation.data;
 
-    // 2. Authentication
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    // 3. Get student information
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('client_id, is_active')
-      .eq('id', user.id)
-      .single();
+    // Get student information from JWT claims
+    const clientId = claims?.client_id;
+    const isActive = claims?.profile_is_active;
 
-    if (studentFetchError) {
-      console.error('Student Fetch Error:', studentFetchError);
-      if (studentFetchError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Forbidden: Student record not found' },
-          { status: 403 },
-        );
-      }
-      return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch student record' },
-        { status: 500 },
-      );
-    }
-
-    if (!studentRecord.is_active) {
+    if (!isActive) {
       return NextResponse.json(
         { error: 'Forbidden: Student account is inactive' },
         { status: 403 },
       );
     }
 
-    if (!studentRecord.client_id) {
-      console.error(`Student ${user.id} has no assigned client_id in students table.`);
+    if (!clientId) {
+      console.error(`Student ${user.id} has no assigned client_id in JWT claims.`);
       return NextResponse.json(
         { error: 'Forbidden: Student not linked to a client' },
         { status: 403 }
@@ -109,9 +91,8 @@ export async function GET(
     }
 
     const studentId = user.id;
-    const clientId = studentRecord.client_id;
 
-    // 4. Fetch Assessment Module Details
+    // Fetch Assessment Module Details
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
       .select('id, name, type, configuration')
@@ -134,7 +115,7 @@ export async function GET(
       );
     }
 
-    // 5. Verify enrollment by checking if the student's client has access to this module's product
+    // Verify enrollment by checking if the student's client has access to this module's product
     const { data: productData, error: productError } = await supabase
       .from('modules')
       .select('product_id')
@@ -170,13 +151,13 @@ export async function GET(
       );
     }
 
-    // 6. Extract assessment configuration details
+    // Extract assessment configuration details
     const config = moduleData.configuration || {};
     const timeLimit = config.timeLimitMinutes || config.time_limit_minutes || null;
     const passingThreshold = config.passThreshold || config.passing_threshold || 60; // Default to 60%
     const instructions = config.instructions || null;
 
-    // 7. Check if assessment has been submitted
+    // Check if assessment has been submitted
     const { data: submissionData, error: submissionError } = await supabase
       .from('assessment_progress')
       .select('submitted_at, passed')
@@ -192,20 +173,20 @@ export async function GET(
     const isSubmitted = !!submissionData?.submitted_at;
     const retakesAllowed = config.retakesAllowed || config.retakes_allowed || false; // Default to false
 
-    // 8. Fetch Assessment Questions
+    // Fetch Assessment Questions
     const { data: questionData, error: questionError } = await supabase
       .from('assessment_module_questions')
       .select(`
         question_id,
         assessment_questions (
-          id, 
-          question_text, 
-          question_type, 
+          id,
+          question_text,
+          question_type,
           options
         )
       `)
       .eq('module_id', validModuleId)
-      .returns<QuestionData[]>();
+      .order('sequence', { ascending: true });
 
     if (questionError) {
       console.error(`Error fetching questions for module ${validModuleId}:`, questionError);
@@ -215,67 +196,65 @@ export async function GET(
       );
     }
 
-    // Process questions, removing any null joins and formatting
-    const questions: AssessmentQuestionOutput[] = questionData
+    // Transform question data
+    const questions: AssessmentQuestionOutput[] = (questionData as QuestionData[])
       .filter(q => q.assessment_questions !== null)
       .map(q => {
-        const aq = q.assessment_questions!; // Non-null assertion since we filtered nulls
+        const question = q.assessment_questions!;
         return {
-          id: q.question_id,
-          question_text: aq.question_text,
-          question_type: aq.question_type,
-          options: aq.options || []
+          id: question.id,
+          question_text: question.question_text,
+          question_type: question.question_type,
+          options: question.options || []
         };
       });
 
-    // 9. Fetch In-Progress Attempt if not submitted
+    // Check for in-progress attempt (if not submitted)
     let inProgressAttempt: InProgressAttemptDetails | null = null;
-
     if (!isSubmitted) {
-      const { data: savedProgressData, error: savedProgressError } = await supabase
+      const { data: attemptData, error: attemptError } = await supabase
         .from('assessment_progress')
         .select('saved_answers, started_at, remaining_time_seconds')
         .eq('student_id', studentId)
         .eq('module_id', validModuleId)
-        .is('submitted_at', null) // Only get attempts that haven't been submitted
+        .is('submitted_at', null)
         .maybeSingle();
 
-      if (savedProgressError && savedProgressError.code !== 'PGRST116') {
-        console.error(`Error fetching saved progress for module ${validModuleId}:`, savedProgressError);
-        // Continue - we'll assume no saved progress
-      }
-
-      if (savedProgressData) {
+      if (attemptError && attemptError.code !== 'PGRST116') {
+        console.error(`Error fetching in-progress attempt for module ${validModuleId}:`, attemptError);
+        // Continue without in-progress data
+      } else if (attemptData) {
         inProgressAttempt = {
-          saved_answers: savedProgressData.saved_answers || {},
-          start_time: savedProgressData.started_at,
-          remaining_time_seconds: savedProgressData.remaining_time_seconds
+          saved_answers: attemptData.saved_answers || {},
+          start_time: attemptData.started_at,
+          remaining_time_seconds: attemptData.remaining_time_seconds
         };
       }
     }
 
-    // 10. Build and return response
-    const responsePayload: AssessmentPageDataResponse = {
-      assessment: {
-        id: moduleData.id,
-        name: moduleData.name,
-        instructions,
-        time_limit_minutes: timeLimit,
-        passing_threshold: passingThreshold,
-        questions,
-        is_submitted: isSubmitted,
-        retakes_allowed: retakesAllowed,
-      },
+    // Build response
+    const assessmentDetails: AssessmentDetailsOutput = {
+      id: moduleData.id,
+      name: moduleData.name,
+      instructions,
+      time_limit_minutes: timeLimit,
+      passing_threshold: passingThreshold,
+      questions,
+      is_submitted: isSubmitted,
+      retakes_allowed: retakesAllowed
+    };
+
+    const response: AssessmentPageDataResponse = {
+      assessment: assessmentDetails,
       in_progress_attempt: inProgressAttempt
     };
 
-    return NextResponse.json(responsePayload);
+    return NextResponse.json(response);
 
-  } catch (e) {
-    const error = e as Error;
-    console.error('Unexpected error in /api/app/assessments/[moduleId]/details:', error);
+  } catch (error) {
+    console.error('Unexpected error in GET /api/app/assessments/[moduleId]/details:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred.', details: error.message },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }

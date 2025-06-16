@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Assumes server client creator is here
-import { getUserSessionAndRole } from '@/lib/supabase/utils'; // Assumes utility is here
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { UploadFileSchema } from '@/lib/schemas/storage'; // Import the file validation schema
 import { ZodError } from 'zod';
 
@@ -11,22 +11,16 @@ import { ZodError } from 'zod';
 export async function POST(request: Request) {
   console.log('Received request to /api/admin/storage/upload');
 
-  // 1. Authentication & Authorization
-  const { user, profile, role, error: authError } = await getUserSessionAndRole();
-
-  if (authError || !user || !profile) {
-    console.error('Authentication failed:', authError?.message || 'No user or profile');
-    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+  const authResult = await authenticateApiRequest(['Admin']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
+  const { user, claims, supabase } = authResult;
 
-  if (role !== 'Admin') {
-    console.warn(`Unauthorized attempt by user ${user.id} with role ${role}`);
-    return NextResponse.json({ error: 'Forbidden: Admin privileges required.' }, { status: 403 });
-  }
+  console.log(`Admin user ${user.id} authorized.`);
 
-  console.log(`Admin user ${user.id} (${profile?.full_name || 'N/A'}) authorized.`);
-
-  // 2. Process FormData and Validate File
+  // Process FormData and Validate File
   let file: File;
   try {
     const formData = await request.formData();
@@ -69,12 +63,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to process request data.' }, { status: 400 });
   }
 
-  // 3. Upload to Supabase Storage
+  // Upload to Supabase Storage
   const bucketName = 'course-bucket'; // Changed from 'course-videos' to match the actual Supabase bucket
   let uploadDataPath: string | undefined;
   try {
-    const supabase = await createClient();
-
     // Retrieve Supabase URL for constructing the full path later
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) {
@@ -119,13 +111,13 @@ export async function POST(request: Request) {
     uploadDataPath = uploadData.path; // Store path for final response
     console.log(`File successfully uploaded to bucket path: ${uploadData.path}`);
 
-    // 4. Get Public URL (Optional but useful)
+    // Get Public URL (Optional but useful)
     // Note: getPublicUrl requires the path relative to the bucket root, which uploadData.path provides.
     const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(uploadData.path);
     const publicUrl = urlData?.publicUrl;
     console.log(`Public URL (if applicable): ${publicUrl}`);
 
-    // 5. Return Success Response
+    // Return Success Response
     // Construct the full URL using the Supabase project URL and the returned path
     const fullPath = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${uploadData.path}`;
     

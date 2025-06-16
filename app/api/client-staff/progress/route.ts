@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { ProgressQuerySchema } from '@/lib/schemas/progress';
 import { type NextRequest } from "next/server";
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define types for cleaner data handling
 type ModuleData = {
@@ -51,24 +52,42 @@ type AssessmentProgress = {
  */
 export async function GET(request: NextRequest) {
   try {
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['client_staff', 'admin', 'staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const userClientId = claims.client_id;
+
     // Get clientId from query parameters
     const searchParams = request.nextUrl.searchParams;
     const clientId = searchParams.get("clientId");
     
-    if (!clientId) {
+    // If no clientId provided, use the user's client_id (for client staff)
+    const targetClientId = clientId || userClientId;
+    
+    if (!targetClientId) {
       return NextResponse.json(
         { error: "Client ID is required" },
         { status: 400 }
       );
     }
+
+    // Authorization check: Client Staff can only access their own client's data
+    if (userRole === 'Client Staff' && targetClientId !== userClientId) {
+      return NextResponse.json(
+        { error: "Forbidden: Access denied to this client's data" },
+        { status: 403 }
+      );
+    }
     
-    // In a real implementation, we'd:
-    // 1. Check user authentication and authorization (Client Staff/Admin/Staff roles)
-    // 2. Verify the user has access to this specific client's data
-    // 3. Query the database for real client progress data
-    
-    // For now, simulate data
-    const clientProgressData = fetchClientProgressData(clientId);
+    // In a real implementation, we'd query the database for real client progress data
+    // For now, simulate data with the authenticated client context
+    const clientProgressData = fetchClientProgressData(targetClientId);
     
     return NextResponse.json(clientProgressData, { status: 200 });
   } catch (error) {

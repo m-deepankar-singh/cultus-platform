@@ -3,41 +3,17 @@ import { createClient } from '@/lib/supabase/server';
 // import { getUserSessionAndRole } from '@/lib/auth/utils'; // Removed incorrect assumption
 import { QuestionBankQuerySchema, QuestionApiSchema } from '@/lib/schemas/question';
 import { createPaginatedResponse, calculatePaginationRange } from '@/lib/pagination';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(request: Request) {
     try {
-        const supabase = await createClient();
-        // const { user, error: authError, role: assumedRole } = await getUserSessionAndRole(supabase); // Old way
-
-        // 1. Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            console.error('GET /api/admin/question-banks: Auth Error', authError);
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+        const authResult = await authenticateApiRequest(['Admin']);
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-
-        // 2. Fetch user role from your profiles table (adjust table/column names if needed)
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles') // ASSUMPTION: Profiles table stores roles
-            .select('role')   // ASSUMPTION: Role column name is 'role'
-            .eq('id', user.id)
-            .single();
-
-        if (profileError || !profile) {
-            console.error(`GET /api/admin/question-banks: Profile/Role fetch error for user ${user.id}`, profileError);
-            // Decide if this is a 403 (Forbidden) or 500 (Internal Server Error)
-            // If a user exists but has no profile/role, Forbidden might be appropriate.
-            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-        }
-
-        const userRole = profile.role;
-
-        // 3. Authorization based on fetched role
-        if (userRole !== 'Admin') {
-            console.warn(`GET /api/admin/question-banks: User ${user.id} with role ${userRole} attempted access.`);
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
+        const { user, claims, supabase } = authResult;
 
         // Parse & Validate Query Parameters
         const { searchParams } = new URL(request.url);
@@ -84,7 +60,7 @@ export async function GET(request: Request) {
         }
 
         // Build Supabase Query for data
-        let dataQuery = supabase.from(tableName).select('*');
+        let dataQuery = supabase.from(tableName).select(SELECTORS.QUESTION_BANK.LIST); // 📊 OPTIMIZED: Specific fields only
 
         if (search) {
             dataQuery = dataQuery.ilike('question_text', `%${search}%`);
@@ -107,7 +83,7 @@ export async function GET(request: Request) {
         }
 
         // Format all questions with bankType property
-        const formattedQuestions = (questions || []).map(q => ({ ...q, bankType: 'assessment' }));
+        const formattedQuestions = (questions || []).map((q: any) => ({ ...q, bankType: 'assessment' }));
 
         // Create paginated response
         const paginatedResponse = createPaginatedResponse(
@@ -128,27 +104,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const supabase = await createClient();
+        // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+        const authResult = await authenticateApiRequest(['Admin']);
+        if ('error' in authResult) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+        }
+        const { user, claims, supabase } = authResult;
 
-        // 1. Get authenticated user & role (same logic as GET)
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-        if (profileError || !profile) {
-            return NextResponse.json({ error: 'Could not retrieve user role.' }, { status: 403 });
-        }
-        const userRole = profile.role;
-        if (userRole !== 'Admin') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        // 2. Parse & Validate Request Body
+        // Parse & Validate Request Body
         const body = await request.json();
         const validationResult = QuestionApiSchema.safeParse(body);
 
@@ -160,15 +123,15 @@ export async function POST(request: Request) {
             );
         }
 
-        // 3. Extract data - always use assessment_questions table
+        // Extract data - always use assessment_questions table
         const { bank_type, ...questionData } = validationResult.data;
         const tableName = 'assessment_questions';
 
-        // 4. Insert Question into the database
+        // Insert Question into the database
         const { data: newQuestion, error: dbError } = await supabase
             .from(tableName)
             .insert(questionData)
-            .select()
+            .select(SELECTORS.QUESTION_BANK.DETAIL) // 📊 OPTIMIZED: Specific fields only
             .single();
 
         if (dbError) {
@@ -177,7 +140,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Database error while creating question.', details: dbError.message }, { status: 500 });
         }
 
-        // 5. Return new question data
+        // Return new question data
         return NextResponse.json(newQuestion, { status: 201 });
 
     } catch (error) {

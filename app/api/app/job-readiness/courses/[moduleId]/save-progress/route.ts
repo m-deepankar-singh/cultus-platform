@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Schema for progress data validation
 const ProgressDataSchema = z.object({
@@ -44,14 +45,12 @@ export async function POST(
     }
     const validModuleId = moduleIdValidation.data;
 
-    // 2. Authentication
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 2. JWT-based authentication (replaces getUser() + student record lookup)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
     // 3. Parse and validate request body
     let body;
@@ -88,36 +87,24 @@ export async function POST(
       last_viewed_lesson_sequence 
     } = validation.data;
 
-    // 4. Get student information
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('id, client_id, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError) {
-      console.error('Student Fetch Error:', studentFetchError);
-      if (studentFetchError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Forbidden: Student record not found' },
-          { status: 403 },
-        );
-      }
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
       return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch student record' },
-        { status: 500 },
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 }
       );
     }
 
-    if (!studentRecord.is_active) {
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
       return NextResponse.json(
-        { error: 'Forbidden: Student account is inactive' },
-        { status: 403 },
+        { error: 'Forbidden: Student not linked to a client' },
+        { status: 403 }
       );
     }
 
     const studentId = user.id;
-    const clientId = studentRecord.client_id;
 
     // 5. Fetch Course Module Details (must be Job Readiness course)
     const { data: moduleData, error: moduleError } = await supabase
@@ -198,88 +185,88 @@ export async function POST(
     // 9. Merge progress details with enhanced video tracking
     const currentDetails = existingProgress?.progress_details || {};
     
-    // Update video playback positions
-    const updatedVideoPositions = {
-      ...(currentDetails.video_playback_positions || {}),
-      ...(lesson_id && video_playback_position !== undefined ? { [lesson_id]: video_playback_position } : {})
-    };
-
-    // Update fully watched video IDs
-    const updatedFullyWatchedIds = [...(currentDetails.fully_watched_video_ids || [])];
-    if (video_fully_watched && lesson_id && !updatedFullyWatchedIds.includes(lesson_id)) {
-      updatedFullyWatchedIds.push(lesson_id);
+    // Initialize arrays if they don't exist
+    if (!currentDetails.video_playback_positions) {
+      currentDetails.video_playback_positions = {};
+    }
+    if (!currentDetails.fully_watched_video_ids) {
+      currentDetails.fully_watched_video_ids = [];
+    }
+    if (!currentDetails.completed_lesson_ids) {
+      currentDetails.completed_lesson_ids = [];
     }
 
-    // Update last viewed lesson sequence
-    const updatedLastViewedSequence = last_viewed_lesson_sequence !== undefined 
-      ? Math.max(last_viewed_lesson_sequence, currentDetails.last_viewed_lesson_sequence || 0)
-      : currentDetails.last_viewed_lesson_sequence || 0;
+    // Process lesson-specific updates
+    if (lesson_id) {
+      // Update video playback position
+      if (video_playback_position !== undefined) {
+        currentDetails.video_playback_positions[lesson_id] = video_playback_position;
+      }
 
-    const updatedDetails = {
-      ...currentDetails,
-      ...progress_details,
-      last_viewed_lesson_sequence: updatedLastViewedSequence,
-      video_playback_positions: updatedVideoPositions,
-      fully_watched_video_ids: updatedFullyWatchedIds,
-      lesson_quiz_results: currentDetails.lesson_quiz_results || {},
-      completed_lesson_ids: currentDetails.completed_lesson_ids || [],
-      updated_at: new Date().toISOString(),
-    };
+      // Mark video as fully watched
+      if (video_fully_watched === true) {
+        if (!currentDetails.fully_watched_video_ids.includes(lesson_id)) {
+          currentDetails.fully_watched_video_ids.push(lesson_id);
+        }
+      }
 
-    // Handle lesson completion
-    if (lesson_completed && lesson_id) {
-      if (!updatedDetails.completed_lesson_ids.includes(lesson_id)) {
-        updatedDetails.completed_lesson_ids.push(lesson_id);
+      // Mark lesson as completed
+      if (lesson_completed === true) {
+        if (!currentDetails.completed_lesson_ids.includes(lesson_id)) {
+          currentDetails.completed_lesson_ids.push(lesson_id);
+        }
       }
     }
 
-    // Handle video completion (separate from lesson completion)
-    if (video_completed && lesson_id) {
-      // Mark video as fully watched if not already marked
-      if (!updatedDetails.fully_watched_video_ids.includes(lesson_id)) {
-        updatedDetails.fully_watched_video_ids.push(lesson_id);
-      }
-      
-      // Set video position to end (assuming 100% completion)
-      updatedDetails.video_playback_positions[lesson_id] = -1; // -1 indicates completed
+    // Update global progress indicators
+    if (last_viewed_lesson_sequence !== undefined) {
+      currentDetails.last_viewed_lesson_sequence = last_viewed_lesson_sequence;
     }
 
-    // 9.5. Calculate progress and check if module should be auto-completed based on lesson completion
-    let finalStatus = status;
+    // Merge additional progress_details if provided
+    if (progress_details) {
+      Object.assign(currentDetails, progress_details);
+    }
+
+    // Calculate progress percentage based on completed lessons if not provided
     let finalProgressPercentage = progress_percentage;
-    
-    // Get total lesson count for this module
-    const { count: totalLessons, error: lessonCountError } = await supabase
-      .from('lessons')
-      .select('id', { count: 'exact' })
-      .eq('module_id', validModuleId);
-    
-    if (!lessonCountError && totalLessons) {
-      const completedLessonsCount = updatedDetails.completed_lesson_ids?.length || 0;
-      
-      // Calculate progress percentage if not explicitly provided
-      if (progress_percentage === undefined || progress_percentage === 0) {
-        finalProgressPercentage = Math.round((completedLessonsCount / totalLessons) * 100);
-      }
-      
-      // Auto-complete module if all lessons are completed
-      if (completedLessonsCount >= totalLessons) {
-        finalStatus = 'Completed';
-        finalProgressPercentage = 100;
+    if (finalProgressPercentage === undefined || finalProgressPercentage === 0) {
+      // Get total lessons count for this module
+      const { count: totalLessonsCount, error: lessonsCountError } = await supabase
+        .from('lessons')
+        .select('id', { count: 'exact' })
+        .eq('module_id', validModuleId);
+
+      if (!lessonsCountError && totalLessonsCount > 0) {
+        const completedLessonsCount = currentDetails.completed_lesson_ids?.length || 0;
+        finalProgressPercentage = Math.round((completedLessonsCount / totalLessonsCount) * 100);
+      } else {
+        finalProgressPercentage = progress_percentage || 0;
       }
     }
 
-    // 10. Save progress to student_module_progress
+    // Determine final status
+    let finalStatus = status || existingProgress?.status || 'InProgress';
+    if (finalProgressPercentage >= 100) {
+      finalStatus = 'Completed';
+    }
+
+    // Build the final progress object to save
+    const progressToSave = {
+      student_id: studentId,
+      module_id: validModuleId,
+      progress_percentage: finalProgressPercentage,
+      status: finalStatus,
+      progress_details: currentDetails,
+      last_updated: new Date().toISOString()
+    };
+
+    // 10. Save progress
     const { data: savedProgress, error: saveError } = await supabase
       .from('student_module_progress')
-      .upsert({
-        student_id: studentId,
-        module_id: validModuleId,
-        status: finalStatus,
-        progress_percentage: finalProgressPercentage,
-        progress_details: updatedDetails,
-        last_updated: new Date().toISOString(),
-        completed_at: finalStatus === 'Completed' ? new Date().toISOString() : null,
+      .upsert(progressToSave, {
+        onConflict: 'student_id,module_id',
+        returning: 'minimal'
       })
       .select('progress_percentage, status, last_updated')
       .single();
@@ -292,120 +279,93 @@ export async function POST(
       );
     }
 
-    // 10.5. Check for star level progression AFTER saving progress
+    // 11. Check for star level unlock (if applicable for courses)
     let starLevelUnlocked = false;
-    
+    let newStarLevel = '';
+
+    // Only check for star level progression if the course is completed
     if (finalStatus === 'Completed') {
-      console.log(`Course module ${validModuleId} completed for student ${studentId}. Checking for star level progression...`);
-      
-      // Get student's current star level
+      // Get current star level from database to ensure we have the latest state
       const { data: currentStudentData, error: studentDataError } = await supabase
         .from('students')
         .select('job_readiness_star_level')
         .eq('id', studentId)
         .single();
 
-      if (!studentDataError && currentStudentData) {
-        const currentStarLevel = currentStudentData.job_readiness_star_level;
-        console.log(`Current star level: ${currentStarLevel}`);
+      if (studentDataError) {
+        console.error('Error fetching current student star level:', studentDataError);
+      }
 
-        // Only check for 2nd star if student has 1st star but not 2nd star yet
-        if (currentStarLevel === 'ONE') {
-          console.log('Student has first star, checking if all course modules are completed...');
+      const currentStarLevel = currentStudentData?.job_readiness_star_level;
+      
+      // Only check for second star if student has first star and doesn't have second star yet
+      if (currentStarLevel === 'ONE') {
+        // Check if ALL courses for this product are now completed
+        const { data: allCourses, error: coursesError } = await supabase
+          .from('modules')
+          .select('id')
+          .eq('product_id', productData.id)
+          .eq('type', 'Course');
+
+        const { data: completedCourses, error: completedCoursesError } = await supabase
+          .from('student_module_progress')
+          .select('module_id')
+          .eq('student_id', studentId)
+          .eq('status', 'Completed')
+          .in('module_id', allCourses?.map((c: { id: string }) => c.id) || []);
+
+        if (!coursesError && !completedCoursesError) {
+          const totalCourses = allCourses?.length || 0;
+          const completedCoursesCount = completedCourses?.length || 0;
           
-          // Get ALL course modules for this product
-          const { data: allCourseModules, error: allModulesError } = await supabase
-            .from('modules')
-            .select('id')
-            .eq('product_id', productData.id)
-            .eq('type', 'Course');
-
-          if (!allModulesError && allCourseModules && allCourseModules.length > 0) {
-            console.log(`Found ${allCourseModules.length} course modules for product ${productData.id}`);
+          console.log(`Course completion check: ${completedCoursesCount}/${totalCourses} courses completed for product ${productData.id}`);
+          
+          // Award second star if ALL courses are completed
+          if (completedCoursesCount === totalCourses && totalCourses > 0) {
+            console.log(`🌟 Student ${studentId} completed all ${totalCourses} courses. Awarding second star!`);
             
-            // Get completed course modules for this student (NOW includes the just-saved module)
-            const { data: completedModules, error: completedError } = await supabase
-              .from('student_module_progress')
-              .select('module_id, status')
-              .eq('student_id', studentId)
-              .eq('status', 'Completed')
-              .in('module_id', allCourseModules.map(m => m.id));
+            const { error: starUpdateError } = await supabase
+              .from('students')
+              .update({
+                job_readiness_star_level: 'TWO',
+                job_readiness_last_updated: new Date().toISOString(),
+              })
+              .eq('id', studentId);
 
-            if (!completedError) {
-              console.log(`Found ${completedModules?.length || 0} completed course modules`);
-              
-              // Check if ALL course modules are now completed (including the current one)
-              const completedModuleIds = completedModules?.map(m => m.module_id) || [];
-              const allModuleIds = allCourseModules.map(m => m.id);
-              const allCompleted = allModuleIds.every(id => completedModuleIds.includes(id));
-
-              console.log(`All course modules: [${allModuleIds.join(', ')}]`);
-              console.log(`Completed course modules: [${completedModuleIds.join(', ')}]`);
-              console.log(`All courses completed: ${allCompleted}`);
-
-              if (allCompleted) {
-                console.log('🌟 All course modules completed! Awarding second star...');
-                
-                starLevelUnlocked = true;
-                
-                console.log(`Updating student ${studentId} with star level: TWO`);
-                
-                const { error: updateStudentError } = await supabase
-                  .from('students')
-                  .update({
-                    job_readiness_star_level: 'TWO',
-                    job_readiness_last_updated: new Date().toISOString(),
-                  })
-                  .eq('id', studentId);
-
-                if (updateStudentError) {
-                  console.error('Error updating student star level:', updateStudentError);
-                  // Continue - don't fail the progress save
-                  starLevelUnlocked = false;
-                } else {
-                  console.log('🎉 Successfully awarded second star!');
-                }
-              } else {
-                console.log('Not all course modules completed yet. Missing modules:', 
-                  allModuleIds.filter(id => !completedModuleIds.includes(id)));
-              }
+            if (!starUpdateError) {
+              starLevelUnlocked = true;
+              newStarLevel = 'TWO';
+              console.log('🎉 Successfully awarded second star for completing all courses!');
             } else {
-              console.error('Error fetching completed course modules:', completedError);
+              console.error('Error updating student star level:', starUpdateError);
             }
           } else {
-            console.log('No course modules found for this product or error fetching them');
+            console.log(`Student ${studentId} completed ${completedCoursesCount}/${totalCourses} courses. Second star will be awarded when all are complete.`);
           }
         } else {
-          console.log(`Student already has star level ${currentStarLevel}, no progression needed for courses`);
+          console.error('Error checking course completion:', { coursesError, completedCoursesError });
         }
-      } else {
-        console.error('Error fetching current student data:', studentDataError);
+      } else if (currentStarLevel) {
+        console.log(`Student ${studentId} already has star level ${currentStarLevel}, skipping second star awarding logic.`);
       }
-    }
-
-    // 11. Return success response
-    let message = `Course progress saved successfully (${savedProgress.progress_percentage}%)`;
-    if (starLevelUnlocked) {
-      message += ` 🌟 Congratulations! You've completed all courses and unlocked your second star!`;
     }
 
     const response: ProgressSaveResponse = {
       success: true,
-      message,
-      progress_percentage: savedProgress.progress_percentage,
-      status: savedProgress.status,
-      updated_at: savedProgress.last_updated,
-      star_level_unlocked: starLevelUnlocked,
-      new_star_level: starLevelUnlocked ? 'TWO' : undefined,
+      message: 'Progress saved successfully',
+      progress_percentage: savedProgress?.progress_percentage || finalProgressPercentage,
+      status: savedProgress?.status || finalStatus,
+      updated_at: savedProgress?.last_updated || progressToSave.last_updated,
+      star_level_unlocked: starLevelUnlocked ? starLevelUnlocked : undefined,
+      new_star_level: starLevelUnlocked ? newStarLevel : undefined
     };
 
     return NextResponse.json(response);
 
-  } catch (e) {
-    const error = e as Error;
-    console.error('Unexpected error in /api/app/job-readiness/courses/[moduleId]/save-progress:', error);
+  } catch (error) {
+    console.error('Unexpected error in course progress save:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred.', details: error.message },
+      { error: 'An unexpected error occurred', details: (error as Error).message },
       { status: 500 }
     );
   }

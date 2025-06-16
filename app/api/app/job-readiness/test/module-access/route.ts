@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkModuleAccess, JOB_READINESS_MODULE_ORDER, JobReadinessModuleType } from '@/lib/api/job-readiness/check-module-access';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/app/job-readiness/test/module-access
@@ -12,7 +13,13 @@ import { checkModuleAccess, JOB_READINESS_MODULE_ORDER, JobReadinessModuleType }
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
     const url = new URL(req.url);
     const moduleType = url.searchParams.get('moduleType') as JobReadinessModuleType;
 
@@ -21,15 +28,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ 
         error: `Invalid module type. Must be one of: ${JOB_READINESS_MODULE_ORDER.join(', ')}` 
       }, { status: 400 });
-    }
-
-    // Verify authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get student profile for the current user

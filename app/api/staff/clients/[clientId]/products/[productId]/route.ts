@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { ProductIdSchema } from '@/lib/schemas/product';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * DELETE handler to unassign a product from a client.
@@ -16,18 +16,16 @@ export async function DELETE(
   // Properly await the params object
   const params = await context.params;
   
-  // Authenticate and authorize the user
-  const { profile, role, error: authError } = await getUserSessionAndRole();
-
-  if (authError || !profile || !role) {
-    console.error('DELETE /api/staff/clients/[clientId]/products/[productId] Auth Error:', authError?.message);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // JWT-based authentication (0 database queries)
+  const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
+  const { user, claims, supabase } = authResult;
 
-  // Only Admins and Staff are allowed
-  if (!['Admin', 'Staff'].includes(role)) {
-    return NextResponse.json({ error: 'Forbidden: Access denied for this role' }, { status: 403 });
-  }
+  // Get role and client_id from JWT claims
+  const userRole = claims.user_role;
+  const userClientId = claims.client_id;
 
   // Validate clientId from route params
   const clientIdValidation = ClientIdSchema.safeParse({ clientId: params.clientId });
@@ -51,21 +49,18 @@ export async function DELETE(
   const validatedProductId = productIdValidation.data.productId;
 
   // Staff can only access their assigned client
-  if (role === 'Staff') {
-    if (!profile.client_id) {
-      console.warn(`Staff user ${profile.id} has no assigned client_id.`);
+  if (userRole === 'Staff') {
+    if (!userClientId) {
+      console.warn(`Staff user ${user.id} has no assigned client_id.`);
       return NextResponse.json({ error: 'Forbidden: Staff user not assigned to any client' }, { status: 403 });
     }
-    if (profile.client_id !== validatedClientId) {
-      console.warn(`Staff user ${profile.id} attempted to access client ${validatedClientId} but is assigned to ${profile.client_id}.`);
+    if (userClientId !== validatedClientId) {
+      console.warn(`Staff user ${user.id} attempted to access client ${validatedClientId} but is assigned to ${userClientId}.`);
       return NextResponse.json({ error: 'Forbidden: Access denied to this client' }, { status: 403 });
     }
   }
 
   try {
-    // Create Supabase client
-    const supabase = await createClient();
-    
     // Delete the assignment
     const { error } = await supabase
       .from('client_product_assignments')

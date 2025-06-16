@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
 import { AssessmentSubmissionSchema } from '@/lib/schemas/progress';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define a schema for UUID validation (reuse or define locally)
 const UuidSchema = z.string().uuid({ message: 'Invalid Assessment ID format' });
@@ -50,55 +51,32 @@ export async function POST(
     // Use validated submission data
     const submissionData = bodyValidation.data;
 
-    // 3. Authentication & Authorization
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('Auth Error:', authError);
-      return NextResponse.json(
-        { error: 'Unauthorized: No active session' },
-        { status: 401 },
-      );
+    // 3. 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, client_id')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-      console.error('Profile Fetch Error:', profileError);
-      if (profileError.code === 'PGRST116') { // Specific code for row not found
-        return NextResponse.json(
-          { error: 'Forbidden: User profile not found' },
-          { status: 403 },
-        );
-      }
+    // Check if student account is active (from JWT claims)
+    if (!claims.profile_is_active) {
       return NextResponse.json(
-        { error: 'Internal Server Error: Could not fetch profile' },
-        { status: 500 },
-      );
-    }
-
-    if (profile.role !== 'Student') {
-       return NextResponse.json(
-        { error: 'Forbidden: User does not have Student role' },
+        { error: 'Forbidden: Student account is inactive' },
         { status: 403 }
       );
     }
 
-    if (!profile.client_id) {
-      console.error(`Student ${user.id} has no assigned client_id.`);
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
+      console.error(`Student ${user.id} has no assigned client_id in JWT claims.`);
       return NextResponse.json(
         { error: 'Forbidden: Student not associated with a client' },
-        { status: 403 },
+        { status: 403 }
       );
     }
 
     const studentId = user.id;
-    const clientId = profile.client_id;
 
     // 4. Fetch Assessment & Correct Answers
     // Assuming 'assessments' table has 'id', 'module_id', and 'questions' (JSONB) columns

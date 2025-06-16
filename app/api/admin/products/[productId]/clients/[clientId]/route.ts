@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * DELETE handler to unassign a client from a specific product.
@@ -12,19 +12,15 @@ export async function DELETE(
   request: Request,
   context: { params: { productId: string, clientId: string } }
 ) {
+  // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
+  const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+  const { user, claims, supabase } = authResult;
+
   // Properly await the params object
   const params = await context.params;
-  const { profile, role, error: authError } = await getUserSessionAndRole();
-
-  if (authError || !profile || !role) {
-    console.error('DELETE /api/admin/products/[productId]/clients/[clientId] Auth Error:', authError?.message);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Only Admins and Staff are allowed
-  if (!['Admin', 'Staff'].includes(role)) {
-    return NextResponse.json({ error: 'Forbidden: Access denied for this role' }, { status: 403 });
-  }
   
   // Validate ids
   const idSchema = z.object({
@@ -47,9 +43,6 @@ export async function DELETE(
   const { productId, clientId } = validationResult.data;
 
   try {
-    // Create supabase client for this request
-    const supabase = await createClient();
-    
     // Delete the assignment record
     const { error: deleteError } = await supabase
       .from('client_product_assignments')

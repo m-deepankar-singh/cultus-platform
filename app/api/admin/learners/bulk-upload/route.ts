@@ -3,6 +3,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { z } from 'zod';
 import { sendLearnerWelcomeEmail } from '@/lib/email/service';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Schema for validating each learner
 const LearnerSchema = z.object({
@@ -60,23 +61,16 @@ const BATCH_SIZE = 50;
  */
 export async function POST(request: Request) {
   try {
-    // 1. Authentication & Authorization
-    const { user, profile, role, error: sessionError } = await getUserSessionAndRole();
-
-    if (sessionError || !user || !profile) {
-      const status = sessionError?.message.includes('No active user session') ? 401 : 403;
-      return new NextResponse(JSON.stringify({ error: sessionError?.message || 'Unauthorized or profile missing' }), {
-        status,
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
-
-    if (!role || !["Admin", "Staff"].includes(role)) {
-      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Parse and validate the request body
     const body = await request.json();
@@ -97,8 +91,7 @@ export async function POST(request: Request) {
         });
     }
 
-    // 3. Get client list for validation and display
-    const supabase = await createClient();
+    // 3. Get client list for validation and display (supabase client from authResult)
     const { data: clients, error: clientsError } = await supabase
       .from('clients')
       .select('id, name');
@@ -110,7 +103,7 @@ export async function POST(request: Request) {
       });
     }
     
-    const clientMap = (clients || []).reduce((map, client) => {
+    const clientMap = (clients || []).reduce((map: any, client: any) => {
       map[client.id] = client.name;
       return map;
     }, {} as Record<string, string>);
@@ -177,13 +170,16 @@ export async function POST(request: Request) {
  */
 export async function PUT(request: Request) {
   try {
-    // 1. Authentication & Authorization (same as POST)
-    const { user, profile, role, error: sessionError } = await getUserSessionAndRole();
-    if (sessionError || !user || !profile || !role || !["Admin", "Staff"].includes(role)) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized or Forbidden' }), {
-        status: role ? 403 : 401, headers: { 'Content-Type': 'application/json' }
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
+        headers: { 'Content-Type': 'application/json' },
       });
     }
+    
+    const { user, claims, supabase } = authResult;
 
     // 2. Parse and validate the request body
     const body = await request.json();
@@ -195,8 +191,7 @@ export async function PUT(request: Request) {
     }
     const { learners: learnersToSubmit } = payloadValidation.data;
 
-    // 3. Set up clients
-    const supabase = await createClient();
+    // 3. Set up service client (supabase client from authResult)
     const serviceClient = await createServiceClient();
     
     // 4. Re-validate each learner and check for existing emails in DB
@@ -212,7 +207,7 @@ export async function PUT(request: Request) {
         status: 500, headers: { 'Content-Type': 'application/json' }
       });
     }
-    const existingDbEmails = new Set((existingDbLearners || []).map(s => (s.email || '').toLowerCase()));
+    const existingDbEmails = new Set((existingDbLearners || []).map((s: any) => (s.email || '').toLowerCase()));
 
     const successfulLearners: any[] = [];
     const failedLearners: any[] = [];

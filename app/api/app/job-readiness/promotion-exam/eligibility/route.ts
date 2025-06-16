@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/app/job-readiness/promotion-exam/eligibility
@@ -8,7 +9,6 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
     const url = new URL(req.url);
     const productId = url.searchParams.get('productId');
 
@@ -16,38 +16,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
 
-    // Verify authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get client_id from JWT claims
+    const clientId = claims.client_id;
+    if (!clientId) {
+      return NextResponse.json({ error: 'Student not properly enrolled' }, { status: 403 });
     }
 
-    // Get student profile for the current user
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select(`
-        id,
-        client_id,
-        job_readiness_star_level,
-        job_readiness_tier,
-        job_readiness_promotion_eligible
-      `)
-      .eq('id', user.id)
-      .single();
-
-    if (studentError || !student) {
-      console.error('Error fetching student:', studentError);
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
-    }
-    
     // Verify the product is assigned to the student's client
     const { data: clientProduct, error: clientProductError } = await supabase
       .from('client_product_assignments')
       .select('client_id, product_id')
-      .eq('client_id', student.client_id)
+      .eq('client_id', clientId)
       .eq('product_id', productId)
       .maybeSingle();
 
@@ -58,6 +44,23 @@ export async function GET(req: NextRequest) {
 
     if (!clientProduct) {
       return NextResponse.json({ error: 'This product is not available for your client' }, { status: 403 });
+    }
+
+    // Get student profile for the current user - specific fields only
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select(`
+        id,
+        job_readiness_star_level,
+        job_readiness_tier,
+        job_readiness_promotion_eligible
+      `)
+      .eq('id', user.id)
+      .single();
+
+    if (studentError || !student) {
+      console.error('Error fetching student:', studentError);
+      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
     
     // Check if promotion exams are enabled for this product
@@ -130,7 +133,7 @@ export async function GET(req: NextRequest) {
     }
 
     // If the student has any successful attempts for this star level, they can't take it again
-    const hasPassedExam = previousAttempts?.some(attempt => attempt.passed);
+    const hasPassedExam = previousAttempts?.some((attempt: any) => attempt.passed);
     if (hasPassedExam) {
       return NextResponse.json({ 
         error: 'You have already passed a promotion exam for this star level',

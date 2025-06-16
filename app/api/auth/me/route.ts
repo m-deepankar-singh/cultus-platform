@@ -1,78 +1,75 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/auth/me
  * 
  * Returns information about the currently authenticated user
- * including their profile data and role.
+ * including their profile data and role from JWT claims.
  */
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    
-    // Get auth user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
+    // JWT-based authentication (0 database queries for basic user info)
+    const authResult = await authenticateApiRequest();
+    if ('error' in authResult) {
       return NextResponse.json({
         user: null,
         role: null
       }, { status: 401 });
     }
-    
-    // Try to get user profile from profiles table first
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, full_name, client_id')
-      .eq('id', user.id)
-      .maybeSingle(); // Use maybeSingle to avoid error when no rows found
+    const { user, claims, supabase } = authResult;
 
-    // If not found in profiles, try students table
-    let studentData = null;
-    if (!profile) {
-      const { data: student, error: studentError } = await supabase
-        .from('students')
-        .select('id, full_name, job_readiness_background_type, job_readiness_tier, job_readiness_star_level')
+    // Get basic user info from JWT claims
+    const userRole = claims.user_role;
+    const clientId = claims.client_id;
+    const isActive = claims.profile_is_active;
+    const isStudent = claims.is_student;
+
+         // For students, get additional data from database (minimal query)
+     if (isStudent || userRole === 'student') {
+       const { data: studentData, error: studentError } = await supabase
+         .from('students')
+         .select('full_name, job_readiness_background_type, job_readiness_tier, job_readiness_star_level')
+         .eq('id', user.id)
+         .maybeSingle();
+
+       return NextResponse.json({
+         user: {
+           id: user.id,
+           email: user.email
+         },
+         role: 'student',
+         profile: {
+           fullName: studentData?.full_name || null,
+           backgroundType: studentData?.job_readiness_background_type || null,
+           tier: studentData?.job_readiness_tier || null,
+           starLevel: studentData?.job_readiness_star_level || null,
+           clientId: clientId || null
+         }
+       });
+    } else if (userRole && ['Admin', 'Staff', 'Client Staff', 'Viewer'].includes(userRole)) {
+      // For admin/staff users, get full_name from profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name')
         .eq('id', user.id)
         .maybeSingle();
-      
-      if (!studentError && student) {
-        studentData = student;
-      }
-    }
 
-    // Return appropriate data based on what we found
-    if (profile) {
-      // User has admin/staff profile
       return NextResponse.json({
         user: {
           id: user.id,
           email: user.email
         },
-        role: profile.role || null,
+        role: userRole,
         profile: {
-          fullName: profile.full_name,
-          clientId: profile.client_id
-        }
-      });
-    } else if (studentData) {
-      // User is a student
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email
-      },
-        role: 'student',
-      profile: {
-          fullName: studentData.full_name,
-          backgroundType: studentData.job_readiness_background_type,
-          tier: studentData.job_readiness_tier,
-          starLevel: studentData.job_readiness_star_level
+          fullName: profile?.full_name || null,
+          clientId: clientId || null,
+          isActive: isActive
         }
       });
     } else {
-      // User exists but no profile data found
+      // User exists but no valid role found
       return NextResponse.json({
         user: {
           id: user.id,

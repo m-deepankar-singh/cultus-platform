@@ -570,8 +570,8 @@ export default function TakeAssessmentPage() {
                 </>
               )}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-neutral-600 dark:text-neutral-400">
-              <div className="py-4">
+            <AlertDialogDescription asChild>
+              <div className="py-4 text-neutral-600 dark:text-neutral-400">
                 <p className="text-lg font-medium mb-2 text-neutral-800 dark:text-white">
                   Your score: {assessmentResult?.score}%
                 </p>

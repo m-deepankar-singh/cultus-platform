@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { authenticateApiRequest } from "@/lib/auth/api-auth";
 
 // Schema for updating Job Readiness assessments
 const UpdateJobReadinessAssessmentSchema = z.object({
@@ -40,40 +41,13 @@ export async function GET(
     }
     const validAssessmentId = assessmentIdValidation.data;
 
-    // Create Supabase server client
-    const supabase = await createClient();
-
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Fetch user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error("Error fetching user profile:", profileError);
-      return NextResponse.json(
-        { error: "Server Error", message: "Error fetching user profile" },
-        { status: 500 }
-      );
-    }
-
-    // Verify user is an Admin
-    if (profile.role !== "Admin") {
-      return NextResponse.json(
-        { error: "Forbidden", message: "Admin role required" },
-        { status: 403 }
-      );
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Fetch the Job Readiness assessment
     const { data: assessment, error: assessmentError } = await supabase
@@ -163,40 +137,13 @@ export async function PATCH(
     }
     const validAssessmentId = assessmentIdValidation.data;
 
-    // Create Supabase server client
-    const supabase = await createClient();
-
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Fetch user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error("Error fetching user profile:", profileError);
-      return NextResponse.json(
-        { error: "Server Error", message: "Error fetching user profile" },
-        { status: 500 }
-      );
-    }
-
-    // Verify user is an Admin
-    if (profile.role !== "Admin") {
-      return NextResponse.json(
-        { error: "Forbidden", message: "Admin role required" },
-        { status: 403 }
-      );
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Parse and validate request body
     let body;

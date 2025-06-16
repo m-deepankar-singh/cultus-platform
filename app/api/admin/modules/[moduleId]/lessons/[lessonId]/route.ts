@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema, LessonIdSchema, UpdateCourseLessonSchema } from '@/lib/schemas/module';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 const LessonUpdateSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
@@ -28,21 +29,13 @@ export async function GET(
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId, lessonId: rawLessonId } = resolvedParams;
     
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, message: 'Authentication required' }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Validate route parameters
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
@@ -107,21 +100,13 @@ export async function PUT(
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId, lessonId: rawLessonId } = resolvedParams;
     
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, message: 'Authentication required' }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Validate route parameters
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
@@ -213,21 +198,13 @@ export async function DELETE(
     const resolvedParams = await Promise.resolve(params);
     const { moduleId: rawModuleId, lessonId: rawLessonId } = resolvedParams;
     
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, message: 'Authentication required' }, { status: authResult.status });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Server Error', message: 'Error fetching user profile' }, { status: 500 });
-    }
-    if (profile.role !== 'Admin') {
-      return NextResponse.json({ error: 'Forbidden', message: 'Admin role required' }, { status: 403 });
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Validate route parameters
     const moduleIdValidation = ModuleIdSchema.safeParse({ moduleId: rawModuleId });
@@ -294,7 +271,7 @@ export async function DELETE(
       // We don't need to fail the request for this - deletion was successful
     } else if (remainingLessons && remainingLessons.length > 0) {
       // Update sequences to ensure there are no gaps
-      const updatePromises = remainingLessons.map(async (lesson, index) => {
+      const updatePromises = remainingLessons.map(async (lesson: any, index: number) => {
         if (lesson.sequence !== index + 1) {
           const { error } = await supabase
             .from("lessons")

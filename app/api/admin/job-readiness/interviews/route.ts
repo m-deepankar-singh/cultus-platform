@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { authenticateApiRequest } from '@/lib/auth/api-auth'
 
 const querySchema = z.object({
   page: z.string().optional().default('1'),
@@ -19,25 +20,13 @@ const querySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
     
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user has admin role - use case insensitive comparison
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin' || profile.role.toLowerCase() === 'staff')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role })
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
-    }
+    const { user, claims, supabase } = authResult;
 
     // Parse query parameters
     const { searchParams } = new URL(request.url)
@@ -122,7 +111,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data for frontend compatibility
-    const transformedSubmissions = submissions?.map(submission => ({
+    const transformedSubmissions = submissions?.map((submission: any) => ({
       id: submission.id,
       student_id: submission.student_id,
       student_name: submission.student?.full_name || 'Unknown Student',

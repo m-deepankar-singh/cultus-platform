@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 const quickVerdictSchema = z.object({
   admin_verdict_override: z.enum(['approved', 'rejected']),
@@ -25,28 +26,13 @@ export async function PATCH(
       );
     }
 
-    // Validate admin role
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    // Check if user is admin or staff
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    
-    if (profileError || !profile || 
-        (profile.role.toLowerCase() !== 'admin' && profile.role.toLowerCase() !== 'staff')) {
-      return NextResponse.json(
-        { error: 'Only administrators and staff can perform this action' },
-        { status: 403 }
-      );
-    }
+    const { user, claims, supabase } = authResult;
 
     // Parse and validate request body
     const body = await req.json();

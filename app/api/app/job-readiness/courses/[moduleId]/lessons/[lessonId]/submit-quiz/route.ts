@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Schema for quiz submission validation
 const QuizSubmissionSchema = z.object({
@@ -43,11 +44,11 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function POST(
   request: NextRequest,
-  context: { params: { moduleId: string; lessonId: string } }
+  context: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
     // 1. Validate parameters
-    const { params } = context;
+    const params = await context.params;
     const moduleIdValidation = ModuleIdSchema.safeParse(params.moduleId);
     const lessonIdValidation = LessonIdSchema.safeParse(params.lessonId);
     
@@ -68,14 +69,12 @@ export async function POST(
     const validModuleId = moduleIdValidation.data;
     const validLessonId = lessonIdValidation.data;
 
-    // 2. Authentication
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 2. JWT-based authentication (Phase 1 optimization - 0 database queries for auth)
+    const authResult = await authenticateApiRequest(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, claims, supabase } = authResult;
 
     // 3. Parse and validate request body
     let body;
@@ -102,25 +101,20 @@ export async function POST(
 
     const { answers } = validation.data;
 
-    // 4. Get student information
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('id, client_id, job_readiness_tier, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError || !studentRecord) {
-      console.error('Student Fetch Error:', studentFetchError);
+    // 4. Check student account status from JWT claims (no database query needed)
+    if (!claims.profile_is_active) {
       return NextResponse.json(
-        { error: 'Forbidden: Student record not found' },
-        { status: 403 },
+        { error: 'Forbidden: Student account is inactive' },
+        { status: 403 }
       );
     }
 
-    if (!studentRecord.is_active) {
+    // Get client_id from JWT claims instead of database lookup
+    const clientId = claims.client_id;
+    if (!clientId) {
       return NextResponse.json(
-        { error: 'Forbidden: Student account is inactive' },
-        { status: 403 },
+        { error: 'Forbidden: Student not linked to a client' },
+        { status: 403 }
       );
     }
 
@@ -154,11 +148,11 @@ export async function POST(
       );
     }
 
-    // 7. Verify enrollment
+    // 7. Verify enrollment using client_id from JWT claims
     const { count, error: assignmentError } = await supabase
       .from('client_product_assignments')
       .select('*', { count: 'exact', head: true })
-      .eq('client_id', studentRecord.client_id)
+      .eq('client_id', clientId)
       .eq('product_id', productData.id);
 
     if (assignmentError || count === 0) {
