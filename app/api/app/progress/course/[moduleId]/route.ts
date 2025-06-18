@@ -23,11 +23,12 @@ interface CourseProgressUpdatePayload {
 // Define PATCH handler
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // Extract moduleId and validate
-    const moduleId = params?.moduleId;
+    const resolvedParams = await params;
+    const moduleId = resolvedParams?.moduleId;
     if (!moduleId) {
       return NextResponse.json({ error: 'Module ID is required' }, { status: 400 });
     }

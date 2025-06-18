@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation"
 import Link from 'next/link';
-import { BackgroundPaths } from "@/components/ui/background-paths";
 import Image from 'next/image';
+import { HomePageClient } from '@/components/app/HomePageClient';
 
 export default function HomePage() {
   return (
@@ -32,7 +31,7 @@ export default function HomePage() {
         />
       </div>
 
-      <BackgroundPaths title="Cultus Learning" />
+      <HomePageClient title="Cultus Learning" />
     </main>
   );
 }

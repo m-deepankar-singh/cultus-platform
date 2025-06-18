@@ -13,6 +13,13 @@ interface VideoUploaderProps {
   moduleId?: string
 }
 
+interface UploadResult {
+  success: boolean
+  url?: string
+  key?: string
+  error?: string
+}
+
 export function VideoUploader({ 
   onUploadComplete, 
   currentVideoUrl, 
@@ -26,7 +33,7 @@ export function VideoUploader({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  // Simulated progress function (actual progress would require special upload handling)
+  // Simulated progress function for S3 upload (actual progress would require special upload handling)
   const simulateProgress = () => {
     setUploadProgress(0)
     const interval = setInterval(() => {
@@ -48,16 +55,17 @@ export function VideoUploader({
       return;
     }
     
-    // Check file type
-    if (!selectedFile.type.startsWith('video/')) {
-      setError("Please select a valid video file")
+    // Check file type - restrict to MP4 and WebM for S3 compatibility
+    if (!selectedFile.type.startsWith('video/') || 
+        (!selectedFile.type.includes('mp4') && !selectedFile.type.includes('webm'))) {
+      setError("Please select a valid MP4 or WebM video file")
       return
     }
     
-    // Check file size (max 1GB)
-    const MAX_SIZE = 1024 * 1024 * 1000 // 1GB
+    // Check file size (max 500MB for S3 upload)
+    const MAX_SIZE = 500 * 1024 * 1024 // 500MB
     if (selectedFile.size > MAX_SIZE) {
-      setError(`File size exceeds the 1GB limit (${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB)`)
+      setError(`File size exceeds the 500MB limit (${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB)`)
       return
     }
     
@@ -79,50 +87,47 @@ export function VideoUploader({
     const progressInterval = simulateProgress()
     
     try {
+      // Use new S3 upload endpoint instead of old R2 upload helper
       const formData = new FormData()
       formData.append('file', file)
       
-      // Add module ID to metadata if available
-      if (moduleId) {
-        formData.append('moduleId', moduleId)
-      }
-      
-      const response = await fetch('/api/admin/storage/upload', {
+      const response = await fetch('/api/admin/lessons/upload-video', {
         method: 'POST',
         body: formData,
       })
       
+      const result: UploadResult = await response.json()
+      
       clearInterval(progressInterval)
       
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Upload failed')
+      if (result.success && result.url && result.key) {
+        // Complete the progress bar
+        setUploadProgress(100)
+        
+        // Set the video URL from the S3 response
+        setVideoUrl(result.url)
+        
+        // Call the callback with the new video URL and key (as path)
+        // This maintains the same interface as the old R2 system
+        onUploadComplete(result.url, result.key)
+        
+        toast({
+          title: "Upload successful",
+          description: "Video has been uploaded successfully",
+        })
+      } else {
+        throw new Error(result.error || 'Upload failed')
       }
-      
-      const data = await response.json()
-      
-      // Complete the progress bar
-      setUploadProgress(100)
-      
-      // Set the video URL from the response
-      setVideoUrl(data.publicUrl || data.fullPath)
-      
-      // Call the callback with the new video URL
-      onUploadComplete(data.publicUrl || data.fullPath, data.path)
-      
-      toast({
-        title: "Upload successful",
-        description: "Video has been uploaded successfully",
-      })
     } catch (err) {
       clearInterval(progressInterval)
       setUploadProgress(0)
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+      setError(errorMessage)
       
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: err instanceof Error ? err.message : 'An unknown error occurred',
+        description: errorMessage,
       })
     } finally {
       setIsUploading(false)
@@ -185,7 +190,7 @@ export function VideoUploader({
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/*"
+              accept="video/mp4,video/webm"
               onChange={handleFileChange}
               className="hidden"
               id="video-upload"
@@ -207,7 +212,7 @@ export function VideoUploader({
                   </Button>
                 </div>
                 <p className="mt-2 text-sm text-gray-500">
-                  MP4 format recommended. Maximum file size: 1GB
+                  MP4 or WebM format recommended. Maximum file size: 500MB
                 </p>
               </div>
             )}

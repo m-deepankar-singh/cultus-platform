@@ -19,11 +19,12 @@ const UuidSchema = z.string().uuid({ message: 'Invalid Module ID format' });
  */
 export async function GET(
   request: Request,
-  { params }: { params: { moduleId: string } },
+  { params }: { params: Promise<{ moduleId: string }> },
 ) {
   try {
     // 1. Validate Route Parameter (moduleId)
-    const moduleIdValidation = UuidSchema.safeParse(params.moduleId);
+    const resolvedParams = await params;
+    const moduleIdValidation = UuidSchema.safeParse(resolvedParams.moduleId);
     if (!moduleIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request: Invalid Module ID format', details: moduleIdValidation.error.flatten().formErrors },

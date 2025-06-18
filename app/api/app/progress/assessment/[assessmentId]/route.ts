@@ -20,11 +20,12 @@ const UuidSchema = z.string().uuid({ message: 'Invalid Assessment ID format' });
  */
 export async function POST(
   request: Request,
-  { params }: { params: { assessmentId: string } },
+  { params }: { params: Promise<{ assessmentId: string }> },
 ) {
   try {
     // 1. Validate Route Parameter (assessmentId)
-    const assessmentIdValidation = UuidSchema.safeParse(params.assessmentId);
+    const resolvedParams = await params;
+    const assessmentIdValidation = UuidSchema.safeParse(resolvedParams.assessmentId);
     if (!assessmentIdValidation.success) {
       return NextResponse.json(
         { error: 'Bad Request: Invalid Assessment ID format', details: assessmentIdValidation.error.flatten().formErrors },

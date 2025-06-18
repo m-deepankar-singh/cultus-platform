@@ -9,15 +9,15 @@ const CourseProgressUpdateSchema = z.object({
   moduleId: z.string().uuid(),
   current_lesson_id: z.string().uuid().optional(),
   current_lesson_sequence: z.number().int().min(0).optional(),
-  video_playback_position: z.number().min(0).optional(),
+  video_playback_position: z.number().min(0).finite().optional(), // Ensure no NaN or Infinity
   status: z.enum(['NotStarted', 'InProgress', 'Completed']).optional(),
-  progress_percentage: z.number().int().min(0).max(100).optional(),
+  progress_percentage: z.number().int().min(0).max(100).finite().optional(), // Ensure no NaN or Infinity
   lessonVideoIdCompleted: z.string().uuid().optional(), // For marking a video as fully watched
   lesson_quiz_submission: z.object({ // For submitting in-lesson quiz results
     lessonId: z.string().uuid(),
     answers: z.record(z.string(), z.union([z.string(), z.array(z.string())])), // Student's answers
     // score: z.number().optional(), // Score calculation might happen here or be a separate step
-    time_taken_seconds: z.number().optional(), // Optional: time taken in seconds
+    time_taken_seconds: z.number().min(0).finite().optional(), // Optional: time taken in seconds, ensure no NaN
   }).optional(),
 });
 
@@ -58,6 +58,10 @@ export async function updateCourseProgressAction(
     // Validate input data with Zod
     const validationResult = CourseProgressUpdateSchema.safeParse(data);
     if (!validationResult.success) {
+      console.error('Zod validation failed for course progress update:', {
+        data,
+        errors: validationResult.error.flatten()
+      });
       return {
         success: false,
         error: 'Invalid input data',

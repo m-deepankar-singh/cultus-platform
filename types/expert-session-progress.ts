@@ -17,6 +17,22 @@ export interface ExpertSessionProgressRecord {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  last_milestone_reached?: number; // Phase 1: Milestone tracking
+  
+  // Phase 2: Enhanced video functionality
+  resume_from_milestone?: number;
+  session_data?: SessionTrackingData;
+}
+
+// Phase 2: Session tracking data structure
+export interface SessionTrackingData {
+  sessions?: Array<{
+    started_at: string;
+    ended_at?: string;
+    milestones_reached: number[];
+    pauses: number;
+    pause_time: number; // Total pause time in seconds
+  }>;
 }
 
 // Progress data sent to API for milestone tracking
@@ -28,6 +44,12 @@ export interface MilestoneProgressData {
   force_completion?: boolean;
   seek_from_seconds?: number; // For tracking seek behavior
   pause_duration_seconds?: number; // For tracking pause behavior
+  
+  // Phase 2: Enhanced video fields
+  resume_from_milestone?: number;
+  session_started?: boolean;
+  session_ended?: boolean;
+  pause_duration?: number; // Duration of pause in seconds
 }
 
 // Legacy progress data format (for backward compatibility)
@@ -50,6 +72,12 @@ export interface MilestoneProgressResponse {
     session_just_completed: boolean;
     milestone_reached?: ProgressMilestone;
     trigger_type: SaveTriggerType;
+    last_milestone_reached?: number;
+    
+    // Phase 2: Enhanced resume functionality
+    resume_from_milestone: number;
+    can_resume: boolean;
+    resume_position_seconds: number; // Calculated from milestone
   };
   overall_progress: {
     completed_sessions_count: number;
@@ -86,6 +114,12 @@ export interface ExpertSessionWithMilestones {
     completed_at: string | null;
     last_milestone_reached?: ProgressMilestone;
     milestones_reached?: ProgressMilestone[];
+    
+    // Phase 2: Enhanced resume functionality
+    can_resume: boolean;
+    resume_from_milestone: number;
+    resume_position_seconds: number;
+    milestones_unlocked: number[];
   };
 }
 

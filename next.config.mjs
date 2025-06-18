@@ -1,23 +1,16 @@
-let userConfig = undefined
-try {
-  // try to import ESM first
-  userConfig = await import('./v0-user-next.config.mjs')
-} catch (e) {
-  try {
-    // fallback to CJS import
-    userConfig = await import("./v0-user-next.config");
-  } catch (innerError) {
-    // ignore error
-  }
-}
+import bundleAnalyzer from '@next/bundle-analyzer';
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+});
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [
@@ -26,6 +19,13 @@ const nextConfig = {
         hostname: 'meizvwwhasispvfbprck.supabase.co',
         port: '',
         pathname: '/storage/v1/object/public/**',
+      },
+      // Add R2 public domain for image access
+      {
+        protocol: 'https',
+        hostname: 'pub-696d7c88c1d1483e90f5fedec576342a.r2.dev',
+        port: '',
+        pathname: '/**',
       },
     ],
   },
@@ -51,23 +51,4 @@ const nextConfig = {
   },
 }
 
-if (userConfig) {
-  // ESM imports will have a "default" property
-  const config = userConfig.default || userConfig
-
-  for (const key in config) {
-    if (
-      typeof nextConfig[key] === 'object' &&
-      !Array.isArray(nextConfig[key])
-    ) {
-      nextConfig[key] = {
-        ...nextConfig[key],
-        ...config[key],
-      }
-    } else {
-      nextConfig[key] = config[key]
-    }
-  }
-}
-
-export default nextConfig
+export default withBundleAnalyzer(nextConfig)

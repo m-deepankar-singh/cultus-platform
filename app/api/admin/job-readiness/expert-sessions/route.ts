@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { cacheManager, CacheUtils } from '@/lib/cache/cache-manager';
 
 /**
  * GET /api/admin/job-readiness/expert-sessions
@@ -19,104 +20,146 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const productId = url.searchParams.get('productId');
 
-    // Build query to get expert sessions with associated products via junction table
-    let query = supabase
-      .from('job_readiness_expert_sessions')
-      .select(`
-        id,
-        title,
-        description,
-        video_url,
-        video_duration,
-        is_active,
-        created_at,
-        updated_at,
-        job_readiness_expert_session_products!inner (
-          product_id,
-          products!inner (
-            id,
-            name,
-            type
-          )
-        )
-      `)
-      .eq('job_readiness_expert_session_products.products.type', 'JOB_READINESS')
-      .order('created_at', { ascending: false });
+    try {
+      // Use the authenticated supabase client to call the cache function directly
+      const { data: sessionsWithStats, error: cacheError } = await supabase.rpc('get_expert_sessions_with_stats_cached', {
+        p_product_id: productId || null,
+        p_cache_duration: CacheUtils.durations.LONG // 15 minutes instead of 5 minutes
+      });
 
-    // Filter by product if specified
-    if (productId) {
-      query = query.eq('job_readiness_expert_session_products.product_id', productId);
-    }
-
-    const { data: expertSessions, error } = await query;
-
-    if (error) {
-      console.error('Error fetching expert sessions:', error);
-      return NextResponse.json({ error: 'Failed to fetch expert sessions' }, { status: 500 });
-    }
-
-    // Transform the data to group products by session
-    const sessionsMap = new Map();
-    
-    expertSessions?.forEach((session: any) => {
-      const sessionId = session.id;
-      
-      if (!sessionsMap.has(sessionId)) {
-        sessionsMap.set(sessionId, {
-          id: session.id,
-          title: session.title,
-          description: session.description,
-          video_url: session.video_url,
-          video_duration: session.video_duration,
-          is_active: session.is_active,
-          created_at: session.created_at,
-          updated_at: session.updated_at,
-          products: []
+      if (cacheError) {
+        console.error('Cache RPC error:', cacheError);
+        // If cache fails, fall back to the base function directly
+        console.log('Falling back to base function...');
+        const { data: fallbackSessions, error: fallbackError } = await supabase.rpc('get_expert_sessions_with_stats', {
+          p_product_id: productId || null
         });
+        
+        if (fallbackError) {
+          throw new Error(`Both cache and fallback failed: ${fallbackError.message}`);
+        }
+        
+        return NextResponse.json({ sessions: fallbackSessions || [] });
       }
       
-      // Add product to the session's products array
-      if (session.job_readiness_expert_session_products?.products) {
-        sessionsMap.get(sessionId).products.push(session.job_readiness_expert_session_products.products);
+      // Cache returns the data as an array, so return it directly
+      return NextResponse.json({ sessions: sessionsWithStats || [] });
+    } catch (cacheError) {
+      console.error('❌ Cache error, falling back to direct query:', cacheError);
+      
+      // Fallback to direct query if cache fails
+      let query = supabase
+        .from('job_readiness_expert_sessions')
+        .select(`
+          id,
+          title,
+          description,
+          video_url,
+          video_duration,
+          is_active,
+          created_at,
+          updated_at,
+          job_readiness_expert_session_products (
+            product_id,
+            products (
+              id,
+              name,
+              type
+            )
+          )
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      // Filter by product if specified
+      if (productId) {
+        query = query.eq('job_readiness_expert_session_products.product_id', productId);
       }
-    });
 
-    const transformedSessions = Array.from(sessionsMap.values());
+      const { data: expertSessions, error } = await query;
 
-    // Get completion statistics for each session
-    const sessionsWithStats = await Promise.all(
-      transformedSessions.map(async (session) => {
-        const { data: progressStats, error: statsError } = await supabase
-          .from('job_readiness_expert_session_progress')
-          .select('student_id, is_completed, watch_time_seconds')
-          .eq('expert_session_id', session.id);
+      if (error) {
+        console.error('Error fetching expert sessions:', error);
+        return NextResponse.json({ error: 'Failed to fetch expert sessions' }, { status: 500 });
+      }
 
-        let completionStats = {
-          total_viewers: 0,
-          completion_rate: 0,
-          average_watch_time: 0
-        };
-
-        if (!statsError && progressStats) {
-          const totalViewers = progressStats.length;
-          const completedViewers = progressStats.filter((p: any) => p.is_completed).length;
-          const totalWatchTime = progressStats.reduce((sum: number, p: any) => sum + p.watch_time_seconds, 0);
-
-          completionStats = {
-            total_viewers: totalViewers,
-            completion_rate: totalViewers > 0 ? Math.round((completedViewers / totalViewers) * 100) : 0,
-            average_watch_time: totalViewers > 0 ? Math.round(totalWatchTime / totalViewers) : 0
-          };
+      // Transform the data to group products by session
+      const sessionsMap = new Map();
+      
+      expertSessions?.forEach((session: any) => {
+        const sessionId = session.id;
+        
+        if (!sessionsMap.has(sessionId)) {
+          sessionsMap.set(sessionId, {
+            id: session.id,
+            title: session.title,
+            description: session.description,
+            video_url: session.video_url,
+            video_duration: session.video_duration,
+            is_active: session.is_active,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+            products: []
+          });
         }
+        
+        // Add product to the session's products array only if it's a Job Readiness product
+        if (session.job_readiness_expert_session_products?.products && 
+            session.job_readiness_expert_session_products.products.type === 'JOB_READINESS') {
+          sessionsMap.get(sessionId).products.push(session.job_readiness_expert_session_products.products);
+        }
+      });
 
-        return {
+      // Filter sessions to only include those with at least one Job Readiness product (unless no productId filter)
+      let transformedSessions = Array.from(sessionsMap.values());
+      if (productId) {
+        // If filtering by specific product, only include sessions with that product
+        transformedSessions = transformedSessions.filter(session => 
+          session.products.some((p: any) => p.id === productId)
+        );
+      } else {
+        // For admin view, show all sessions but note which ones have no valid products
+        transformedSessions = transformedSessions.map(session => ({
           ...session,
-          completion_stats: completionStats
-        };
-      })
-    );
+          has_valid_products: session.products.length > 0
+        }));
+      }
 
-    return NextResponse.json({ sessions: sessionsWithStats });
+      // Get completion statistics for each session
+      const sessionsWithStats = await Promise.all(
+        transformedSessions.map(async (session) => {
+          const { data: progressStats, error: statsError } = await supabase
+            .from('job_readiness_expert_session_progress')
+            .select('student_id, is_completed, watch_time_seconds')
+            .eq('expert_session_id', session.id);
+
+          let completionStats = {
+            total_viewers: 0,
+            completion_rate: 0,
+            average_watch_time: 0
+          };
+
+          if (!statsError && progressStats) {
+            const totalViewers = progressStats.length;
+            const completedViewers = progressStats.filter((p: any) => p.is_completed).length;
+            const totalWatchTime = progressStats.reduce((sum: number, p: any) => sum + p.watch_time_seconds, 0);
+
+            completionStats = {
+              total_viewers: totalViewers,
+              completion_rate: totalViewers > 0 ? Math.round((completedViewers / totalViewers) * 100) : 0,
+              average_watch_time: totalViewers > 0 ? Math.round(totalWatchTime / totalViewers) : 0
+            };
+          }
+
+          return {
+            ...session,
+            completion_stats: completionStats
+          };
+        })
+      );
+
+      return NextResponse.json({ sessions: sessionsWithStats });
+    }
   } catch (error) {
     console.error('Unexpected error in expert-sessions GET:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -238,12 +281,14 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // Use the new session-based upload helper function
-    const { uploadExpertSessionVideoById } = await import('@/lib/supabase/upload-helpers');
+    // Use the new S3 upload service instead of old R2 upload helper
+    const { uploadService } = await import('@/lib/r2/simple-upload-service');
     
     let uploadResult;
     try {
-      uploadResult = await uploadExpertSessionVideoById(videoFile, expertSession.id);
+      // Generate key with session ID for organization (matches the old system)
+      const key = uploadService.generateKey(`expert-sessions/${expertSession.id}`, videoFile.name);
+      uploadResult = await uploadService.uploadFile(videoFile, key, videoFile.type);
     } catch (uploadError: any) {
       console.error('Video upload failed:', uploadError);
       
@@ -261,16 +306,13 @@ export async function POST(req: NextRequest) {
     // Update session record with video URL
     const { error: updateError } = await supabase
       .from('job_readiness_expert_sessions')
-      .update({ video_url: uploadResult.publicUrl })
+      .update({ video_url: uploadResult.url })
       .eq('id', expertSession.id);
 
     if (updateError) {
       console.error('Error updating session with video URL:', updateError);
       
-      // Clean up uploaded file and session record
-      await supabase.storage
-        .from('expert-session-videos-public')
-        .remove([uploadResult.path]);
+      // Clean up session record (S3 file cleanup would require additional deletion logic)
       await supabase
         .from('job_readiness_expert_sessions')
         .delete()
@@ -294,10 +336,7 @@ export async function POST(req: NextRequest) {
     if (associationError) {
       console.error('Error creating product associations:', associationError);
       
-      // Clean up uploaded file and session record
-      await supabase.storage
-        .from('expert-session-videos-public')
-        .remove([uploadResult.path]);
+      // Clean up session record (S3 file cleanup would require additional deletion logic)
       await supabase
         .from('job_readiness_expert_sessions')
         .delete()

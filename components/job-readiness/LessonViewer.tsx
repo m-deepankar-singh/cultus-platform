@@ -4,17 +4,20 @@ import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useSubmitQuiz, useUpdateProgress } from '@/hooks/useJobReadinessMutations'
-import { AiQuiz } from './AiQuiz'
-import { Video, Play, Pause, Volume2, VolumeX, Maximize, ChevronLeft, ChevronRight, CheckCircle, Award, Clock, AlertCircle } from 'lucide-react'
-import Link from 'next/link'
+import { Video, Play, Pause, Volume2, VolumeX, Maximize, CheckCircle, Award, Clock, AlertCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { AiQuiz } from './AiQuiz'
+import { useSubmitQuiz } from '@/hooks/useJobReadinessMutations'
+import { useSimplifiedCourseProgress } from '@/hooks/useSimplifiedCourseProgress'
 
 interface LessonQuizResult {
   score: number
+  total_questions: number
   passed: boolean
   attempts: number
+  answers: Record<string, string | string[]>
+  submitted_at: string
 }
 
 interface Lesson {
@@ -24,7 +27,7 @@ interface Lesson {
   video_url: string
   sequence: number
   enable_ai_quiz: boolean
-  quiz_questions: Array<{
+  quiz_questions?: Array<{
     id: string
     question_text: string
     options: Array<{
@@ -33,18 +36,14 @@ interface Lesson {
     }>
     question_type: string
   }>
-  quiz_already_passed: boolean
-  quiz_available?: boolean
-  video_fully_watched?: boolean
-  video_playback_position?: number
 }
 
-interface CourseProgress {
-  last_viewed_lesson_sequence: number
-  video_playback_positions: Record<string, number>
-  lesson_quiz_results: Record<string, LessonQuizResult>
-  fully_watched_video_ids?: string[]
-  completed_lesson_ids?: string[]
+interface SimplifiedCourseProgress {
+  completed_videos: string[]
+  video_completion_count: number
+  course_completed_at: string | null
+  last_viewed_lesson_sequence?: number
+  lesson_quiz_results?: Record<string, LessonQuizResult>
 }
 
 interface LessonViewerProps {
@@ -53,7 +52,7 @@ interface LessonViewerProps {
   courseName: string
   previousLesson: Lesson | null
   nextLesson: Lesson | null
-  progressData: CourseProgress
+  progressData: SimplifiedCourseProgress
 }
 
 export function LessonViewer({ 
@@ -70,83 +69,45 @@ export function LessonViewer({
   const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
-  const [videoWatched, setVideoWatched] = useState(false)
+  const [canCompleteVideo, setCanCompleteVideo] = useState(false)
+  const [localQuizResult, setLocalQuizResult] = useState<LessonQuizResult | null>(null)
+  const [localVideoCompleted, setLocalVideoCompleted] = useState(false)
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const { toast } = useToast()
   const router = useRouter()
   
   const submitQuizMutation = useSubmitQuiz()
-  const updateProgressMutation = useUpdateProgress()
+  const saveProgressMutation = useSimplifiedCourseProgress()
   
-  const quizResult = progressData.lesson_quiz_results?.[lesson.id]
-  const hasVideoPosition = (progressData.video_playback_positions?.[lesson.id] || lesson.video_playback_position || 0) > 0
-  const isVideoFullyWatched = lesson.video_fully_watched || progressData.fully_watched_video_ids?.includes(lesson.id) || false
-  const isLessonCompleted = quizResult?.passed || progressData.completed_lesson_ids?.includes(lesson.id) || false
-  const isQuizAvailable = lesson.quiz_available || isVideoFullyWatched || quizResult?.passed || false
+  // Simplified progress tracking - check if video is completed
+  const quizResult = localQuizResult || progressData.lesson_quiz_results?.[lesson.id]
+  const isVideoCompleted = localVideoCompleted || progressData.completed_videos?.includes(lesson.id) || false
+  const isLessonCompleted = isVideoCompleted && (!lesson.enable_ai_quiz || quizResult?.passed)
+  const isQuizAvailable = isVideoCompleted
   const watchedPercentage = duration > 0 ? Math.round((currentTime / duration) * 100) : 0
 
-  // Set initial video position from progress (prioritize lesson data from backend)
+  // No position tracking - videos always start from beginning
   useEffect(() => {
-    if (videoRef.current && hasVideoPosition) {
-      const savedPosition = lesson.video_playback_position || 
-                           progressData.video_playback_positions?.[lesson.id] || 0
-      if (savedPosition > 0 && savedPosition !== -1) { // -1 indicates completed video
-        videoRef.current.currentTime = savedPosition
-        setCurrentTime(savedPosition)
-      }
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0
+      setCurrentTime(0)
     }
-  }, [lesson.id, hasVideoPosition, lesson.video_playback_position, progressData.video_playback_positions])
+  }, [lesson.id])
 
-  // Save video progress periodically with enhanced tracking
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (videoRef.current && isPlaying) {
-        const position = videoRef.current.currentTime
-        const videoCompleted = duration > 0 && position >= duration * 0.95 // 95% completion threshold
-        
-        updateProgressMutation.mutate({
-          moduleId,
-          progressData: {
-            lesson_id: lesson.id,
-            last_viewed_lesson_sequence: lesson.sequence,
-            video_playback_position: position,
-            video_completed: videoCompleted,
-            video_fully_watched: videoCompleted
-          }
-        })
-      }
-    }, 10000) // Save every 10 seconds
-
-    return () => clearInterval(interval)
-  }, [isPlaying, lesson.id, lesson.sequence, moduleId, updateProgressMutation, duration])
-
-  // Check if video is mostly watched (95% threshold for completion)
+  // Check if video reached 95% completion threshold
   useEffect(() => {
     if (duration > 0 && currentTime > 0) {
       const watchedPercent = (currentTime / duration) * 100
-      if (watchedPercent >= 95 && !videoWatched) {
-        setVideoWatched(true)
-        
-        // Save completion status immediately
-        updateProgressMutation.mutate({
-          moduleId,
-          progressData: {
-            lesson_id: lesson.id,
-            last_viewed_lesson_sequence: lesson.sequence,
-            video_playback_position: currentTime,
-            video_completed: true,
-            video_fully_watched: true
-          }
+      if (watchedPercent >= 95 && !canCompleteVideo && !isVideoCompleted) {
+        setCanCompleteVideo(true)
+        toast({
+          title: "Video Almost Complete!",
+          description: "You can now mark this video as completed.",
         })
-        
-        // Show quiz if available and not passed
-        if (lesson.enable_ai_quiz && !quizResult?.passed) {
-          setShowQuiz(true)
-        }
       }
     }
-  }, [currentTime, duration, lesson.enable_ai_quiz, lesson.id, lesson.sequence, moduleId, quizResult?.passed, updateProgressMutation, videoWatched])
+  }, [currentTime, duration, canCompleteVideo, isVideoCompleted, toast])
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -171,12 +132,10 @@ export function LessonViewer({
     }
   }
 
+  // DISABLED: No seeking allowed
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value)
-    setCurrentTime(newTime)
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime
-    }
+    // Seeking is disabled for controlled viewing
+    e.preventDefault()
   }
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,6 +160,46 @@ export function LessonViewer({
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
   }
 
+  // Handle manual completion
+  const handleCompleteVideo = async () => {
+    if (!canCompleteVideo && watchedPercentage < 95) {
+      toast({
+        title: "Not Ready",
+        description: "You need to watch at least 95% of the video to complete it.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      await saveProgressMutation.mutateAsync({
+        moduleId,
+        lessonId: lesson.id,
+        videoCompleted: true,
+        quizPassed: false
+      })
+
+      // Mark video as completed locally
+      setLocalVideoCompleted(true)
+
+      toast({
+        title: "Video Completed!",
+        description: "Your progress has been saved. " + (lesson.enable_ai_quiz ? "Quiz unlocked!" : "")
+      })
+
+      // Automatically show quiz if available and not passed
+      if (lesson.enable_ai_quiz && !quizResult?.passed) {
+        setShowQuiz(true)
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save progress. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleQuizSubmit = async (answers: Array<{ question_id: string; selected_option_id: string | string[] }>) => {
     try {
       const result = await submitQuizMutation.mutateAsync({
@@ -208,43 +207,61 @@ export function LessonViewer({
         lessonId: lesson.id,
         answers
       })
-      
-      toast({
-        title: "Quiz Submitted",
-        description: `Quiz completed! Score: ${result.score}% ${result.passed ? '(Passed)' : '(Failed)'}`,
-        variant: result.passed ? "default" : "destructive"
+
+      // Update local quiz result immediately
+      setLocalQuizResult({
+        score: result.score,
+        total_questions: result.total_questions,
+        passed: result.passed,
+        attempts: result.attempts,
+        answers: result.answers,
+        submitted_at: new Date().toISOString()
       })
-      
-      setShowQuiz(false)
-      
-      // If quiz passed, save lesson completion and redirect
+
       if (result.passed) {
-        await updateProgressMutation.mutateAsync({
+        await saveProgressMutation.mutateAsync({
           moduleId,
-          progressData: {
-            lesson_id: lesson.id,
-            lesson_completed: true
-          }
+          lessonId: lesson.id,
+          videoCompleted: true,
+          quizPassed: true
         })
-        
-        // Show success message with redirect countdown
+
         toast({
-          title: "🎉 Lesson Completed!",
-          description: "Redirecting to course page...",
-          duration: 2000,
+          title: "Quiz Passed!",
+          description: `Congratulations! You scored ${result.score}%. Returning to course...`
         })
+        setShowQuiz(false)
         
-        // Redirect to course page after a short delay
+        // Redirect to course overview after a short delay
         setTimeout(() => {
           router.push(`/app/job-readiness/courses/${moduleId}`)
         }, 2000)
+      } else {
+        toast({
+          title: "Quiz Failed",
+          description: `You scored ${result.score}%. You can try again.`,
+          variant: "destructive"
+        })
+        setShowQuiz(false)
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error?.message || "Failed to submit quiz. Please try again.",
+        description: "Failed to submit quiz. Please try again.",
         variant: "destructive"
       })
+    }
+  }
+
+  const goToNextLesson = () => {
+    if (nextLesson) {
+      router.push(`/app/job-readiness/courses/${moduleId}/lessons/${nextLesson.id}`)
+    }
+  }
+
+  const goToPreviousLesson = () => {
+    if (previousLesson) {
+      router.push(`/app/job-readiness/courses/${moduleId}/lessons/${previousLesson.id}`)
     }
   }
 
@@ -296,36 +313,28 @@ export function LessonViewer({
         )}
       </div>
 
-      {/* Video Player */}
+      {/* Video Player - No Seeking Allowed */}
       <Card className="overflow-hidden">
         <div className="relative aspect-video bg-black">
           <video
             ref={videoRef}
             className="w-full h-full"
+            style={{ pointerEvents: 'none' }} // Disable direct video interaction
             onTimeUpdate={handleTimeUpdate}
             onDurationChange={handleDurationChange}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onSeeking={(e) => {
+              // Prevent seeking
+              if (videoRef.current) {
+                videoRef.current.currentTime = currentTime
+              }
+            }}
             onEnded={() => {
               setIsPlaying(false)
-              setVideoWatched(true)
-              
-              // Save completion status when video ends
-              updateProgressMutation.mutate({
-                moduleId,
-                progressData: {
-                  lesson_id: lesson.id,
-                  last_viewed_lesson_sequence: lesson.sequence,
-                  video_playback_position: duration,
-                  video_completed: true,
-                  video_fully_watched: true
-                }
-              })
-              
-              // Show quiz if available and not passed
-              if (lesson.enable_ai_quiz && !quizResult?.passed) {
-                setShowQuiz(true)
-              }
+              setCanCompleteVideo(true)
+              // Automatically complete the video when it ends
+              handleCompleteVideo()
             }}
           >
             <source src={lesson.video_url} type="video/mp4" />
@@ -337,9 +346,6 @@ export function LessonViewer({
             <div className="flex justify-between items-center">
               <h3 className="text-white font-medium truncate">{lesson.title}</h3>
               <div className="flex items-center gap-2">
-                <span className="text-white text-sm">
-                  {watchedPercentage}% watched
-                </span>
                 {duration > 0 && (
                   <span className="text-white text-sm">
                     <Clock className="h-4 w-4 inline mr-1" />
@@ -350,73 +356,74 @@ export function LessonViewer({
             </div>
 
             <div className="space-y-4">
-              {/* Progress bar */}
-              <div className="w-full">
-                <input
-                  type="range"
-                  min="0"
-                  max={duration || 0}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="w-full h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-300 mt-1">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
+              {/* Time display only */}
+              <div className="flex justify-between text-xs text-gray-300">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
               </div>
 
-              {/* Control buttons */}
-              <div className="flex items-center justify-between">
+              {/* Control buttons - No skip controls */}
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={togglePlay}
+                  className="text-white hover:bg-white/20"
+                >
+                  {isPlaying ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Play className="h-5 w-5" />
+                  )}
+                </Button>
+
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
+                    onClick={toggleMute}
                     className="text-white hover:bg-white/20"
-                    onClick={togglePlay}
                   >
-                    {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                    {isMuted ? (
+                      <VolumeX className="h-4 w-4" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
                   </Button>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-white hover:bg-white/20"
-                      onClick={toggleMute}
-                    >
-                      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                    </Button>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={isMuted ? 0 : volume}
-                      onChange={handleVolumeChange}
-                      className="w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                  />
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-white hover:bg-white/20"
-                  onClick={() => videoRef.current?.requestFullscreen()}
-                >
-                  <Maximize className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Completion Status */}
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Video Status:</span>
+            <Badge variant={isVideoCompleted ? "default" : "outline"}>
+              {isVideoCompleted ? "Completed" : "In Progress"}
+            </Badge>
+          </div>
+          {!isVideoCompleted && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              Watch the video to completion. Quiz will unlock automatically.
+            </p>
+          )}
+        </CardContent>
       </Card>
 
-      {/* AI Quiz Section */}
+      {/* Quiz Section */}
       {lesson.enable_ai_quiz && (
         <div className="space-y-6">
-          {/* Quiz Status */}
           <Card className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
@@ -442,18 +449,13 @@ export function LessonViewer({
                   <div className="text-xs text-gray-500">
                     Attempts: {quizResult.attempts}
                   </div>
-                  {!quizResult.passed && quizResult.attempts < 3 && isQuizAvailable && (
+                  {!quizResult.passed && (
                     <Button 
                       onClick={() => setShowQuiz(true)}
                       className="w-full"
                     >
-                      Retake Quiz ({3 - quizResult.attempts} attempts left)
+                      Retake Quiz
                     </Button>
-                  )}
-                  {!quizResult.passed && quizResult.attempts >= 3 && (
-                    <div className="text-sm text-red-600 dark:text-red-400">
-                      Maximum attempts reached. Contact your instructor for help.
-                    </div>
                   )}
                 </div>
               ) : isQuizAvailable ? (
@@ -464,19 +466,8 @@ export function LessonViewer({
                   Take Quiz
                 </Button>
               ) : (
-                <div className="space-y-2">
-                  <div className="text-sm text-purple-700 dark:text-purple-300">
-                    Complete watching the video to unlock the quiz
-                  </div>
-                  <div className="w-full bg-purple-200 dark:bg-purple-800 rounded-full h-2">
-                    <div 
-                      className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${watchedPercentage}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-purple-600 dark:text-purple-400">
-                    {watchedPercentage}% watched (need 95% to unlock quiz)
-                  </div>
+                <div className="text-sm text-purple-700 dark:text-purple-300">
+                  Complete the video to unlock the quiz
                 </div>
               )}
             </CardContent>
@@ -489,69 +480,27 @@ export function LessonViewer({
               onSubmit={handleQuizSubmit}
               onCancel={() => setShowQuiz(false)}
               isSubmitting={submitQuizMutation.isPending}
-              remainingAttempts={quizResult ? 3 - quizResult.attempts : 3}
             />
-          )}
-          
-          {/* Quiz Error State */}
-          {showQuiz && (!lesson.quiz_questions || lesson.quiz_questions.length === 0) && (
-            <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-red-900 dark:text-red-100">
-                  <AlertCircle className="h-5 w-5" />
-                  Quiz Not Available
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-red-700 dark:text-red-300 mb-4">
-                  Quiz questions are not available at the moment. Please reload the page and try again.
-                </p>
-                <Button variant="outline" onClick={() => setShowQuiz(false)}>
-                  Close
-                </Button>
-              </CardContent>
-            </Card>
           )}
         </div>
       )}
 
-      {/* Lesson Navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href={`/app/job-readiness/courses/${moduleId}`}>
-            <Button variant="ghost">
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Course
-            </Button>
-          </Link>
-          
-          {previousLesson && (
-            <Link href={`/app/job-readiness/courses/${moduleId}/lessons/${previousLesson.id}`}>
-              <Button variant="outline">
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Previous: {previousLesson.title}
-              </Button>
-            </Link>
-          )}
-        </div>
-        
-        <div>
-          {nextLesson ? (
-            <Link href={`/app/job-readiness/courses/${moduleId}/lessons/${nextLesson.id}`}>
-              <Button>
-                Next: {nextLesson.title}
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          ) : isLessonCompleted && (
-            <Link href={`/app/job-readiness/courses/${moduleId}`}>
-              <Button>
-                Course Complete! Return to Course
-                <CheckCircle className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          )}
-        </div>
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={goToPreviousLesson}
+          disabled={!previousLesson}
+        >
+          {previousLesson ? `← Previous: ${previousLesson.title}` : 'No Previous Lesson'}
+        </Button>
+
+        <Button
+          onClick={goToNextLesson}
+          disabled={!nextLesson || (!isLessonCompleted && lesson.enable_ai_quiz)}
+        >
+          {nextLesson ? `Next: ${nextLesson.title} →` : 'Course Complete'}
+        </Button>
       </div>
     </div>
   )

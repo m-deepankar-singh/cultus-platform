@@ -105,7 +105,9 @@ export async function GET(request: NextRequest) {
           module_id,
           status,
           progress_percentage,
-          progress_details,
+          completed_videos,
+          video_completion_count,
+          course_completed_at,
           completed_at,
           last_updated
         ),
@@ -124,22 +126,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch courses' }, { status: 500 });
     }
 
-    // Enhanced courses with progress data and Job Readiness specific information
+    // Enhanced courses with simplified progress data and Job Readiness specific information
     const enhancedCourses: CourseModuleOutput[] = (courses || []).map((course: any) => {
       const progress = course.student_module_progress?.[0] || null;
       const totalLessons = course.lessons?.length || 0;
       
-      // Check completion based on lessons completed, not just status
-      const completedLessonIds = progress?.progress_details?.completed_lesson_ids || [];
-      const completedLessonsCount = Array.isArray(completedLessonIds) ? completedLessonIds.length : 0;
-      const isCompletedByLessons = totalLessons > 0 && completedLessonsCount >= totalLessons;
+      // Use new simplified progress tracking columns
+      const videosCompleted = progress?.video_completion_count || 0;
+      const completedVideos = progress?.completed_videos || [];
       const isCompletedByStatus = progress?.status === 'Completed';
-      const isCompleted = isCompletedByStatus || isCompletedByLessons;
+      const isCompletedByVideos = totalLessons > 0 && videosCompleted >= totalLessons;
+      const isCompleted = isCompletedByStatus || isCompletedByVideos;
       
-      // Calculate completion percentage
-      const statusPercentage = progress?.progress_percentage || 0;
-      const lessonPercentage = totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0;
-      const completionPercentage = Math.max(statusPercentage, lessonPercentage);
+      // Calculate completion percentage based on videos completed
+      const completionPercentage = totalLessons > 0 
+        ? Math.round((videosCompleted / totalLessons) * 100) 
+        : (progress?.progress_percentage || 0);
       
       const isUnlocked = true; // Job Readiness courses are generally accessible based on tier
       

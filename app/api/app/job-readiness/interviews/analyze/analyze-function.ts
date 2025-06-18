@@ -432,14 +432,49 @@ export async function analyzeInterview(submissionId: string, userId: string) {
     }
     console.log('✅ Status updated to analyzing');
 
-    // Download video from Supabase storage
-    console.log(`📥 Downloading video from storage: ${submission.video_storage_path}`);
-    const { data: videoData, error: downloadError } = await supabase.storage
-      .from('interview_recordings')
-      .download(submission.video_storage_path);
-
-    if (downloadError || !videoData) {
-      console.error('❌ Failed to download video:', downloadError);
+    // Download video from R2 storage using S3 client
+    console.log(`📥 Downloading video from R2 storage: ${submission.video_storage_path}`);
+    
+    let videoData: Blob;
+    try {
+      // Use the S3 client to download the file instead of legacy upload helpers
+      const { s3Client } = await import('@/lib/r2/s3-client');
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+      
+      const bucketName = process.env.R2_BUCKET_NAME!;
+      const getCommand = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: submission.video_storage_path,
+      });
+      
+      const response = await s3Client.send(getCommand);
+      
+      if (!response.Body) {
+        throw new Error('No body in S3 response');
+      }
+      
+      // Convert the stream to a Blob
+      const chunks: Uint8Array[] = [];
+      const reader = response.Body.transformToWebStream().getReader();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const combined = new Uint8Array(totalLength);
+      let offset = 0;
+      
+      for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      videoData = new Blob([combined], { type: 'video/webm' });
+    } catch (downloadError) {
+      console.error('❌ Failed to download video from R2:', downloadError);
       console.log('🔄 Updating status to error...');
       const { error: errorUpdateError } = await supabase
         .from('job_readiness_ai_interview_submissions')

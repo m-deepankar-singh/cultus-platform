@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    // Get student's progress for all expert sessions
+    // Get student's progress for all expert sessions with enhanced resume data
     const sessionIds = sessionsWithSignedUrls?.map(session => session.id) || [];
     const { data: progressData, error: progressError } = await supabase
       .from('job_readiness_expert_session_progress')
@@ -122,7 +122,10 @@ export async function GET(req: NextRequest) {
         watch_time_seconds,
         completion_percentage,
         is_completed,
-        completed_at
+        completed_at,
+        last_milestone_reached,
+        resume_from_milestone,
+        session_data
       `)
       .eq('student_id', user.id)
       .in('expert_session_id', sessionIds);
@@ -138,14 +141,30 @@ export async function GET(req: NextRequest) {
       progressMap.set(progress.expert_session_id, progress);
     });
 
-    // Combine sessions with student progress
+    // Combine sessions with enhanced student progress
     const sessionsWithProgress = sessionsWithSignedUrls?.map((session: any) => {
       const progress = progressMap.get(session.id) || {
         watch_time_seconds: 0,
         completion_percentage: 0,
         is_completed: false,
-        completed_at: null
+        completed_at: null,
+        last_milestone_reached: 0,
+        resume_from_milestone: 0,
+        session_data: {}
       };
+
+      // Phase 2: Calculate resume capabilities
+      const canResume = !progress.is_completed && progress.resume_from_milestone > 0;
+      const resumePositionSeconds = Math.floor((progress.resume_from_milestone / 100) * session.video_duration);
+      
+      // Phase 2: Extract milestones unlocked from session history
+      const milestonesUnlocked = [];
+      const milestones = [10, 25, 50, 75, 90, 95, 100];
+      for (const milestone of milestones) {
+        if (progress.last_milestone_reached >= milestone) {
+          milestonesUnlocked.push(milestone);
+        }
+      }
 
       return {
         id: session.id,
@@ -158,7 +177,14 @@ export async function GET(req: NextRequest) {
           watch_time_seconds: progress.watch_time_seconds,
           completion_percentage: progress.completion_percentage,
           is_completed: progress.is_completed,
-          completed_at: progress.completed_at
+          completed_at: progress.completed_at,
+          last_milestone_reached: progress.last_milestone_reached || 0,
+          
+          // Phase 2: Enhanced resume functionality
+          can_resume: canResume,
+          resume_from_milestone: progress.resume_from_milestone || 0,
+          resume_position_seconds: resumePositionSeconds,
+          milestones_unlocked: milestonesUnlocked
         }
       };
     }) || [];

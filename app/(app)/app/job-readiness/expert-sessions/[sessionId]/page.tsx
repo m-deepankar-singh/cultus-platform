@@ -6,8 +6,6 @@ import { useJobReadinessProgress } from '@/hooks/useJobReadinessProgress'
 import { useExpertSessions } from '@/hooks/useExpertSessions'
 import { useUpdateExpertSessionProgress } from '@/hooks/useJobReadinessMutations'
 import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayout'
-import { ExpertSessionPlayer } from '@/components/job-readiness/ExpertSessionPlayer'
-import { SessionProgress } from '@/components/job-readiness/SessionProgress'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +14,20 @@ import { ArrowLeft, CheckCircle2, Clock, Play, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { Toaster } from 'sonner'
+
+// Phase 5: Enhanced Components Integration
+import { 
+  EnhancedExpertSessionPlayer,
+  ExpertSessionProgressProvider,
+  MilestoneProgressIndicator 
+} from '@/components/job-readiness/expert-sessions'
+
+// Legacy import for fallback
+import { ExpertSessionPlayer } from '@/components/job-readiness/ExpertSessionPlayer'
+import { SessionProgress } from '@/components/job-readiness/SessionProgress'
+
+// Feature flag for enhanced video player (Phase 6: Deployment)
+const USE_ENHANCED_VIDEO_PLAYER = process.env.NEXT_PUBLIC_ENHANCED_EXPERT_SESSIONS === 'true' || true // Default to true for development
 
 export default function ExpertSessionViewerPage() {
   const params = useParams()
@@ -35,6 +47,35 @@ export default function ExpertSessionViewerPage() {
   // Find the current session
   const session = sessionsData?.sessions?.find(s => s.id === sessionId)
 
+  // Enhanced session data preparation for Phase 2 integration
+  const enhancedSession = useMemo(() => {
+    if (!session) return null
+    
+    // Since we're in development, simulate Phase 2 enhanced API response structure
+    // In production, this data will come from the enhanced API
+    const completionPercentage = session.student_progress.completion_percentage || 0
+    const watchTime = session.student_progress.watch_time_seconds || 0
+    
+    // Calculate simulated milestone data based on completion percentage
+    const lastMilestone = Math.floor(completionPercentage / 10) * 10
+    const milestonesUnlocked = lastMilestone > 0 
+      ? Array.from({ length: Math.floor(lastMilestone / 10) }, (_, i) => (i + 1) * 10)
+      : []
+    
+    return {
+      ...session,
+      student_progress: {
+        ...session.student_progress,
+        // Phase 2: Enhanced resume functionality (simulate for now)
+        can_resume: watchTime > 0 && !session.student_progress.is_completed,
+        resume_from_milestone: lastMilestone,
+        resume_position_seconds: watchTime,
+        milestones_unlocked: milestonesUnlocked,
+        last_milestone_reached: lastMilestone
+      }
+    }
+  }, [session])
+
   if (isLoading) {
     return (
       <JobReadinessLayout title="Loading Session...">
@@ -48,7 +89,7 @@ export default function ExpertSessionViewerPage() {
     )
   }
 
-  if (error || !session) {
+  if (error || !session || !enhancedSession) {
     return (
       <JobReadinessLayout title="Session Not Found">
         <div className="max-w-2xl mx-auto">
@@ -72,25 +113,28 @@ export default function ExpertSessionViewerPage() {
     )
   }
 
-  // Import the progress update event type
-  const handleProgressUpdate = (event: {
+  // Enhanced progress update handler for Phase 2 integration
+  const handleProgressUpdate = async (event: {
     sessionId: string
     currentTime: number
     duration: number
     triggerType: string
     milestone?: number
     forceCompletion?: boolean
+    // Phase 2: Additional fields
+    session_started?: boolean
+    session_ended?: boolean
+    pause_duration?: number
+    resume_from_milestone?: number
   }) => {
-    updateProgressMutation.mutate(event, {
-      onSuccess: (data) => {
-        console.log('Progress updated successfully:', data)
-        // Success handling is managed in the hook with toasts
-      },
-      onError: (error) => {
-        console.error('Failed to update expert session progress:', error)
-        // Error handling is already managed in the hook
-      }
-    })
+    try {
+      const result = await updateProgressMutation.mutateAsync(event)
+      console.log('Progress updated successfully:', result)
+      return result
+    } catch (error) {
+      console.error('Failed to update expert session progress:', error)
+      throw error
+    }
   }
 
   const formatDuration = (seconds: number) => {
@@ -105,7 +149,7 @@ export default function ExpertSessionViewerPage() {
   const isCompleted = session.student_progress.is_completed
   const completionPercentage = session.student_progress.completion_percentage
 
-  // If session is completed, show completion message instead of allowing re-access
+  // If session is completed, show completion message
   if (isCompleted) {
     return (
       <JobReadinessLayout showProgress={false}>
@@ -120,7 +164,7 @@ export default function ExpertSessionViewerPage() {
           </Link>
         </div>
 
-        {/* Completion Message */}
+        {/* Enhanced Completion Message */}
         <div className="max-w-2xl mx-auto text-center">
           <Card>
             <CardContent className="p-8">
@@ -135,6 +179,22 @@ export default function ExpertSessionViewerPage() {
                     You have successfully completed "<strong>{session.title}</strong>"
                   </p>
                 </div>
+
+                {/* Milestone Achievement Display */}
+                {enhancedSession.student_progress.milestones_unlocked.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="space-y-2">
+                      <p className="text-blue-800 font-medium">Milestones Achieved</p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {enhancedSession.student_progress.milestones_unlocked.map(milestone => (
+                          <Badge key={milestone} variant="default" className="bg-blue-600 text-white">
+                            {milestone}%
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center justify-center space-x-2">
@@ -169,6 +229,7 @@ export default function ExpertSessionViewerPage() {
   return (
     <JobReadinessLayout showProgress={false}>
       <Toaster richColors position="top-right" />
+      
       {/* Navigation */}
       <div className="mb-6">
         <Link href="/app/job-readiness/expert-sessions">
@@ -207,22 +268,101 @@ export default function ExpertSessionViewerPage() {
                     Not started
                   </Badge>
                 )}
+                
+                {/* Enhanced Progress Badge */}
+                {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.can_resume && (
+                  <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50">
+                    Resume from {enhancedSession.student_progress.resume_from_milestone}%
+                  </Badge>
+                )}
               </div>
             </div>
           </CardHeader>
         </Card>
 
-        {/* Progress Component */}
-        <SessionProgress session={session} />
+        {/* Enhanced Milestone Progress Display */}
+        {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.milestones_unlocked.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Progress Milestones</CardTitle>
+              <CardDescription>
+                Your milestone achievements for this session
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MilestoneProgressIndicator
+                currentPercentage={completionPercentage}
+                milestonesUnlocked={enhancedSession.student_progress.milestones_unlocked}
+                isDisabled={true}
+              />
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Video Player */}
-        <ExpertSessionPlayer
-          session={session}
-          onProgressUpdate={handleProgressUpdate}
-          isUpdatingProgress={updateProgressMutation.isPending}
-        />
+        {/* Legacy Progress Component (Fallback) */}
+        {!USE_ENHANCED_VIDEO_PLAYER && (
+          <SessionProgress session={session} />
+        )}
 
-        {/* Session Details */}
+        {/* Video Player with Context Provider */}
+        {USE_ENHANCED_VIDEO_PLAYER ? (
+                     <ExpertSessionProgressProvider
+             sessionId={sessionId}
+             initialProgressData={{
+               currentMilestone: enhancedSession.student_progress.last_milestone_reached || 0,
+               milestonesUnlocked: enhancedSession.student_progress.milestones_unlocked,
+               watchTimeSeconds: enhancedSession.student_progress.watch_time_seconds,
+               completionPercentage: enhancedSession.student_progress.completion_percentage,
+               canResume: enhancedSession.student_progress.can_resume,
+               resumeFromMilestone: enhancedSession.student_progress.resume_from_milestone,
+               resumePositionSeconds: enhancedSession.student_progress.resume_position_seconds
+             }}
+             onProgressUpdate={async (data) => {
+               // Transform ProgressUpdate to our enhanced handler format
+               return await handleProgressUpdate({
+                 sessionId,
+                 currentTime: data.currentTime,
+                 duration: data.duration,
+                 triggerType: data.triggerType,
+                 milestone: data.milestone,
+                 forceCompletion: data.forceCompletion,
+                 session_started: data.sessionStarted,
+                 session_ended: data.sessionEnded,
+                 pause_duration: data.pauseDuration,
+                 resume_from_milestone: data.resumeFromMilestone
+               })
+             }}
+           >
+             <EnhancedExpertSessionPlayer
+               session={enhancedSession}
+               onProgressUpdate={async (event) => {
+                 return await handleProgressUpdate({
+                   ...event,
+                   sessionId: sessionId
+                 })
+               }}
+               isUpdatingProgress={updateProgressMutation.isPending}
+             />
+          </ExpertSessionProgressProvider>
+        ) : (
+          // Legacy Video Player (Fallback)
+          <ExpertSessionPlayer
+            session={session}
+            onProgressUpdate={(event) => {
+              updateProgressMutation.mutate(event, {
+                onSuccess: (data) => {
+                  console.log('Progress updated successfully:', data)
+                },
+                onError: (error) => {
+                  console.error('Failed to update expert session progress:', error)
+                }
+              })
+            }}
+            isUpdatingProgress={updateProgressMutation.isPending}
+          />
+        )}
+
+        {/* Enhanced Session Details */}
         <Card>
           <CardHeader>
             <CardTitle>Session Details</CardTitle>
@@ -255,9 +395,48 @@ export default function ExpertSessionViewerPage() {
                   </p>
                 </div>
               )}
+              
+              {/* Enhanced Details for Enhanced Player */}
+              {USE_ENHANCED_VIDEO_PLAYER && (
+                <>
+                  {enhancedSession.student_progress.milestones_unlocked.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Milestones Achieved</p>
+                      <p className="text-muted-foreground">
+                        {enhancedSession.student_progress.milestones_unlocked.length} of 7 milestones reached
+                      </p>
+                    </div>
+                  )}
+                  {enhancedSession.student_progress.can_resume && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Resume Position</p>
+                      <p className="text-muted-foreground">
+                        {enhancedSession.student_progress.resume_from_milestone}% milestone ({formatDuration(enhancedSession.student_progress.resume_position_seconds)})
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Development Info (Remove in production) */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardHeader>
+              <CardTitle className="text-yellow-800">Development Info</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-yellow-700 space-y-1">
+                <p><strong>Enhanced Player:</strong> {USE_ENHANCED_VIDEO_PLAYER ? 'Enabled' : 'Disabled'}</p>
+                <p><strong>Session ID:</strong> {sessionId}</p>
+                <p><strong>Can Resume:</strong> {enhancedSession.student_progress.can_resume ? 'Yes' : 'No'}</p>
+                <p><strong>Resume Milestone:</strong> {enhancedSession.student_progress.resume_from_milestone}%</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </JobReadinessLayout>
   )

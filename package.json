@@ -6,9 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:cache": "jest --testPathPatterns=cache",
+    "test:cache-performance": "npx tsx scripts/test-cache-performance.ts",
+    "test:cache-load": "npx tsx scripts/load-test-cache.ts",
+    "analyze": "ANALYZE=true pnpm build",
+    "performance:baseline": "lighthouse http://localhost:3000 --output json --output html --output-path ./lighthouse-baseline",
+    "performance:check": "lighthouse http://localhost:3000 --output json --output html --output-path ./lighthouse-results"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.830.0",
+    "@aws-sdk/lib-storage": "^3.830.0",
+    "@aws-sdk/s3-request-presigner": "^3.830.0",
     "@google/genai": "^1.2.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.10.0",
@@ -88,15 +100,22 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^15.3.3",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-window-infinite-loader": "^1.0.9",
     "@types/three": "^0.176.0",
+    "eslint": "^9.29.0",
+    "eslint-config-next": "^15.3.3",
+    "jest": "^30.0.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
+    "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
     "typescript": "^5"
   }
 }

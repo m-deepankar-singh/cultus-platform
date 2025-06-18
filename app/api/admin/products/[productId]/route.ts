@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'; // Keep this for the instance
 import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
 import { ProductIdSchema, UpdateProductSchema } from '@/lib/schemas/product';
-import { removeFileByUrl } from '@/lib/supabase/upload-helpers';
+// Note: File deletion functionality temporarily disabled during S3 migration
 import { z } from 'zod'; // Added z import
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -83,10 +83,8 @@ async function handleProductUpdate(
 
     // If existing product had an image_url and it's different from the new one (or new one is null)
     if (existingProduct?.image_url && existingProduct.image_url !== updateData.image_url) {
-      console.log(`Attempting to remove old product image: ${existingProduct.image_url}`);
-      await removeFileByUrl(existingProduct.image_url).catch(err => {
-        console.warn("Failed to remove old product image file:", err);
-      });
+      console.log(`Old product image exists but deletion temporarily disabled: ${existingProduct.image_url}`);
+      // TODO: Implement S3 file deletion in future phase
     }
   }
   console.log('Updating product in DB with data:', {
@@ -292,12 +290,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to fetch product', details: fetchError.message }, { status: 500 });
     }
 
-    // Delete associated image file if it exists
+    // Note: Image file deletion temporarily disabled during S3 migration
     if (product.image_url) {
-      console.log(`Attempting to remove product image: ${product.image_url}`);
-      await removeFileByUrl(product.image_url).catch(err => {
-        console.warn("Failed to remove product image file during deletion:", err);
-      });
+      console.log(`Product has image but deletion temporarily disabled: ${product.image_url}`);
+      // TODO: Implement S3 file deletion in future phase
     }
 
     // Delete the product from database

@@ -25,8 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { FileUpload } from "@/components/ui/file-upload"
-import { uploadProductImage } from "@/lib/supabase/upload-helpers"
+import { S3FileUpload } from "@/components/ui/s3-file-upload"
 
 interface ProductFormProps {
   open: boolean
@@ -133,22 +132,10 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
     }
   }
 
-  const handleImageUpload = async (file: File): Promise<string> => {
-    try {
-      setIsImageUploading(true);
-      console.log(`Uploading image file: ${file.name} (${Math.round(file.size/1024)}KB)`);
-      const uploadedUrl = await uploadProductImage(file, product?.id);
-      console.log(`Image upload successful, full URL: ${uploadedUrl}`);
-      
-      // Update the form with the URL returned from the upload function
-      form.setValue("image_url", uploadedUrl, { shouldValidate: true, shouldDirty: true });
-      return uploadedUrl;
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      throw error;
-    } finally {
-      setIsImageUploading(false);
-    }
+  const handleImageUpload = (url: string) => {
+    console.log(`Image upload successful, full URL: ${url}`);
+    // Update the form with the URL returned from the S3 upload
+    form.setValue("image_url", url, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleImageRemove = () => {
@@ -220,14 +207,32 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
                 <FormItem>
                   <FormLabel>Product Image {isImageUploading && "(Uploading...)"}</FormLabel>
                   <FormControl>
-                    <FileUpload
-                      currentImageUrl={field.value}
-                      onFileUpload={handleImageUpload}
-                      onRemove={handleImageRemove}
-                      accept="image/*"
-                      maxSizeMB={5}
-                      disabled={isImageUploading}
-                    />
+                    <div className="space-y-4">
+                      {field.value && (
+                        <div className="relative">
+                          <img 
+                            src={field.value} 
+                            alt="Product preview" 
+                            className="w-32 h-32 object-cover rounded-md border"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2"
+                            onClick={handleImageRemove}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      )}
+                      <S3FileUpload
+                        onUpload={handleImageUpload}
+                        accept="image/*"
+                        uploadEndpoint="/api/admin/products/upload-image"
+                        maxSize={5}
+                      />
+                    </div>
                   </FormControl>
                   <FormMessage />
                   <p className="text-xs text-muted-foreground">

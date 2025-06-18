@@ -1750,38 +1750,353 @@ export class DatabaseCacheManager {
 export const cacheManager = new DatabaseCacheManager();
 ```
 
-**Smart Cache Invalidation System**:
-```typescript
-export const CacheInvalidationHooks = {
-  // Automatically invalidate when data changes
-  onStudentProgressUpdate: async (studentId: string, moduleId: string) => {
-    await cacheManager.invalidateByTags([
+**Enhanced Cache Invalidation System** ✅ **COMPREHENSIVE**:
+
+**Files to Create**:
+- `supabase/migrations/[timestamp]_create_cache_triggers.sql`
+- `lib/cache/invalidation-hooks.ts` (enhanced)
+- `lib/cache/trigger-invalidation.ts` (new)
+
+**1. Database-Level Automatic Triggers**:
+```sql
+-- Automatic cache invalidation triggers per Supabase guidelines
+CREATE OR REPLACE FUNCTION public.trigger_cache_invalidation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  -- Log trigger activation
+  RAISE LOG 'Cache invalidation trigger fired for table: %, operation: %', TG_TABLE_NAME, TG_OP;
+  
+  -- Student progress updates
+  IF TG_TABLE_NAME = 'student_module_progress' THEN
+    PERFORM public.invalidate_cache_by_tags(ARRAY[
       'student_progress',
       'product_performance',
       'module_completion',
-      `student:${studentId}`,
-      `module:${moduleId}`
+      'progress',
+      CONCAT('student:', COALESCE(NEW.student_id::text, OLD.student_id::text)),
+      CONCAT('module:', COALESCE(NEW.module_id::text, OLD.module_id::text))
     ]);
-  },
-
-  onExpertSessionUpdate: async (sessionId: string) => {
-    await cacheManager.invalidateByTags([
+  END IF;
+  
+  -- Expert session changes
+  IF TG_TABLE_NAME = 'job_readiness_expert_sessions' THEN
+    PERFORM public.invalidate_cache_by_tags(ARRAY[
       'expert_sessions',
       'expert_session_stats',
       'stats',
-      `session:${sessionId}`
+      CONCAT('session:', COALESCE(NEW.id::text, OLD.id::text))
     ]);
-  },
-
-  onProductChange: async (productId: string) => {
-    await cacheManager.invalidateByTags([
+  END IF;
+  
+  -- Expert session progress changes
+  IF TG_TABLE_NAME = 'job_readiness_expert_session_progress' THEN
+    PERFORM public.invalidate_cache_by_tags(ARRAY[
+      'expert_sessions',
+      'expert_session_stats',
+      'stats',
+      'progress',
+      CONCAT('student:', COALESCE(NEW.student_id::text, OLD.student_id::text)),
+      CONCAT('session:', COALESCE(NEW.expert_session_id::text, OLD.expert_session_id::text))
+    ]);
+  END IF;
+  
+  -- Product changes
+  IF TG_TABLE_NAME = 'products' THEN
+    PERFORM public.invalidate_cache_by_tags(ARRAY[
       'products',
       'product_performance',
       'performance',
-      `product:${productId}`
+      CONCAT('product:', COALESCE(NEW.id::text, OLD.id::text))
     ]);
+  END IF;
+  
+  -- Student changes
+  IF TG_TABLE_NAME = 'students' THEN
+    PERFORM public.invalidate_cache_by_tags(ARRAY[
+      'student_progress',
+      'students',
+      'product_performance',
+      CONCAT('student:', COALESCE(NEW.id::text, OLD.id::text))
+    ]);
+  END IF;
+  
+  -- Module changes
+  IF TG_TABLE_NAME = 'modules' THEN
+    PERFORM public.invalidate_cache_by_tags(ARRAY[
+      'modules',
+      'product_performance',
+      'module_completion',
+      CONCAT('module:', COALESCE(NEW.id::text, OLD.id::text)),
+      CONCAT('product:', COALESCE(NEW.product_id::text, OLD.product_id::text))
+    ]);
+  END IF;
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+-- Create triggers on critical tables
+CREATE TRIGGER student_progress_cache_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.student_module_progress
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_cache_invalidation();
+
+CREATE TRIGGER expert_sessions_cache_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.job_readiness_expert_sessions
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_cache_invalidation();
+
+CREATE TRIGGER expert_session_progress_cache_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.job_readiness_expert_session_progress
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_cache_invalidation();
+
+CREATE TRIGGER products_cache_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.products
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_cache_invalidation();
+
+CREATE TRIGGER students_cache_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.students
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_cache_invalidation();
+
+CREATE TRIGGER modules_cache_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.modules
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_cache_invalidation();
+```
+
+**2. Smart Application-Level Invalidation**:
+```typescript
+export class EnhancedCacheInvalidation {
+  private cacheManager = new DatabaseCacheManager();
+
+  /**
+   * Cascade invalidation - handles complex relationships
+   */
+  async cascadeInvalidation(entityType: string, entityId: string, operation: 'create' | 'update' | 'delete') {
+    const invalidationMap = {
+      student: {
+        tags: ['student_progress', 'product_performance', `student:${entityId}`],
+        cascades: async () => {
+          // When student changes, also invalidate their modules
+          const modules = await this.getStudentModules(entityId);
+          for (const moduleId of modules) {
+            await this.invalidateByTags([`module:${moduleId}`, 'module_completion']);
+          }
+        }
+      },
+      
+      module: {
+        tags: ['modules', 'product_performance', 'module_completion', `module:${entityId}`],
+        cascades: async () => {
+          // When module changes, invalidate all student progress for that module
+          await this.invalidateByTags(['student_progress']);
+          // Also invalidate product performance
+          const productId = await this.getModuleProductId(entityId);
+          if (productId) {
+            await this.invalidateByTags([`product:${productId}`, 'product_performance']);
+          }
+        }
+      },
+      
+      product: {
+        tags: ['products', 'product_performance', `product:${entityId}`],
+        cascades: async () => {
+          // When product changes, invalidate all related modules and progress
+          const modules = await this.getProductModules(entityId);
+          for (const moduleId of modules) {
+            await this.invalidateByTags([`module:${moduleId}`, 'module_completion']);
+          }
+          await this.invalidateByTags(['student_progress']);
+        }
+      },
+      
+      expert_session: {
+        tags: ['expert_sessions', 'expert_session_stats', 'stats', `session:${entityId}`],
+        cascades: async () => {
+          // When expert session changes, invalidate progress for all viewers
+          await this.invalidateByTags(['progress', 'student_progress']);
+        }
+      }
+    };
+
+    const config = invalidationMap[entityType];
+    if (!config) {
+      console.warn(`No invalidation config for entity type: ${entityType}`);
+      return;
+    }
+
+    // Direct invalidation
+    await this.cacheManager.invalidateByTags(config.tags);
+    
+    // Cascade invalidation
+    if (config.cascades) {
+      await config.cascades();
+    }
+    
+    // Log invalidation
+    console.log(`Cache invalidated for ${entityType}:${entityId} (${operation})`);
+  }
+
+  /**
+   * Bulk invalidation for batch operations
+   */
+  async bulkInvalidation(operations: Array<{entityType: string, entityId: string, operation: string}>) {
+    const allTags = new Set<string>();
+    
+    // Collect all tags to invalidate
+    for (const op of operations) {
+      const tags = this.getTagsForEntity(op.entityType, op.entityId);
+      tags.forEach(tag => allTags.add(tag));
+    }
+    
+    // Single bulk invalidation call
+    await this.cacheManager.invalidateByTags(Array.from(allTags));
+    
+    console.log(`Bulk cache invalidation: ${allTags.size} unique tags for ${operations.length} operations`);
+  }
+
+  /**
+   * Scheduled cache maintenance
+   */
+  async scheduleCleanup() {
+    // Clean expired entries
+    const cleaned = await this.supabase.rpc('cleanup_expired_cache');
+    
+    // Clean low-hit entries (hit_count = 0 and older than 1 hour)
+    const { data: lowHitEntries } = await this.supabase
+      .from('query_cache')
+      .delete()
+      .lt('created_at', new Date(Date.now() - 3600000)) // 1 hour ago
+      .eq('hit_count', 0);
+    
+    console.log(`Cache maintenance: ${cleaned} expired, ${lowHitEntries?.length || 0} low-hit entries cleaned`);
+  }
+
+  /**
+   * Cache warming after invalidation
+   */
+  async warmCache(entityType: string, entityId: string) {
+    switch (entityType) {
+      case 'expert_session':
+        // Pre-warm expert session stats
+        await this.cacheManager.getCachedExpertSessions();
+        break;
+      case 'product':
+        // Pre-warm product performance
+        await this.cacheManager.getCachedProductPerformance();
+        break;
+      case 'student':
+        // Pre-warm student progress
+        const modules = await this.getStudentModules(entityId);
+        for (const moduleId of modules) {
+          // Warm specific student-module combinations
+          await this.warmStudentModuleProgress(entityId, moduleId);
+        }
+        break;
+    }
+  }
+
+  // Helper methods
+  private async getStudentModules(studentId: string): Promise<string[]> {
+    const { data } = await this.supabase
+      .from('student_module_progress')
+      .select('module_id')
+      .eq('student_id', studentId);
+    return data?.map(d => d.module_id) || [];
+  }
+
+  private async getModuleProductId(moduleId: string): Promise<string | null> {
+    const { data } = await this.supabase
+      .from('modules')
+      .select('product_id')
+      .eq('id', moduleId)
+      .single();
+    return data?.product_id || null;
+  }
+
+  private async getProductModules(productId: string): Promise<string[]> {
+    const { data } = await this.supabase
+      .from('modules')
+      .select('id')
+      .eq('product_id', productId);
+    return data?.map(d => d.id) || [];
+  }
+
+  private getTagsForEntity(entityType: string, entityId: string): string[] {
+    const tagMap = {
+      student: ['student_progress', 'product_performance', `student:${entityId}`],
+      module: ['modules', 'module_completion', `module:${entityId}`],
+      product: ['products', 'product_performance', `product:${entityId}`],
+      expert_session: ['expert_sessions', 'stats', `session:${entityId}`]
+    };
+    return tagMap[entityType] || [];
+  }
+}
+
+// Export enhanced invalidation system
+export const enhancedCacheInvalidation = new EnhancedCacheInvalidation();
+
+// Legacy hooks for backward compatibility
+export const CacheInvalidationHooks = {
+  onStudentProgressUpdate: async (studentId: string, moduleId: string) => {
+    await enhancedCacheInvalidation.cascadeInvalidation('student', studentId, 'update');
+  },
+
+  onExpertSessionUpdate: async (sessionId: string) => {
+    await enhancedCacheInvalidation.cascadeInvalidation('expert_session', sessionId, 'update');
+  },
+
+  onProductChange: async (productId: string) => {
+    await enhancedCacheInvalidation.cascadeInvalidation('product', productId, 'update');
+  },
+
+  // New comprehensive hooks
+  onBulkStudentUpdate: async (studentIds: string[]) => {
+    const operations = studentIds.map(id => ({
+      entityType: 'student',
+      entityId: id,
+      operation: 'update'
+    }));
+    await enhancedCacheInvalidation.bulkInvalidation(operations);
+  },
+
+  onModuleStructureChange: async (moduleId: string) => {
+    await enhancedCacheInvalidation.cascadeInvalidation('module', moduleId, 'update');
   }
 };
+```
+
+**3. Real-time Cache Invalidation**:
+```typescript
+// For real-time invalidation using Supabase Realtime
+export class RealtimeCacheInvalidation {
+  private supabase = createClient();
+
+  setupRealtimeInvalidation() {
+    // Listen for table changes and invalidate immediately
+    this.supabase
+      .channel('cache-invalidation')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'student_module_progress' },
+        (payload) => this.handleTableChange('student_progress', payload)
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'job_readiness_expert_sessions' },
+        (payload) => this.handleTableChange('expert_sessions', payload)
+      )
+      .subscribe();
+  }
+
+  private async handleTableChange(cacheCategory: string, payload: any) {
+    // Real-time cache invalidation based on database changes
+    await enhancedCacheInvalidation.cascadeInvalidation(
+      cacheCategory, 
+      payload.new?.id || payload.old?.id, 
+      payload.eventType
+    );
+  }
+}
 ```
 
 ### **🛠️ Phase 4 Implementation Plan** ✅ **SUPABASE VERIFIED**
@@ -1832,18 +2147,6 @@ const { data: { user } } = await supabase.auth.getUser();
 const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 ```
 
-#### **2. Role Case Sensitivity (Critical)**
-```typescript
-// ✅ CORRECT: Use lowercase roles (matches JWT claims)
-authenticateApiRequest(['student'])     // for students
-authenticateApiRequest(['admin'])       // for admins  
-authenticateApiRequest(['staff'])       // for staff
-authenticateApiRequest(['client_staff']) // for client staff
-
-// ❌ WRONG: Don't use capitalized roles
-authenticateApiRequest(['Student'])     // Will cause 403 errors
-authenticateApiRequest(['Admin'])       // Will cause 403 errors
-```
 
 #### **3. Student Data Access Pattern**
 ```typescript

@@ -2,7 +2,7 @@
 
 import { createClient as createSupabaseClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { removeFileByUrl } from "@/lib/supabase/upload-helpers"
+// File deletion functionality temporarily removed during S3 migration
 
 // Types matching the API response
 export interface Client {
@@ -92,13 +92,10 @@ export async function updateClient(id: string, data: UpdateClientParams): Promis
     
     console.log('Existing client logo_url:', existingClient?.logo_url || 'none')
     
-    // If client has a logo and we're either removing it or replacing it,
-    // attempt to remove the old file from storage
+    // Note: File deletion temporarily disabled during S3 migration
+    // TODO: Implement S3 file deletion in Phase 7 cleanup
     if (existingClient?.logo_url && existingClient.logo_url !== data.logo_url) {
-      await removeFileByUrl(existingClient.logo_url).catch(err => {
-        // Log but don't block the update
-        console.warn("Failed to remove old logo file:", err)
-      })
+      console.log("Old logo file exists but deletion temporarily disabled during S3 migration:", existingClient.logo_url)
     }
   }
   

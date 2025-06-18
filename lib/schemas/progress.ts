@@ -15,6 +15,13 @@ export const ModuleProgressUpdateSchema = z.object({
   score: z.number().min(0).max(100).nullable().optional(),
 });
 
+// NEW: Simplified schema for completion-based course progress tracking
+export const SimplifiedCourseProgressSchema = z.object({
+  lesson_id: z.string().uuid({ message: 'lesson_id is required for completion tracking' }),
+  video_completed: z.boolean({ message: 'video_completed must be a boolean' }),
+  quiz_passed: z.boolean().optional().default(false),
+});
+
 // Schema for submitting assessment answers (Student POST body)
 export const AssessmentSubmissionSchema = z.object({
   answers: z.record(z.union([z.string(), z.array(z.string())])), // Record<questionId, selectedOptionId(s)>
@@ -45,6 +52,7 @@ export const ViewerReportQuerySchema = z.object({
 
 export type LessonProgressUpdate = z.infer<typeof LessonProgressUpdateSchema>;
 export type ModuleProgressUpdate = z.infer<typeof ModuleProgressUpdateSchema>;
+export type SimplifiedCourseProgress = z.infer<typeof SimplifiedCourseProgressSchema>;
 export type AssessmentSubmission = z.infer<typeof AssessmentSubmissionSchema>;
 export type ProgressQuery = z.infer<typeof ProgressQuerySchema>;
 export type ViewerReportQuery = z.infer<typeof ViewerReportQuerySchema>;

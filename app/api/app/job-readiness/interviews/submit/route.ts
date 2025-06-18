@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { uploadService } from '@/lib/r2/simple-upload-service';
+import { UploadError } from '@/lib/r2/upload-errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,33 +37,24 @@ export async function POST(request: NextRequest) {
     // Create submission record first to get the ID
     const submissionId = crypto.randomUUID();
     
-    // Generate storage path for video
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const videoPath = `interviews/${studentId}/${submissionId}/${timestamp}.webm`;
-
-    // Upload video to Supabase Storage
-    console.log('Uploading video to Supabase Storage...');
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('interview_recordings')
-      .upload(videoPath, videoFile, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Failed to upload video:', uploadError);
-      return NextResponse.json(
-        { error: 'Failed to upload video to storage' },
-        { status: 500 }
-      );
-    }
-
-    console.log('Video uploaded successfully:', uploadData.path);
-
-    // Get the public URL for the video
-    const { data: { publicUrl } } = supabase.storage
-      .from('interview_recordings')
-      .getPublicUrl(uploadData.path);
+    // Upload video to R2 Storage using the same approach as the working admin endpoint
+    console.log('Uploading video to R2 Storage...');
+    
+    // Use the exact same upload logic as the working admin endpoints
+    const key = uploadService.generateKey(`interviews/${submissionId}`, videoFile.name);
+    
+    const uploadResult = await uploadService.uploadFile(
+      videoFile, 
+      key, 
+      videoFile.type,
+      {
+        allowedTypes: ['video/*'],
+        maxSize: 200 * 1024 * 1024, // 200MB for interview videos
+        minSize: 1024 // 1KB minimum
+      }
+    );
+    
+    console.log('Video uploaded successfully to R2:', uploadResult.key);
 
     // Get current student data for tier and background tracking
     const { data: studentData } = await supabase
@@ -77,8 +70,8 @@ export async function POST(request: NextRequest) {
         id: submissionId,
         student_id: studentId,
         product_id: DEFAULT_PRODUCT_ID,
-        video_storage_path: uploadData.path,
-        video_url: publicUrl,
+        video_storage_path: uploadResult.key,
+        video_url: uploadResult.url,
         questions_used: questions,
         status: 'submitted',
         tier_when_submitted: studentData?.job_readiness_tier || 'BRONZE',
@@ -92,14 +85,9 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Failed to save submission:', insertError);
       
-      // Try to clean up uploaded video if database insert failed
-      try {
-        await supabase.storage
-          .from('interview_recordings')
-          .remove([uploadData.path]);
-      } catch (cleanupError) {
-        console.warn('Failed to cleanup uploaded video:', cleanupError);
-      }
+      // Note: S3 file cleanup temporarily disabled during migration
+      // TODO: Implement S3 file deletion in future phase if needed
+      console.warn('Database insert failed, uploaded video cleanup skipped:', uploadResult.key);
       
       return NextResponse.json(
         { error: 'Failed to save submission to database' },

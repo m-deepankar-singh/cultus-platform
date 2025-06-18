@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Building2, MoreHorizontal, Search, SlidersHorizontal, Package } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -264,14 +265,21 @@ export function ClientsTable() {
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted overflow-hidden">
                         {client.logo_url ? (
-                          <img
+                          <Image
                             src={client.logo_url}
                             alt={`${client.name} logo`}
+                            width={40}
+                            height={40}
                             className="object-contain w-full h-full"
+                            onError={(e) => {
+                              // Fallback to building icon if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
                           />
-                        ) : (
-                        <Building2 className="h-5 w-5 text-muted-foreground" />
-                        )}
+                        ) : null}
+                        <Building2 className={`h-5 w-5 text-muted-foreground ${client.logo_url ? 'hidden' : ''}`} />
                       </div>
                       <div className="font-medium">{client.name}</div>
                     </div>

@@ -4,14 +4,23 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Play, CheckCircle2, Clock, Calendar } from "lucide-react"
+import { Play, CheckCircle2, Clock, Calendar, Target, RotateCcw } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+
+// Phase 5: Enhanced Components Integration
+import { MilestoneProgressIndicator } from './expert-sessions'
 
 interface ExpertSessionProgress {
   watch_time_seconds: number
   completion_percentage: number
   is_completed: boolean
   completed_at: string | null
+  // Phase 2: Enhanced progress fields (simulated for now)
+  last_milestone_reached?: number
+  can_resume?: boolean
+  resume_from_milestone?: number
+  resume_position_seconds?: number
+  milestones_unlocked?: number[]
 }
 
 interface ExpertSession {
@@ -27,6 +36,9 @@ interface ExpertSession {
 interface ExpertSessionListProps {
   sessions: ExpertSession[]
 }
+
+// Feature flag for enhanced display (Phase 6: Deployment)
+const USE_ENHANCED_PROGRESS_DISPLAY = process.env.NEXT_PUBLIC_ENHANCED_EXPERT_SESSIONS === 'true' || true // Default to true for development
 
 export function ExpertSessionList({ sessions }: ExpertSessionListProps) {
   if (!sessions || sessions.length === 0) {
@@ -47,17 +59,50 @@ export function ExpertSessionList({ sessions }: ExpertSessionListProps) {
     )
   }
 
+  // Enhance sessions data with milestone information
+  const enhancedSessions = sessions.map(session => {
+    const completionPercentage = session.student_progress.completion_percentage || 0
+    const watchTime = session.student_progress.watch_time_seconds || 0
+    
+    // Calculate simulated milestone data based on completion percentage
+    const lastMilestone = Math.floor(completionPercentage / 10) * 10
+    const milestonesUnlocked = lastMilestone > 0 
+      ? Array.from({ length: Math.floor(lastMilestone / 10) }, (_, i) => (i + 1) * 10)
+      : []
+    
+    return {
+      ...session,
+      student_progress: {
+        ...session.student_progress,
+        // Phase 2: Enhanced resume functionality (simulate for now)
+        last_milestone_reached: lastMilestone,
+        can_resume: watchTime > 0 && !session.student_progress.is_completed,
+        resume_from_milestone: lastMilestone,
+        resume_position_seconds: watchTime,
+        milestones_unlocked: milestonesUnlocked
+      }
+    }
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Available Sessions</h2>
-        <Badge variant="outline">
-          {sessions.length} session{sessions.length !== 1 ? 's' : ''} available
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            {sessions.length} session{sessions.length !== 1 ? 's' : ''} available
+          </Badge>
+          {USE_ENHANCED_PROGRESS_DISPLAY && (
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
+              <Target className="h-3 w-3 mr-1" />
+              Enhanced Progress
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4">
-        {sessions.map((session) => (
+        {enhancedSessions.map((session) => (
           <ExpertSessionCard key={session.id} session={session} />
         ))}
       </div>
@@ -83,6 +128,22 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
     return `${minutes}m`
   }
 
+  const getButtonText = () => {
+    if (isCompleted) return "Session Completed"
+    if (USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume) {
+      return `Resume from ${student_progress.resume_from_milestone}%`
+    }
+    return completionPercentage > 0 ? "Continue Watching" : "Start Watching"
+  }
+
+  const getButtonIcon = () => {
+    if (isCompleted) return CheckCircle2
+    if (USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume) return RotateCcw
+    return Play
+  }
+
+  const ButtonIcon = getButtonIcon()
+
   return (
     <Card className={`transition-all ${isCompleted ? 'opacity-75 bg-gray-50' : 'hover:shadow-md'}`}>
       <CardHeader>
@@ -95,17 +156,26 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
               {session.description}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {isCompleted ? (
               <Badge variant="default" className="bg-green-500 text-white">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Completed
               </Badge>
             ) : completionPercentage > 0 ? (
-              <Badge variant="secondary">
-                <Clock className="h-3 w-3 mr-1" />
-                {completionPercentage}% watched
-              </Badge>
+              <>
+                <Badge variant="secondary">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {completionPercentage}% watched
+                </Badge>
+                {/* Enhanced Progress Badges */}
+                {USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume && (
+                  <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50">
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Resume {student_progress.resume_from_milestone}%
+                  </Badge>
+                )}
+              </>
             ) : (
               <Badge variant="outline">
                 <Play className="h-3 w-3 mr-1" />
@@ -116,8 +186,26 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Progress Bar */}
-        {completionPercentage > 0 && (
+        {/* Enhanced Milestone Progress Display */}
+        {USE_ENHANCED_PROGRESS_DISPLAY && student_progress.milestones_unlocked && student_progress.milestones_unlocked.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-gray-700">Progress Milestones</span>
+              <Badge variant="outline" className="text-xs">
+                {student_progress.milestones_unlocked.length}/7 reached
+              </Badge>
+            </div>
+                         <MilestoneProgressIndicator
+               currentPercentage={completionPercentage}
+               milestonesUnlocked={student_progress.milestones_unlocked}
+               isDisabled={true}
+             />
+          </div>
+        )}
+
+        {/* Standard Progress Bar (Legacy/Fallback) */}
+        {(!USE_ENHANCED_PROGRESS_DISPLAY || !student_progress.milestones_unlocked?.length) && completionPercentage > 0 && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Progress</span>
@@ -148,19 +236,35 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
           </div>
         </div>
 
-        {/* Watch Progress Info */}
+        {/* Enhanced Watch Progress Info */}
         {student_progress.watch_time_seconds > 0 && (
-          <div className="text-sm text-muted-foreground">
-            Watched: {formatDuration(student_progress.watch_time_seconds)} of {formatDuration(session.video_duration)}
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div>
+              Watched: {formatDuration(student_progress.watch_time_seconds)} of {formatDuration(session.video_duration)}
+            </div>
+            
+            {/* Enhanced Resume Information */}
+            {USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume && !isCompleted && (
+              <div className="text-blue-600 bg-blue-50 p-2 rounded text-xs">
+                <div className="flex items-center gap-1">
+                  <RotateCcw className="h-3 w-3" />
+                  <span>
+                    You can resume from {student_progress.resume_from_milestone}% milestone 
+                    ({formatDuration(student_progress.resume_position_seconds || 0)})
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {isCompleted && student_progress.completed_at && (
-              <span className="block mt-1">
+              <div className="text-green-600">
                 Completed {formatDistanceToNow(new Date(student_progress.completed_at), { addSuffix: true })}
-              </span>
+              </div>
             )}
           </div>
         )}
 
-        {/* Action Button */}
+        {/* Enhanced Action Button */}
         <div className="pt-2">
           {isCompleted ? (
             <div className="space-y-2">
@@ -178,13 +282,26 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
             </div>
           ) : (
             <Link href={`/app/job-readiness/expert-sessions/${session.id}`}>
-              <Button className="w-full" variant="default">
-                <Play className="h-4 w-4 mr-2" />
-                {completionPercentage > 0 ? "Continue Watching" : "Start Watching"}
+              <Button 
+                className={`w-full ${USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume ? 'bg-blue-600 hover:bg-blue-700' : ''}`} 
+                variant="default"
+              >
+                <ButtonIcon className="h-4 w-4 mr-2" />
+                {getButtonText()}
               </Button>
             </Link>
           )}
         </div>
+
+        {/* Development Info (Remove in production) */}
+        {process.env.NODE_ENV === 'development' && USE_ENHANCED_PROGRESS_DISPLAY && (
+          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
+            <div><strong>Dev Info:</strong></div>
+            <div>Milestones: [{student_progress.milestones_unlocked?.join(', ')}]</div>
+            <div>Can Resume: {student_progress.can_resume ? 'Yes' : 'No'}</div>
+            <div>Resume From: {student_progress.resume_from_milestone}%</div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -4,11 +4,12 @@ import React, { useState, use } from 'react';
 import { createClient } from '@/lib/supabase/client'; // Changed to client
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Target, ChevronRight } from 'lucide-react';
+import { BookOpen, Target, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { AssessmentResultModal } from '@/components/assessment/assessment-result-modal';
 import { AnimatedCard } from '@/components/ui/animated-card';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,7 @@ interface ProductDetail {
   id: string;
   name: string;
   description: string | null;
+  image_url: string | null;
   modules: ModuleDetail[];
 }
 
@@ -122,6 +124,7 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
             id,
             name,
             description,
+            image_url,
             modules (
               id,
               name,
@@ -255,6 +258,22 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
           </p>
         }
       </div>
+
+      {/* Product Image */}
+      {productData.image_url && (
+        <div className="mb-8">
+          <AnimatedCard className="overflow-hidden">
+            <div className="relative w-full aspect-video">
+              <Image
+                src={productData.image_url}
+                alt={productData.name || "Product image"}
+                fill
+                className="object-cover"
+              />
+            </div>
+          </AnimatedCard>
+        </div>
+      )}
 
       <div className="space-y-4">
         {productData.modules.length > 0 ? (

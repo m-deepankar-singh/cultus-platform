@@ -25,8 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 import { createClient, updateClient } from "@/app/actions/clientActions"
-import { FileUpload } from "@/components/ui/file-upload"
-import { uploadClientLogo } from "@/lib/supabase/upload-helpers"
+import { S3FileUpload } from "@/components/ui/s3-file-upload"
 
 // Form schema for client creation/editing
 const formSchema = z.object({
@@ -124,19 +123,10 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
   }
 
   // Handle logo upload
-  const handleLogoUpload = async (file: File): Promise<string> => {
-    try {
-      // For existing clients, use their ID as the folder path
-      const url = await uploadClientLogo(file, client?.id)
-      console.log('Logo uploaded successfully, URL:', url)
-      
-      // Update the form with the new logo URL
-      form.setValue("logo_url", url, { shouldValidate: true, shouldDirty: true })
-      return url
-    } catch (error) {
-      console.error("Logo upload error:", error)
-      throw error
-    }
+  const handleLogoUpload = (url: string) => {
+    console.log('Logo uploaded successfully, URL:', url)
+    // Update the form with the new logo URL
+    form.setValue("logo_url", url, { shouldValidate: true, shouldDirty: true })
   }
 
   // Handle logo removal
@@ -225,13 +215,32 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
                 <FormItem>
                   <FormLabel>Client Logo</FormLabel>
                   <FormControl>
-                    <FileUpload
-                      currentImageUrl={field.value}
-                      onFileUpload={handleLogoUpload}
-                      onRemove={handleLogoRemove}
-                      accept="image/*"
-                      maxSizeMB={1}
-                    />
+                    <div className="space-y-4">
+                      {field.value && (
+                        <div className="relative">
+                          <img 
+                            src={field.value} 
+                            alt="Client logo preview" 
+                            className="w-24 h-24 object-cover rounded-md border"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2"
+                            onClick={handleLogoRemove}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      )}
+                      <S3FileUpload
+                        onUpload={handleLogoUpload}
+                        accept="image/*"
+                        uploadEndpoint="/api/admin/clients/upload-logo"
+                        maxSize={2}
+                      />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

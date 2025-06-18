@@ -269,31 +269,45 @@ export async function POST(
     let thirdStarUnlocked = false;
 
     if (sessionJustCompleted && completedSessionsCount >= requiredSessions) {
-      // Get current star level from JWT claims
-      const currentStarLevel = claims.job_readiness_star_level || 'NONE';
-      
-      if (currentStarLevel === 'TWO') {
-        console.log(`🌟 Student ${studentId} completed 5+ expert sessions with second star. Awarding third star!`);
-        
-        // Update student star level
-        const { error: starUpdateError } = await supabase
-          .from('students')
-          .update({
-            job_readiness_star_level: 'THREE',
-            job_readiness_last_updated: new Date().toISOString(),
-          })
-          .eq('id', studentId);
+      // Get current star level from database instead of JWT claims (which might be stale)
+      const { data: currentStudentData, error: studentError } = await supabase
+        .from('students')
+        .select('job_readiness_star_level')
+        .eq('id', studentId)
+        .single();
 
-        if (!starUpdateError) {
-          starLevelUnlocked = true;
-          newStarLevel = 'THREE';
-          thirdStarUnlocked = true;
-          console.log('🎉 Successfully awarded third star!');
-        } else {
-          console.error('Error updating student star level:', starUpdateError);
-        }
+      if (studentError) {
+        console.error('Error fetching current student star level:', studentError);
+        // Fallback to JWT claims if database query fails
+        const currentStarLevel = claims.job_readiness_star_level || 'NONE';
+        console.log(`Database query failed, using JWT claims star level: ${currentStarLevel}`);
       } else {
-        console.log(`Student ${studentId} completed 5+ expert sessions but current star level is ${currentStarLevel}, not TWO. No star unlock.`);
+        const currentStarLevel = currentStudentData?.job_readiness_star_level || 'NONE';
+        console.log(`Student ${studentId} current star level from database: ${currentStarLevel}`);
+        
+        if (currentStarLevel === 'TWO') {
+          console.log(`🌟 Student ${studentId} completed 5+ expert sessions with second star. Awarding third star!`);
+          
+          // Update student star level
+          const { error: starUpdateError } = await supabase
+            .from('students')
+            .update({
+              job_readiness_star_level: 'THREE',
+              job_readiness_last_updated: new Date().toISOString(),
+            })
+            .eq('id', studentId);
+
+          if (!starUpdateError) {
+            starLevelUnlocked = true;
+            newStarLevel = 'THREE';
+            thirdStarUnlocked = true;
+            console.log('🎉 Successfully awarded third star!');
+          } else {
+            console.error('Error updating student star level:', starUpdateError);
+          }
+        } else {
+          console.log(`Student ${studentId} completed 5+ expert sessions but current star level is ${currentStarLevel}, not TWO. No star unlock.`);
+        }
       }
     }
 

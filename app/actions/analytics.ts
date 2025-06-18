@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server'; // Assuming you have this server client setup
+import { createClient } from '@/lib/supabase/server';
+import { cacheManager, CacheUtils } from '@/lib/cache/cache-manager'; // Assuming you have this server client setup
 // import { cookies } from 'next/headers'; // No longer needed here if createClient handles it
 
 interface MonthlyActiveLearnersParams {
@@ -216,14 +217,26 @@ export async function getProductPerformance(): Promise<ProductPerformanceResult>
     const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
     if (profileError || !profile || (profile.role !== 'Admin' && profile.role !== 'Staff')) return { error: 'Unauthorized.' };
 
-    const { data, error: queryError } = await supabase.rpc('calculate_product_performance');
-    if (queryError) {
-      console.error('Error in calculate_product_performance RPC:', queryError.message);
-      return { error: 'Failed to retrieve product performance metrics.' };
+    try {
+      // Use cached product performance data
+      const data = await cacheManager.getCachedProductPerformance(
+        undefined, // No client filtering 
+        CacheUtils.durations.LONG // 15 minutes cache for analytics
+      );
+      const products = data as ProductPerformance[]; 
+      return { products };
+    } catch (cacheError) {
+      console.error('Cache error, falling back to direct RPC:', cacheError);
+      
+      // Fallback to direct RPC call if cache fails
+      const { data, error: queryError } = await supabase.rpc('calculate_product_performance');
+      if (queryError) {
+        console.error('Error in calculate_product_performance RPC:', queryError.message);
+        return { error: 'Failed to retrieve product performance metrics.' };
+      }
+      const products = data as ProductPerformance[]; 
+      return { products };
     }
-    // Cast to the updated interface
-    const products = data as ProductPerformance[]; 
-    return { products };
   } catch (e: any) {
     console.error('Unexpected error in getProductPerformance:', e.message);
     return { error: 'An unexpected error occurred.' };

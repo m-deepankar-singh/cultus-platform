@@ -11,6 +11,7 @@ import {
   Briefcase,
   Building2,
   ChevronDown,
+  Database,
   FileQuestion,
   GraduationCap,
   Layers,
@@ -145,6 +146,12 @@ const navItems: NavItem[] = [
     href: "/analytics",
     icon: BarChart3,
     role: ["admin", "staff", "viewer", "client_staff"],
+  },
+  {
+    title: "Cache Management",
+    href: "/admin/cache",
+    icon: Database,
+    role: ["admin"],
   },
   {
     title: "Settings",
