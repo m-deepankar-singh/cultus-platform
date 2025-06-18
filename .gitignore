@@ -29,3 +29,4 @@ next-env.d.ts
 .cursor/mcp.json
 # SpecStory explanation file
 .specstory/.what-is-this.md
+.DS_Store
