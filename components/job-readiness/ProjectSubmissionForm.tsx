@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Send, ArrowLeft, Info, ExternalLink, Code } from 'lucide-react'
+import { Loader2, Send, ArrowLeft, ExternalLink, Code } from 'lucide-react'
 
 interface Project {
   title: string

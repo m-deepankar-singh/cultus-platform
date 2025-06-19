@@ -41,11 +41,6 @@ const assessmentModuleSchema = baseModuleSchema.extend({
   pass_threshold: z.coerce.number().int().min(1).max(100, { message: "Pass threshold must be between 1 and 100" }).optional(),
 })
 
-// Union type for the form data based on module type
-type ModuleFormType = 
-  | (z.infer<typeof courseModuleSchema> & { type: "Course" })
-  | (z.infer<typeof assessmentModuleSchema> & { type: "Assessment" })
-
 interface StandaloneModuleFormProps {
   type: "Course" | "Assessment"
 }

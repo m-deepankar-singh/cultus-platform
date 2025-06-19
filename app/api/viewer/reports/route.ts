@@ -1,9 +1,7 @@
 // app/api/viewer/reports/route.ts
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { Database } from '@/lib/database.types';
 import { ViewerReportQuerySchema } from '@/lib/schemas/progress';
-import { createClient } from '@/lib/supabase/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 

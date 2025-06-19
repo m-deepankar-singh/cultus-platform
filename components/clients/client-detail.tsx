@@ -20,7 +20,7 @@ export function ClientDetail({ client }: ClientDetailProps) {
     if (!dateString) return "N/A"
     try {
       return format(new Date(dateString), "MMMM d, yyyy")
-    } catch (error) {
+    } catch {
       return dateString
     }
   }

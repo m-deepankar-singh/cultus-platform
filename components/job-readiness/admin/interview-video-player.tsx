@@ -4,7 +4,6 @@ import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
   Dialog, 
@@ -12,7 +11,6 @@ import {
   DialogDescription, 
   DialogHeader, 
   DialogTitle,
-  DialogTrigger 
 } from "@/components/ui/dialog"
 import { 
   Play, 
@@ -20,7 +18,6 @@ import {
   Volume2, 
   VolumeX, 
   Maximize, 
-  Clock, 
   User, 
   CheckCircle, 
   XCircle,

@@ -3,7 +3,8 @@
 export interface JrSubmission {
   id: string
   student_id: string
-  submission_type: "project"
+  product_id?: string
+  submission_type: "project" | "interview"
   project_title?: string
   submission_content?: string
   submission_url?: string
@@ -11,12 +12,45 @@ export interface JrSubmission {
   passed?: boolean
   created_at: string
   updated_at: string
+  submission_date?: string
+  ai_grade_status?: AiGradeStatus
+  manual_review_status?: ManualReviewStatus
+  reviewer_id?: string
+  admin_feedback?: string
+  review_date?: string
+  
+  // Related data that gets populated via joins
+  student?: {
+    id: string
+    first_name: string
+    last_name: string
+    full_name: string
+    email: string
+  }
+  
+  product?: {
+    id: string
+    name: string
+    description?: string
+  }
   
   project_submission?: {
     project_title: string
     project_description: string
     tasks: string[]
     deliverables: string[]
+    background_type?: string
+    project_type?: string
+    feedback?: string
+  }
+  
+  interview_submission?: {
+    video_storage_path: string
+    video_url?: string
+    passed?: boolean
+    feedback?: string
+    questions_used?: any[]
+    analysis_result?: any
   }
 }
 
@@ -68,6 +102,11 @@ export const MANUAL_REVIEW_STATUSES = ["pending", "approved", "rejected", "not_r
 export type SubmissionType = typeof SUBMISSION_TYPES[number]
 export type AiGradeStatus = typeof AI_GRADE_STATUSES[number]
 export type ManualReviewStatus = typeof MANUAL_REVIEW_STATUSES[number]
+
+export interface ManualReviewRequest {
+  status: ManualReviewStatus
+  admin_feedback: string
+}
 
 class JrSubmissionsApiError extends Error {
   constructor(message: string, public status?: number) {
@@ -212,15 +251,15 @@ export async function getJrSubmissions(filters: JrSubmissionsFilters = {}): Prom
 }
 
 // Submit manual review for interview submission
-export async function submitManualReview(submissionId: string, approved: boolean, feedback?: string) {
+export async function submitManualReview(submissionId: string, reviewData: ManualReviewRequest) {
   const response = await fetch(`/api/admin/job-readiness/submissions/${encodeURIComponent(submissionId)}/manual-review`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      approved,
-      feedback
+      status: reviewData.status,
+      admin_feedback: reviewData.admin_feedback
     })
   })
   

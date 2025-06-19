@@ -3,9 +3,8 @@
 import React, { useState, useRef } from 'react';
 import ReactPlayer from 'react-player/file'; // Use file player for direct URLs and controlsList
 import { cn } from '@/lib/utils';
-import { Play, Pause, Volume2, VolumeX, Expand, Minimize, Settings, SkipForward, SkipBack, RefreshCw } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Expand, Minimize, Settings, RefreshCw } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import { Progress } from '@/components/ui/progress'; // Using our existing Progress component
 
 interface CustomVideoPlayerProps {
   url: string;
@@ -42,7 +41,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   const [showPlaybackRateMenu, setShowPlaybackRateMenu] = useState(false);
 
   const playerWrapperRef = useRef<HTMLDivElement>(null);
-  let controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -172,19 +171,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
     setShowPlaybackRateMenu(false);
   }
 
-  const handleSeekForward = () => {
-    if (playerRef.current) {
-      const currentTime = playerRef.current.getCurrentTime();
-      playerRef.current.seekTo(Math.min(currentTime + 10, duration));
-    }
-  };
 
-  const handleSeekBackward = () => {
-    if (playerRef.current) {
-      const currentTime = playerRef.current.getCurrentTime();
-      playerRef.current.seekTo(Math.max(currentTime - 10, 0));
-    }
-  };
   
   const handleRestartVideo = () => {
     if (playerRef.current) {

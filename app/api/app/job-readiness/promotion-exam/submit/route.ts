@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -14,7 +13,7 @@ export async function POST(req: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     const body = await req.json();
     
@@ -77,7 +76,6 @@ export async function POST(req: NextRequest) {
     
     // For placeholder purposes, just count answers
     const totalQuestions = questions.length;
-    const answeredQuestions = answers.length;
     
     // For placeholder, assume success ratio (for a real implementation, evaluate the actual answers)
     // Using a simulated random score between 60% and 95%
@@ -107,7 +105,7 @@ export async function POST(req: NextRequest) {
       status: 'COMPLETED'
     };
     
-    const { data: newExamAttempt, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('job_readiness_promotion_exam_attempts')
       .insert(examAttemptData)
       .select()
@@ -135,7 +133,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Get updated student data after tier change
-    const { data: updatedStudent, error: studentError } = await supabase
+    const { data: updatedStudent } = await supabase
       .from('students')
       .select(`
         id,

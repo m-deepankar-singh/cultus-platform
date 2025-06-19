@@ -4,9 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { BookOpen, FileText, Layers, PlusCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { ModulesList } from "../products/modules-list"
 import { AssignModuleModal } from "../products/assign-module-modal"
 import { useCurrentUser } from "@/hooks/use-current-user"
 
@@ -27,7 +26,7 @@ interface ModuleManagerProps {
 export function ModuleManager({ productId }: ModuleManagerProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const { user, role } = useCurrentUser()
+  const { role } = useCurrentUser()
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

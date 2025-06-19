@@ -1,48 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { ProgressQuerySchema } from '@/lib/schemas/progress';
 import { type NextRequest } from "next/server";
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define types for cleaner data handling
-type ModuleData = {
-  id: string;
-  name: string;
-  type: string;
-  sequence: number;
-  product_id: string;
-};
-
-type ProductData = {
-  id: string;
-  name: string;
-  description: string | null;
-  modules: ModuleData[];
-};
-
-type ProductAssignment = {
-  products: ProductData | ProductData[] | null; // Supabase might return object or array
-};
-
-// Define type for module progress data
-type ModuleProgress = {
-  student_id: string;
-  module_id: string;
-  status: string;
-  progress_percentage: number | null;
-  score: number | null;
-  last_updated: string | null;
-  completed_at: string | null;
-};
-
-// Define type for assessment progress data
-type AssessmentProgress = {
-  student_id: string;
-  module_id: string;
-  score: number | null;
-  passed: boolean | null;
-  submitted_at: string | null;
-};
 
 /**
  * GET /api/client-staff/progress
@@ -57,7 +17,7 @@ export async function GET(request: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { claims } = authResult;
 
     // Get role and client_id from JWT claims
     const userRole = claims.user_role;

@@ -1,39 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
+import { Search, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { UserActionsCell } from "./user-actions-cell"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InfoIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { DataPagination } from "@/components/ui/data-pagination"
 
-interface Profile {
-  id: string
-  full_name: string | null
-  role: "Admin" | "Staff" | "Viewer" | "Client Staff"
-  client_id: string | null
-  status?: string
-  client?: {
-    id: string
-    name: string
-  }
-}
+
 
 interface Client {
   id: string
@@ -95,7 +77,6 @@ function isUserActive(user: UserProfile): boolean {
 }
 
 export function UsersTable({ clients, initialCurrentUserRole }: UsersTableProps) {
-  const router = useRouter()
   
   // Pagination and filter state
   const [currentPage, setCurrentPage] = useState(1)
@@ -112,7 +93,7 @@ export function UsersTable({ clients, initialCurrentUserRole }: UsersTableProps)
   const [showFilters, setShowFilters] = useState(false)
   
   // Current user role (for permissions)
-  const [currentUserRole, setCurrentUserRole] = useState<string | undefined>(initialCurrentUserRole)
+  const [currentUserRole] = useState<string | undefined>(initialCurrentUserRole)
   const isStaffUser = currentUserRole === 'Staff'
 
   // Fetch users from the paginated API

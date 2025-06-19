@@ -16,22 +16,9 @@ interface QuizOption {
   text: string;
 }
 
-interface LessonData {
-  id: number;
-  quiz_data?: {
-    quiz_generation_prompt?: string;
-    quiz_enabled?: boolean;
-  };
-}
 
-interface ModuleData {
-  id: number;
-  configuration?: {
-    ai_quiz_enabled?: boolean;
-    enable_ai_quizzes?: boolean;
-    ai_quiz_question_count?: number;
-  };
-}
+
+
 
 // Define type for question bank mapping
 interface QuestionBankMapping {

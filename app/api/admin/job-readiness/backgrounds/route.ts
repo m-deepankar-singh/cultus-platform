@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -6,7 +5,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  * GET /api/admin/job-readiness/backgrounds
  * Get all background types and their project mappings
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // JWT-based authentication (0 database queries for auth)
     const authResult = await authenticateApiRequest(['Admin']);
@@ -14,7 +13,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     // Get all background types and their project mappings
     const { data: backgrounds, error } = await supabase
@@ -45,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
     
     // Parse JSON with better error handling
     let body;
@@ -214,7 +213,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
     
     const url = new URL(req.url);
     const id = url.searchParams.get('id');

@@ -9,7 +9,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)
@@ -19,6 +19,9 @@ export async function GET(
     }
     
     const { user, claims, supabase } = authResult;
+
+    // Await params before using
+    const { id } = await params;
 
     // For testing purposes, use service role client to bypass RLS
     // In production, you should properly implement role-based access
@@ -31,7 +34,7 @@ export async function GET(
     const { data: background, error } = await serviceClient
       .from('job_readiness_background_project_types')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {

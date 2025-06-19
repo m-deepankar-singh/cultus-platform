@@ -10,7 +10,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  */
 export async function DELETE(
   request: Request,
-  context: { params: { productId: string, clientId: string } }
+  context: { params: Promise<{ productId: string; clientId: string }> }
 ) {
   // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
   const authResult = await authenticateApiRequest(['Admin', 'Staff']);

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
@@ -15,7 +14,7 @@ import { SELECTORS } from '@/lib/api/selectors';
  * ✅ Specific column selection (reduces data transfer)
  * ✅ Performance monitoring
  */
-export async function GET(request: Request, context: { params: { clientId: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ clientId: string }> }) {
   const startTime = Date.now();
   
   try {
@@ -83,7 +82,7 @@ export async function GET(request: Request, context: { params: { clientId: strin
  * ✅ Specific column selection for response
  * ✅ Performance monitoring
  */
-export async function PUT(request: Request, context: { params: { clientId: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ clientId: string }> }) {
     const startTime = Date.now();
     
     try {
@@ -171,7 +170,7 @@ export async function PUT(request: Request, context: { params: { clientId: strin
  * ✅ JWT-based authentication (eliminates 1 DB query per request)
  * ✅ Performance monitoring
  */
-export async function DELETE(request: Request, context: { params: { clientId: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ clientId: string }> }) {
     const startTime = Date.now();
     
     try {

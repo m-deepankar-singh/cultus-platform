@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { StarRating } from '@/components/ui/StarRating'
 import { 
-  Trophy, 
   CheckCircle2, 
   XCircle, 
   Star, 
@@ -19,7 +17,6 @@ import {
   Target,
   TrendingUp,
   FileText,
-  Link as LinkIcon,
   Info
 } from 'lucide-react'
 import Link from 'next/link'
@@ -62,7 +59,7 @@ export function ProjectFeedback({
   onStartNew, 
   isAlreadySubmitted = false 
 }: ProjectFeedbackProps) {
-  const { submission, feedback, star_level_updated, new_star_level, passing_threshold } = submissionResult
+  const { submission, feedback, star_level_updated, passing_threshold } = submissionResult
   const passed = submission.passed
   const score = submission.score
 

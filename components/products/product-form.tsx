@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { S3FileUpload } from "@/components/ui/s3-file-upload"
+import NextImage from "next/image"
 
 interface ProductFormProps {
   open: boolean
@@ -37,7 +38,7 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isImageUploading, setIsImageUploading] = useState(false)
+  const [isImageUploading] = useState(false)
   const isEditing = !!product
 
   const form = useForm<ProductFormData>({
@@ -210,9 +211,11 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
                     <div className="space-y-4">
                       {field.value && (
                         <div className="relative">
-                          <img 
+                          <NextImage 
                             src={field.value} 
                             alt="Product preview" 
+                            width={128}
+                            height={128}
                             className="w-32 h-32 object-cover rounded-md border"
                           />
                           <Button

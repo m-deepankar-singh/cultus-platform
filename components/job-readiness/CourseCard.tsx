@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Clock, CheckCircle, Play, Lock, Star } from 'lucide-react'
+import { BookOpen, Clock, CheckCircle, Play, Lock } from 'lucide-react'
 import Link from 'next/link'
 
 interface CourseProgress {
@@ -55,9 +55,7 @@ export function CourseCard({ course, currentTier }: CourseCardProps) {
   const isInProgress = course.progress?.status === 'InProgress'
   const progressPercentage = course.completion_percentage || course.progress?.progress_percentage || 0
   
-  const requiredTier = course.configuration?.required_tier || 'BRONZE'
   const estimatedHours = course.configuration?.estimated_duration_hours || 0
-  const difficultyLevel = course.configuration?.difficulty_level || 'Beginner'
   
   const statusText = isCompleted ? 'Completed' : isInProgress ? 'In Progress' : 'Not Started'
   const statusColor = statusColors[isCompleted ? 'Completed' : isInProgress ? 'InProgress' : 'NotStarted']

@@ -23,7 +23,6 @@ interface UploadResult {
 export function VideoUploader({ 
   onUploadComplete, 
   currentVideoUrl, 
-  moduleId 
 }: VideoUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)

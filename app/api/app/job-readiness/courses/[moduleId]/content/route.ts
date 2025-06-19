@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -67,14 +67,6 @@ interface JobReadinessCoursePageDataResponse {
   progress: StudentModuleProgressOutput;
 }
 
-// Update the interface to include interfaces for the question bank integration
-interface QuestionBankMapping {
-  question_id: string;
-  sequence: number;
-  is_fallback: boolean;
-  is_required: boolean;
-  assessment_questions: AssessmentQuestion;
-}
 
 // Update the cache type definition
 const serverSideQuizCache = new Map<string, { 

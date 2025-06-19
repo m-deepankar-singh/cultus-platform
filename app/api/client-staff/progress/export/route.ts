@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { claims } = authResult;
 
     // Get role and client_id from JWT claims
     const userRole = claims.user_role;

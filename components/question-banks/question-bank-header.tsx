@@ -7,7 +7,7 @@ import { QuestionForm } from './question-form';
 
 export function QuestionBankHeader() {
   const [open, setOpen] = useState(false);
-  const [bankType, setBankType] = useState<'assessment' | 'course'>('assessment');
+  const [bankType] = useState<'assessment' | 'course'>('assessment');
 
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">

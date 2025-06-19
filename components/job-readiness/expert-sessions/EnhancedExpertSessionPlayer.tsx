@@ -6,10 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { Play, Pause, Volume2, VolumeX, Maximize, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { MilestoneProgressIndicator } from './MilestoneProgressIndicator'
-import { EnhancedVideoControls } from './EnhancedVideoControls'
-
 interface ExpertSession {
   id: string
   title: string
@@ -79,7 +76,7 @@ export function EnhancedExpertSessionPlayer({
   const [duration, setDuration] = useState(session.video_duration || 0)
   const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isFullscreen, ] = useState(false)
   
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true)
@@ -415,18 +412,6 @@ export function EnhancedExpertSessionPlayer({
     }
   }, [isPlaying, hasStartedWatching])
 
-  const handleVolumeChange = useCallback((value: number[]) => {
-    const newVolume = value[0]
-    setVolume(newVolume)
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume
-    }
-    if (newVolume === 0) {
-      setIsMuted(true)
-    } else if (isMuted) {
-      setIsMuted(false)
-    }
-  }, [isMuted])
 
   const toggleMute = useCallback(() => {
     if (!videoRef.current) return

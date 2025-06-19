@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
     QuestionIdSchema,
     UpdateQuestionApiSchema,
@@ -8,9 +7,7 @@ import {
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 interface RouteParams {
-    params: {
-        questionId: string;
-    };
+    params: Promise<{ questionId: string }>;
 }
 
 // --- GET Handler (Get Question Details) ---
@@ -21,22 +18,26 @@ export async function GET(request: Request, { params }: RouteParams) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-        const { user, claims, supabase } = authResult;
+        const { supabase } = authResult;
 
+        // Get params asynchronously
+        const { questionId } = await params;
+        
         // Validate the question ID
-        const validationResult = QuestionIdSchema.safeParse({ questionId: params.questionId });
+        const validationResult = QuestionIdSchema.safeParse({ questionId });
         if (!validationResult.success) {
             return NextResponse.json(
                 { error: 'Invalid question ID', details: validationResult.error.flatten() },
                 { status: 400 }
             );
         }
+        // We already have the validated questionId
 
         // Fetch the question (try assessment_questions first)
         const { data: question, error: questionError } = await supabase
             .from('assessment_questions')
             .select('*')
-            .eq('id', params.questionId)
+            .eq('id', questionId)
             .single();
 
         if (questionError && questionError.code !== 'PGRST116') { // Not found error code
@@ -62,7 +63,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-        const { user, claims, supabase } = authResult;
+        const { supabase } = authResult;
 
         // Get params asynchronously
         const { questionId } = await params;
@@ -134,7 +135,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
-        const { user, claims, supabase } = authResult;
+        const { claims, supabase } = authResult;
 
         // Get params asynchronously
         const { questionId } = await params;

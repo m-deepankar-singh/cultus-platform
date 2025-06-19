@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -42,7 +41,7 @@ interface AssessmentSubmissionResponse {
 
 export async function POST(
   request: NextRequest,
-  context: { params: { moduleId: string } }
+  context: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 1. Validate moduleId

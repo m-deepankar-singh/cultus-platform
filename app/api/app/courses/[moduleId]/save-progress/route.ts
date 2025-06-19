@@ -182,7 +182,7 @@ export async function POST(
     // 9. Calculate updated progress
     const existingDetails = currentProgress?.progress_details as any || {};
     const existingCompletedVideos = currentProgress?.completed_videos || [];
-    let newCompletedVideos = [...existingCompletedVideos];
+    const newCompletedVideos = [...existingCompletedVideos];
     let newVideoCompletionCount = currentProgress?.video_completion_count || 0;
 
     // Update video playback positions

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ProjectTasks } from './ProjectTasks'
-import { Briefcase, RefreshCw, Play, Info, AlertTriangle, FileText, Code, ExternalLink } from 'lucide-react'
+import { Briefcase, RefreshCw, Play, Info, AlertTriangle, FileText, ExternalLink } from 'lucide-react'
 
 interface Project {
   title: string

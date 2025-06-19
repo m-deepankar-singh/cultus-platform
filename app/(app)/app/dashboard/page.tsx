@@ -5,10 +5,9 @@ import { useTheme } from "next-themes";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { Gauge } from "@/components/ui/gauge";
-import { GaugeProgress, CompletionGauge } from "@/components/analytics/gauge-progress-display";
+import { GaugeProgress } from "@/components/analytics/gauge-progress-display";
 import gsap from "gsap";
-import { cn } from "@/lib/utils";
-import { BookOpen, Award, Clock, BarChart, ChevronRight } from "lucide-react";
+import { Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
@@ -36,7 +35,6 @@ interface Product {
 }
 
 export default function Dashboard() {
-  const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);

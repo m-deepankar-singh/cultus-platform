@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { BookOpen, ChevronDown, ChevronUp, FileText, GripVertical, MoreHorizontal, Pencil, Trash } from "lucide-react"
+import { BookOpen, FileText, MoreHorizontal, Pencil, Trash } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -41,7 +41,7 @@ interface ModulesListProps {
   onRefresh: () => void
 }
 
-export function ModulesList({ productId, modules, onEdit, onRefresh }: ModulesListProps) {
+export function ModulesList({ modules, onEdit, onRefresh }: ModulesListProps) {
   const { toast } = useToast()
   const [deleteModule, setDeleteModule] = useState<Module | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)

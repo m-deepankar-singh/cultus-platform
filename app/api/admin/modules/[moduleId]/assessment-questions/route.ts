@@ -33,12 +33,11 @@ const AssessmentQuestionsSchema = z.object({
  */
 export async function GET(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // Await params before destructuring to fix Next.js warning
-    const resolvedParams = await Promise.resolve(params);
-    const { moduleId: rawModuleId } = resolvedParams;
+    const { moduleId: rawModuleId } = await params;
     
     // JWT-based authentication (0 database queries for auth)
     const authResult = await authenticateApiRequest(['Admin']);
@@ -141,12 +140,11 @@ export async function GET(
  */
 export async function PUT(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // Await params before destructuring to fix Next.js warning
-    const resolvedParams = await Promise.resolve(params);
-    const { moduleId: rawModuleId } = resolvedParams;
+    const { moduleId: rawModuleId } = await params;
     
     // JWT-based authentication (0 database queries for auth)
     const authResult = await authenticateApiRequest(['Admin']);

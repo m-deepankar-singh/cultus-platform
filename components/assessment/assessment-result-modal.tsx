@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Award, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Gauge } from "@/components/ui/gauge";
 import { cn } from "@/lib/utils";

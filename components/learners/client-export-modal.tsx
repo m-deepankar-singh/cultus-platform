@@ -69,7 +69,7 @@ export function ClientExportModal({ open, onOpenChange, onExport }: ClientExport
     try {
       await onExport(selectedClientId)
       onOpenChange(false)
-    } catch (error) {
+    } catch {
       // Error handling is done in the parent component
     } finally {
       setIsExporting(false)

@@ -10,7 +10,6 @@ import {
   LiveServerToolCallCancellation,
   Part,
   Session,
-  Modality,
 } from "@google/genai";
 
 import { EventEmitter } from 'eventemitter3';

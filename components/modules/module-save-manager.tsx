@@ -42,7 +42,6 @@ interface ModuleSaveManagerProps {
 }
 
 export function ModuleSaveManager({ 
-  moduleId, 
   moduleType, 
   components, 
   onComplete 

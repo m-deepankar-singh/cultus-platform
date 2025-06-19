@@ -473,7 +473,7 @@ export const manualReviewSchema = z.object({
 // Progress Override Form Component
 interface ProgressOverrideFormProps {
   form: any
-  currentStarLevel?: string
+  currentStarLevel?: "ONE" | "TWO" | "THREE" | "FOUR" | "FIVE" | null
   currentTier?: string
 }
 
@@ -505,6 +505,11 @@ export function ProgressOverrideForm({ form, currentStarLevel, currentTier }: Pr
                 Current Level: {starLevelOptions.find(opt => opt.value === currentStarLevel)?.label || currentStarLevel}
               </Badge>
             )}
+            {currentStarLevel === null && (
+              <Badge variant="outline" className="text-sm">
+                Current Level: ☆ No Stars
+              </Badge>
+            )}
             {currentTier && (
               <Badge variant="outline" className="text-sm">
                 Current Tier: {tierOptions.find(opt => opt.value === currentTier)?.label || currentTier}
@@ -524,7 +529,7 @@ export function ProgressOverrideForm({ form, currentStarLevel, currentTier }: Pr
               <FormLabel>New Star Level</FormLabel>
               <Select 
                 onValueChange={(value) => field.onChange(value === "NONE" ? null : value)} 
-                defaultValue={field.value || "NONE"}
+                defaultValue={field.value === null ? "NONE" : field.value || "NONE"}
               >
                 <FormControl>
                   <SelectTrigger>

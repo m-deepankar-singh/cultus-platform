@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, GraduationCap, Award, Settings, Menu, LucideIcon, Briefcase } from "lucide-react"
+import { Home, Settings, Menu, LucideIcon, Briefcase } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"

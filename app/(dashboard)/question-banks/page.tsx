@@ -17,10 +17,10 @@ interface SearchParams {
   search?: string;
 }
 
-export default async function QuestionBanksPage({ 
+export default async function QuestionBanksPage({
   searchParams 
 }: { 
-  searchParams: SearchParams | Promise<SearchParams>
+  searchParams: Promise<SearchParams>
 }) {
   // Ensure searchParams is awaited
   const params = await searchParams;

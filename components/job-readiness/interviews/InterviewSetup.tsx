@@ -13,7 +13,6 @@ import {
   AlertTriangle, 
   Volume2,
   Loader2,
-  Monitor 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

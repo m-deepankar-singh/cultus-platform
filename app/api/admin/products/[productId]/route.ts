@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Keep this for the instance
 import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
 import { ProductIdSchema, UpdateProductSchema } from '@/lib/schemas/product';
 // Note: File deletion functionality temporarily disabled during S3 migration
@@ -9,7 +8,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 // Handler for fetching details of a specific product
 export async function GET(
   request: Request, 
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -17,7 +16,7 @@ export async function GET(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { supabase } = authResult;
 
     const paramsObj = await params;
 
@@ -125,7 +124,7 @@ async function handleProductUpdate(
 // Handler for updating an existing product
 export async function PUT(
   request: Request, 
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -133,7 +132,7 @@ export async function PUT(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { supabase } = authResult;
 
     const paramsObj = await params;
 
@@ -190,7 +189,7 @@ export async function PUT(
 // Handler for partial updates
 export async function PATCH(
   request: Request, 
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -198,7 +197,7 @@ export async function PATCH(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { supabase } = authResult;
 
     const paramsObj = await params;
 
@@ -255,7 +254,7 @@ export async function PATCH(
 // Handler for deleting a product
 export async function DELETE(
   request: Request, // Keep request parameter for consistency, even if unused
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -263,7 +262,7 @@ export async function DELETE(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { supabase } = authResult;
 
     const paramsObj = await params;
 

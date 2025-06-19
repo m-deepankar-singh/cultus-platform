@@ -6,8 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+// Removed unused Card components and Separator
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -535,7 +534,7 @@ export default function TakeAssessmentPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-neutral-800 dark:text-white">Submit Assessment?</AlertDialogTitle>
             <AlertDialogDescription className="text-neutral-600 dark:text-neutral-400">
-              Are you sure you want to submit your assessment? You won't be able to change your answers after submission.
+              Are you sure you want to submit your assessment? You won&apos;t be able to change your answers after submission.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

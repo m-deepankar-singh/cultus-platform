@@ -1,5 +1,4 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 

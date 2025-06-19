@@ -5,15 +5,13 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertTriangle } from "lucide-react"
 import { 
   JrFormDialog, 
   JrFormWrapper, 
   ManualReviewForm, 
-  manualReviewSchema,
-  LoadingButton 
+  manualReviewSchema
 } from "./shared/jr-form-components"
 import {
   JrSubmission,
@@ -102,7 +100,7 @@ export function JrManualReviewForm({
   if (!submission) return null
 
   const studentName = submission.student 
-    ? `${submission.student.first_name} ${submission.student.last_name}`
+    ? `${submission.student.first_name || ''} ${submission.student.last_name || ''}`.trim() || submission.student.full_name || "Unknown Student"
     : "Unknown Student"
 
   return (
@@ -128,7 +126,7 @@ export function JrManualReviewForm({
               <span className="font-medium">Product:</span> {submission.product?.name || "Unknown"}
             </div>
             <div>
-              <span className="font-medium">Submitted:</span> {formatSubmissionDate(submission.submission_date)}
+              <span className="font-medium">Submitted:</span> {formatSubmissionDate(submission.submission_date || submission.created_at)}
             </div>
           </div>
 
@@ -136,12 +134,16 @@ export function JrManualReviewForm({
             <Badge variant="outline" className="text-xs">
               {getSubmissionTypeLabel(submission.submission_type)}
             </Badge>
-            <Badge variant="outline" className="text-xs">
-              AI Status: {getAiGradeStatusLabel(submission.ai_grade_status)}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              Review: {getManualReviewStatusLabel(submission.manual_review_status)}
-            </Badge>
+            {submission.ai_grade_status && (
+              <Badge variant="outline" className="text-xs">
+                AI Status: {getAiGradeStatusLabel(submission.ai_grade_status)}
+              </Badge>
+            )}
+            {submission.manual_review_status && (
+              <Badge variant="outline" className="text-xs">
+                Review: {getManualReviewStatusLabel(submission.manual_review_status)}
+              </Badge>
+            )}
           </div>
 
           {submission.score !== undefined && (
@@ -169,7 +171,7 @@ export function JrManualReviewForm({
         )}
 
         {/* Warning for already reviewed submissions */}
-        {submission.manual_review_status !== "pending" && (
+        {submission.manual_review_status && submission.manual_review_status !== "pending" && (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
@@ -195,7 +197,7 @@ export function JrManualReviewForm({
             form={form}
             submissionType={submission.submission_type}
             studentName={studentName}
-            submissionDate={formatSubmissionDate(submission.submission_date)}
+            submissionDate={formatSubmissionDate(submission.submission_date || submission.created_at)}
           />
         </JrFormWrapper>
       </div>

@@ -15,7 +15,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  */
 export async function GET(
   request: Request, // Keep request param even if unused for potential future use (e.g., headers)
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)
@@ -152,7 +152,7 @@ const UpdateLearnerSchema = z.object({
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)
@@ -289,7 +289,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)

@@ -1,6 +1,6 @@
 "use client"
 
-import { BarChart, BookOpen, Building2, FileText, GraduationCap, Users } from "lucide-react"
+import { BarChart, Building2, GraduationCap, Users } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserEngagement } from "@/components/analytics/user-engagement"

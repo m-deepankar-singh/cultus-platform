@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { generateProject } from '@/lib/ai/project-generator';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
     
     // Get the associated student record - specific fields needed for project generation
     const { data: student, error: studentError } = await supabase

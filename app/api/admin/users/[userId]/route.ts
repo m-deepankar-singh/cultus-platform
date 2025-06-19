@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Adjust path
 import { UserIdSchema, UpdateUserSchema } from '@/lib/schemas/user'; // Adjust path
 import { createAdminClient } from '@/lib/supabase/admin'; // Adjust path
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: Request, 
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -14,10 +13,10 @@ export async function GET(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
 
     // Validate Route Parameter
-    const validationResult = UserIdSchema.safeParse({ userId: params.userId });
+    const resolvedParams = await params;
+    const validationResult = UserIdSchema.safeParse({ userId: resolvedParams.userId });
     if (!validationResult.success) {
       return NextResponse.json({ error: 'Invalid User ID format', details: validationResult.error.flatten() }, { status: 400 });
     }
@@ -73,7 +72,7 @@ export async function GET(
 
 export async function PUT(
   request: Request, 
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -81,10 +80,10 @@ export async function PUT(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
 
     // Validate Route Parameter
-    const userIdValidation = UserIdSchema.safeParse({ userId: params.userId });
+    const resolvedParams = await params;
+    const userIdValidation = UserIdSchema.safeParse({ userId: resolvedParams.userId });
     if (!userIdValidation.success) {
       return NextResponse.json({ error: 'Invalid User ID format', details: userIdValidation.error.flatten() }, { status: 400 });
     }
@@ -173,7 +172,7 @@ export async function PUT(
 
 export async function DELETE(
   request: Request, 
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -181,10 +180,10 @@ export async function DELETE(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
 
     // Validate Route Parameter
-    const validationResult = UserIdSchema.safeParse({ userId: params.userId });
+    const resolvedParams = await params;
+    const validationResult = UserIdSchema.safeParse({ userId: resolvedParams.userId });
     if (!validationResult.success) {
       return NextResponse.json({ error: 'Invalid User ID format', details: validationResult.error.flatten() }, { status: 400 });
     }

@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -18,7 +17,7 @@ export async function POST(req: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     const body = await req.json();
     
@@ -192,7 +191,7 @@ export async function POST(req: NextRequest) {
     const tierQuestions = questionsByBackgroundAndTier[validBackground][currentTier];
     
     // Generate more questions to meet the required count (simple solution for placeholder)
-    let questions = [];
+    const questions = [];
     for (let i = 0; i < questionCount; i++) {
       const baseQuestion = tierQuestions[i % tierQuestions.length];
       questions.push({

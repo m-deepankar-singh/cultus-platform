@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -50,7 +49,7 @@ interface QuestionData {
 
 export async function GET(
   request: NextRequest,
-  context: { params: { moduleId: string } }
+  context: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // Validate moduleId

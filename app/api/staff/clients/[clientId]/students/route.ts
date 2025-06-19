@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { EnrollStudentSchema } from '@/lib/schemas/enrollment';
@@ -9,7 +8,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: Request,
-  { params }: { params: { clientId: string } }
+  { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries)
@@ -63,7 +62,7 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { clientId: string } }
+  { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
         // JWT-based authentication (0 database queries)
@@ -71,7 +70,7 @@ export async function POST(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, claims } = authResult;
 
     // Get role and client_id from JWT claims
     const userRole = claims.user_role;
@@ -276,7 +275,7 @@ export async function POST(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { clientId: string } }
+  { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
     // Extract the studentId from query parameters
@@ -372,7 +371,7 @@ if (!studentIdValidation.success) {
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { clientId: string } }
+  { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
     // Extract the studentId from query parameters
@@ -427,7 +426,7 @@ export async function PATCH(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, claims } = authResult;
 
     // Get role and client_id from JWT claims
     const userRole = claims.user_role;

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+
 import { callGeminiWithRetry, logAICall } from './gemini-client';
 
 // Define types for project grading

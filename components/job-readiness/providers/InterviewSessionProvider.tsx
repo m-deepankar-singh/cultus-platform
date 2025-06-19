@@ -125,7 +125,7 @@ export function InterviewSessionProvider({
       setSessionId(newSessionId);
       
       // Fetch student profile and questions (which includes background data)
-      const [profileData, questionsResponse] = await Promise.all([
+      const [, questionsResponse] = await Promise.all([
         fetchStudentProfile(),
         fetchQuestions(bgId)
       ]);

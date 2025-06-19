@@ -15,8 +15,6 @@ export function JrPromotionExamStats({ attempts }: JrPromotionExamStatsProps) {
   const totalAttempts = attempts.length
   const completedAttempts = attempts.filter(attempt => attempt.status === 'COMPLETED')
   const passedAttempts = attempts.filter(attempt => attempt.passed === true)
-  const failedAttempts = attempts.filter(attempt => attempt.passed === false)
-  const inProgressAttempts = attempts.filter(attempt => attempt.status === 'IN_PROGRESS')
   
   const passRate = completedAttempts.length > 0 ? (passedAttempts.length / completedAttempts.length) * 100 : 0
   const averageScore = completedAttempts.length > 0 

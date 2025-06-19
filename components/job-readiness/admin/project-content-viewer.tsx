@@ -22,7 +22,6 @@ import {
   ExternalLink, 
   AlertTriangle, 
   User, 
-  Calendar, 
   Tag, 
   Star,
   ChevronRight,
@@ -142,7 +141,7 @@ export function ProjectContentViewer({
         title: "Copied to Clipboard",
         description: `${label} has been copied to your clipboard.`,
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Copy Failed",
         description: "Failed to copy to clipboard.",

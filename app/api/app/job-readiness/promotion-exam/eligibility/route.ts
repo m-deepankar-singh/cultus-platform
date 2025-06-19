@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -133,7 +132,7 @@ export async function GET(req: NextRequest) {
     }
 
     // If the student has any successful attempts for this star level, they can't take it again
-    const hasPassedExam = previousAttempts?.some((attempt: any) => attempt.passed);
+    const hasPassedExam = previousAttempts?.some((attempt: { passed: boolean }) => attempt.passed);
     if (hasPassedExam) {
       return NextResponse.json({ 
         error: 'You have already passed a promotion exam for this star level',

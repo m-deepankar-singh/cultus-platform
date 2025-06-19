@@ -10,22 +10,7 @@ interface ProjectDetails {
   submission_type: 'text_input';
 }
 
-interface StudentData {
-  id: string;
-  job_readiness_background_type: string;
-  job_readiness_tier: 'BRONZE' | 'SILVER' | 'GOLD';
-}
 
-interface ProjectConfig {
-  background_type: string;
-  tier: string;
-  bronze_system_prompt?: string;
-  bronze_input_prompt?: string;
-  silver_system_prompt?: string;
-  silver_input_prompt?: string;
-  gold_system_prompt?: string;
-  gold_input_prompt?: string;
-}
 
 /**
  * Generates a real-world project based on student background and tier

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 /**
@@ -8,7 +7,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  * Returns information about the currently authenticated user
  * including their profile data and role from JWT claims.
  */
-export async function GET(request: Request) {
+export async function GET() {
   try {
     // JWT-based authentication (0 database queries for basic user info)
     const authResult = await authenticateApiRequest();
@@ -28,7 +27,7 @@ export async function GET(request: Request) {
 
          // For students, get additional data from database (minimal query)
      if (isStudent || userRole === 'student') {
-       const { data: studentData, error: studentError } = await supabase
+       const { data: studentData } = await supabase
          .from('students')
          .select('full_name, job_readiness_background_type, job_readiness_tier, job_readiness_star_level')
          .eq('id', user.id)
@@ -50,7 +49,7 @@ export async function GET(request: Request) {
        });
     } else if (userRole && ['Admin', 'Staff', 'Client Staff', 'Viewer'].includes(userRole)) {
       // For admin/staff users, get full_name from profiles table
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('full_name')
         .eq('id', user.id)

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Award, Brain, CheckCircle, X, AlertCircle } from 'lucide-react'
+import { Brain, CheckCircle, X, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface QuizOption {
@@ -31,7 +31,7 @@ interface AiQuizProps {
   onReturnToCourse?: () => void
 }
 
-export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingAttempts, onReturnToCourse }: AiQuizProps) {
+export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingAttempts }: AiQuizProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
   const [showResults, setShowResults] = useState(false)

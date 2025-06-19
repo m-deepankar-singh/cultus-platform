@@ -15,7 +15,7 @@ export function ProjectAIFeedbackDisplay({ feedback }: ProjectAIFeedbackDisplayP
   
   try {
     parsedFeedback = typeof feedback === 'string' ? JSON.parse(feedback) : feedback
-  } catch (e) {
+  } catch {
     // If parsing fails, display as raw text with better formatting
     return (
       <Card>

@@ -20,9 +20,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from "@/components/ui/use-toast"
-import { createUser, updateUser, UserFormState } from '@/app/actions/userActions'
+import { UserFormState } from '@/app/actions/userActions'
 import { Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 // Define the schema again (can be imported from actions if preferred and compatible)
 const BaseUserSchema = z.object({
@@ -40,7 +39,7 @@ const UserFormSchema = BaseUserSchema.refine((data) => {
     if (data.role === 'Client Staff' && !data.clientId) return false;
     return true;
 }, { message: "Client selection is required for Client Staff role", path: ['clientId'] })
-  .refine((data) => {
+  .refine(() => {
       // Require password only in create mode (when initialData is not present)
       // This logic depends on how you differentiate modes in the component call
       // For simplicity, we'll handle this check outside the main zod schema for now
@@ -49,13 +48,6 @@ const UserFormSchema = BaseUserSchema.refine((data) => {
       return true; // Placeholder - actual check might be more complex
   });
 
-// Update schema needs userId
-const UserUpdateSchema = BaseUserSchema.omit({ password: true })
-    .extend({ userId: z.string().min(1) })
-    .refine((data) => {
-        if (data.role === 'Client Staff' && !data.clientId) return false;
-        return true;
-    }, { message: "Client selection is required for Client Staff role", path: ['clientId'] });
 
 type UserFormValues = z.infer<typeof UserFormSchema>;
 

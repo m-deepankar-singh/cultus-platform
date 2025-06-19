@@ -1,4 +1,3 @@
-import { PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { s3Client } from './s3-client';
 import { 

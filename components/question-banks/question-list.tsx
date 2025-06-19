@@ -41,7 +41,7 @@ interface QuestionListProps {
 export default function QuestionList({ questions: initialQuestions, initialData }: QuestionListProps) {
   // States for pagination
   const [currentPage, setCurrentPage] = useState(initialData?.metadata.currentPage || 1);
-  const [pageSize, setPageSize] = useState(initialData?.metadata.pageSize || 10);
+  const [pageSize] = useState(initialData?.metadata.pageSize || 10);
   const [totalItems, setTotalItems] = useState(initialData?.metadata.totalCount || 0);
   const [totalPages, setTotalPages] = useState(initialData?.metadata.totalPages || 1);
   

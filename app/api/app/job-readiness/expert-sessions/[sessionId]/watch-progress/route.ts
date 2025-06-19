@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -85,7 +84,7 @@ export async function POST(
     let body;
     try {
       body = await req.json();
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid JSON in request body' },
         { status: 400 }
@@ -111,7 +110,6 @@ export async function POST(
       completion_percentage,
       video_duration,
       force_completion,
-      product_id,
       trigger_type,
       milestone
     } = validation.data;
@@ -193,7 +191,7 @@ export async function POST(
     }
 
     // 7. Verify enrollment - check if student's client has access to at least one of the products
-    const productIds = assignedProducts.map((p: any) => p.product_id);
+    const productIds = assignedProducts.map((p: { product_id: string }) => p.product_id);
     
     const { data: clientAssignments, error: assignmentError } = await supabase
       .from('client_product_assignments')
@@ -213,7 +211,7 @@ export async function POST(
     const isCompleted = finalCompletionPercentage >= 95 || force_completion; // 95% threshold or forced completion
 
     // 9. Get current progress to check if this is a new completion
-    const { data: existingProgress, error: existingProgressError } = await supabase
+    const { data: existingProgress } = await supabase
       .from('job_readiness_expert_session_progress')
       .select('watch_time_seconds, completion_percentage, is_completed, last_milestone_reached')
       .eq('student_id', studentId)
@@ -254,7 +252,7 @@ export async function POST(
     }
 
     // 11. Calculate overall expert session progress across all sessions
-    const { data: allSessionsProgress, error: allProgressError } = await supabase
+    const { data: allSessionsProgress } = await supabase
       .from('job_readiness_expert_session_progress')
       .select('expert_session_id, is_completed')
       .eq('student_id', studentId);

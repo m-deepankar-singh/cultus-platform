@@ -139,7 +139,7 @@ export async function GET() {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
     
     // In a real implementation, we'd:
     // 1. ✅ User authentication and authorization completed (Admin/Staff roles verified)

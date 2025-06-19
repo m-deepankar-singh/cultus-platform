@@ -27,7 +27,7 @@ export const UpdateUserSchema = z.object({
   client_id: z.string().uuid({ message: 'Invalid Client ID' }).optional().nullable(),
   full_name: z.string().min(1, { message: 'Full name cannot be empty' }).optional(),
   // Add other updatable profile fields as optional
-}).refine(data => {
+}).refine(() => {
     // This refinement logic depends heavily on business rules.
     // Example: Ensure client_id is present if role is set to 'Client Staff'.
     // If updating *to* 'Client Staff', client_id should likely be provided in the *same* update.

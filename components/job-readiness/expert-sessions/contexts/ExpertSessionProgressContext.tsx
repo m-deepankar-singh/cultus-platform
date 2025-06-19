@@ -87,7 +87,6 @@ type ProgressAction =
 // Constants
 const MILESTONES = [10, 25, 50, 75, 90, 95, 100]
 const COMPLETION_THRESHOLD = 95
-const PAUSE_THRESHOLD = 30 // seconds
 
 // Reducer
 function progressReducer(state: ExpertSessionProgressState, action: ProgressAction): ExpertSessionProgressState {

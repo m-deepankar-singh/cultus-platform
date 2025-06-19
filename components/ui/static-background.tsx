@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 
 function StaticPaths({ position }: { position: number }) {
     const paths = Array.from({ length: 36 }, (_, i) => ({

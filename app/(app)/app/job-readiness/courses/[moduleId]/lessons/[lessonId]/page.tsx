@@ -12,7 +12,6 @@ import Link from 'next/link'
 
 export default function LessonPage() {
   const params = useParams()
-  const router = useRouter()
   const moduleId = params.moduleId as string
   const lessonId = params.lessonId as string
 
@@ -128,7 +127,25 @@ export default function LessonPage() {
           courseName={courseData.module.name}
           previousLesson={previousLesson}
           nextLesson={nextLesson}
-          progressData={courseData.progress}
+          progressData={{
+            completed_videos: courseData.progress.fully_watched_video_ids || [],
+            video_completion_count: courseData.progress.fully_watched_video_ids?.length || 0,
+            course_completed_at: null, // This would need to be calculated based on business logic
+            last_viewed_lesson_sequence: courseData.progress.last_viewed_lesson_sequence,
+            lesson_quiz_results: Object.fromEntries(
+              Object.entries(courseData.progress.lesson_quiz_results || {}).map(([lessonId, result]) => [
+                lessonId,
+                {
+                  score: result.score,
+                  total_questions: 0, // This field is missing in CourseProgress type
+                  passed: result.passed,
+                  attempts: result.attempts,
+                  answers: {}, // This field is missing in CourseProgress type
+                  submitted_at: new Date().toISOString() // This field is missing in CourseProgress type
+                }
+              ])
+            )
+          }}
         />
       </div>
     </JobReadinessLayout>

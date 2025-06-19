@@ -23,7 +23,7 @@ interface PaginatedResponse<T> {
 
 export function LearnersHeader() {
   const [clients, setClients] = useState<Client[]>([])
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const { toast } = useToast()
 
   // Fetch clients for the dropdown

@@ -3,14 +3,19 @@
 import { Suspense } from 'react'
 import { CourseOverview } from '@/components/courses/CourseOverview'
 import { useEnhancedCourseContent } from '@/hooks/useEnhancedCourseContent'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 
+interface CourseApiResponse {
+  course: any;
+  progress: any;
+}
+
 // Transform API response to component props
-function transformCourseData(apiResponse: any) {
+function transformCourseData(apiResponse: CourseApiResponse) {
   const { course, progress } = apiResponse
 
   // Transform course data to match CourseOverview component expectations

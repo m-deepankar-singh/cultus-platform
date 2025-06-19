@@ -13,8 +13,6 @@ import {
 import { 
   JrStudentProgress,
   OverrideProgressRequest,
-  getStarLevelLabel,
-  getTierLevelLabel
 } from "@/lib/api/job-readiness/progress"
 
 interface JrProgressOverrideFormProps {

@@ -1,27 +1,31 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Assuming this path is correct, adjust if needed
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
-export async function GET(request: Request, { params }: { params: { clientId: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ clientId: string }> }
+) {
   try {
+    const resolvedParams = await params;
+    const { clientId } = resolvedParams;
+
     // JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequest(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     // --- User is authenticated and has an allowed role (Staff or Admin), proceed ---
 
     // 3. Validate route parameter
-    const validationResult = ClientIdSchema.safeParse(params);
+    const validationResult = ClientIdSchema.safeParse({ clientId });
     if (!validationResult.success) {
         console.error('Validation Error (clientId):', validationResult.error.errors);
         return NextResponse.json({ error: 'Invalid Client ID format', details: validationResult.error.flatten() }, { status: 400 });
     }
-    const { clientId } = validationResult.data;
 
     // 4. Fetch Client Details (RLS Enforced)
     // RLS policies will automatically prevent Staff from accessing clients they aren't assigned to.
@@ -58,24 +62,29 @@ export async function GET(request: Request, { params }: { params: { clientId: st
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { clientId: string } }) {
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ clientId: string }> }
+) {
   try {
+    const resolvedParams = await params;
+    const { clientId } = resolvedParams;
+
     // JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequest(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     // --- User is authenticated and has an allowed role (Staff or Admin), proceed ---
 
     // 3. Validate route parameter
-    const paramValidation = ClientIdSchema.safeParse(params);
+    const paramValidation = ClientIdSchema.safeParse({ clientId });
     if (!paramValidation.success) {
         console.error('Validation Error (clientId):', paramValidation.error.errors);
         return NextResponse.json({ error: 'Invalid Client ID format', details: paramValidation.error.flatten() }, { status: 400 });
     }
-    const { clientId } = paramValidation.data;
 
     // 4. Parse and validate request body
     let body;

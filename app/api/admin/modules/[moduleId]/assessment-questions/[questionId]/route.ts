@@ -17,7 +17,7 @@ const QuestionIdSchema = z.object({
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { moduleId: string; questionId: string } }
+  { params }: { params: Promise<{ moduleId: string; questionId: string }> }
 ) {
   try {
     // Await params to ensure moduleId and questionId are available

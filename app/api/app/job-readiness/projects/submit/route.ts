@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { gradeProject } from '@/lib/ai/project-grader';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -15,7 +14,7 @@ export async function POST(req: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     const body = await req.json();
     
@@ -76,7 +75,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Check if the student has already submitted a SUCCESSFUL project for this product
-    const { data: existingSubmission, error: existingError } = await supabase
+    const { data: existingSubmission } = await supabase
       .from('job_readiness_ai_project_submissions')
       .select('id, passed, score')
       .eq('student_id', user.id)

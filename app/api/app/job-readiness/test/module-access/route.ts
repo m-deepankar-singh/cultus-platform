@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkModuleAccess, JOB_READINESS_MODULE_ORDER, JobReadinessModuleType } from '@/lib/api/job-readiness/check-module-access';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -18,7 +17,7 @@ export async function GET(req: NextRequest) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     const url = new URL(req.url);
     const moduleType = url.searchParams.get('moduleType') as JobReadinessModuleType;

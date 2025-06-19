@@ -29,15 +29,14 @@ import { AssessmentQuestionManager } from "@/components/modules/assessment-quest
 import { QuestionsTabButton } from "@/components/modules/questions-tab-button"
 
 interface ModulePageProps {
-  params: {
+  params: Promise<{
     moduleId: string
-  }
+  }>
 }
 
 export default async function ModuleDetailPage({ params }: ModulePageProps) {
   // Await params before destructuring to avoid NextJS error
-  const resolvedParams = await Promise.resolve(params);
-  const { moduleId } = resolvedParams;
+  const { moduleId } = await params;
   const supabase = await createClient()
 
   // Fetch basic module info to display

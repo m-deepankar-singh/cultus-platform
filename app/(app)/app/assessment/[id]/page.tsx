@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
@@ -36,7 +36,7 @@ interface InProgressAttempt {
   last_updated: string;
   remaining_time_seconds?: number;
   timer_paused?: boolean;
-  saved_answers?: Record<string, any>; // question_id: answer
+  saved_answers?: Record<string, string | string[]>; // question_id: answer
 }
 
 interface AssessmentPageData {

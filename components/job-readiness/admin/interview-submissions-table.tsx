@@ -37,10 +37,8 @@ import { JrDataTable } from "./shared/jr-data-table"
 import { InterviewVideoPlayer } from "./interview-video-player"
 import { InterviewManualReviewEnhanced } from "./interview-manual-review-enhanced"
 import {
-  JrSubmission,
   JrSubmissionsFilters,
   formatSubmissionDate,
-  requiresManualReview,
 } from "@/lib/api/job-readiness/submissions"
 
 // Quick Verdict Toggle Component
@@ -125,7 +123,7 @@ function AIFeedbackDisplay({ feedback }: { feedback: string | object }) {
   let parsedFeedback = null
   try {
     parsedFeedback = typeof feedback === 'string' ? JSON.parse(feedback) : feedback
-  } catch (e) {
+  } catch {
     return <div className="text-red-500">Error parsing AI feedback</div>
   }
 
@@ -138,7 +136,6 @@ function AIFeedbackDisplay({ feedback }: { feedback: string | object }) {
     technical_knowledge,
     problem_solving,
     confidence_and_presence,
-    interview_engagement,
     areas_for_improvement,
     strengths,
     overall_assessment,
@@ -316,13 +313,10 @@ interface InterviewSubmissionsTableProps {
 export function InterviewSubmissionsTable({
   interviews,
   isLoading = false,
-  onReviewSubmission,
-  onViewVideo,
   onViewDetails,
   onRefresh,
   filters,
   onFiltersChange,
-  products = [],
   clients = [],
 }: InterviewSubmissionsTableProps) {
   const { toast } = useToast()

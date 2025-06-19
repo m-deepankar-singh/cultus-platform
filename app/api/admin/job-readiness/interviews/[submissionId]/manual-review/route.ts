@@ -13,10 +13,10 @@ const manualReviewSchema = z.object({
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { submissionId: string } }
+  { params }: { params: Promise<{ submissionId: string }> }
 ) {
   try {
-    const { submissionId } = params;
+    const { submissionId } = await params;
 
     if (!submissionId) {
       return NextResponse.json(

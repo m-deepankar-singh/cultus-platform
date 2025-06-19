@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 
-import { createClient } from '@/lib/supabase/server';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { ProductAssignmentSchema } from '@/lib/schemas/assignment';
-import type { Product, ClientProductAssignment } from '@/lib/types/supabase';
+import type { Product } from '@/lib/types/supabase';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define the expected structure of the assignment data including the joined product
@@ -19,7 +17,7 @@ type AssignmentWithProduct = {
  */
 export async function GET(
   request: Request,
-  context: { params: { clientId: string } }
+  context: { params: Promise<{ clientId: string }> }
 ) {
   // Properly await the params object
   const params = await context.params;
@@ -29,7 +27,7 @@ export async function GET(
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
-  const { user, claims, supabase } = authResult;
+  const { supabase } = authResult;
 
   // Validate clientId from route params
   const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
@@ -88,7 +86,7 @@ export async function GET(
  */
 export async function POST(
   request: Request,
-  context: { params: { clientId: string } }
+  context: { params: Promise<{ clientId: string }> }
 ) {
   // Properly await the params object
   const params = await context.params;
@@ -98,7 +96,7 @@ export async function POST(
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
-  const { user, claims, supabase } = authResult;
+  const { supabase } = authResult;
   
   // Validate clientId from route params
   const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });

@@ -18,10 +18,11 @@ const QuestionMappingsSchema = z.object({
 // GET - Retrieve all question bank mappings for a lesson
 export async function GET(
   request: Request,
-  { params }: { params: { moduleId: string; lessonId: string } }
+  { params }: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
-    const { moduleId, lessonId } = params;
+    const resolvedParams = await params;
+    const { moduleId, lessonId } = resolvedParams;
     
     if (!moduleId || !lessonId) {
       return NextResponse.json({ error: 'Module ID and Lesson ID are required' }, { status: 400 });
@@ -80,10 +81,11 @@ export async function GET(
 // POST - Add or update question mappings for a lesson
 export async function POST(
   request: Request,
-  { params }: { params: { moduleId: string; lessonId: string } }
+  { params }: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
-    const { moduleId, lessonId } = params;
+    const resolvedParams = await params;
+    const { moduleId, lessonId } = resolvedParams;
     
     if (!moduleId || !lessonId) {
       return NextResponse.json({ error: 'Module ID and Lesson ID are required' }, { status: 400 });
@@ -173,10 +175,11 @@ export async function POST(
 // DELETE - Remove all question mappings for a lesson
 export async function DELETE(
   request: Request,
-  { params }: { params: { moduleId: string; lessonId: string } }
+  { params }: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
-    const { moduleId, lessonId } = params;
+    const resolvedParams = await params;
+    const { moduleId, lessonId } = resolvedParams;
     
     if (!moduleId || !lessonId) {
       return NextResponse.json({ error: 'Module ID and Lesson ID are required' }, { status: 400 });

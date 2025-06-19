@@ -515,7 +515,7 @@ export async function analyzeInterview(submissionId: string, userId: string) {
     writeFileSync(tempFilePath, videoBuffer);
     console.log(`✅ Temp file created: ${tempFilePath}, size: ${videoBuffer.length} bytes`);
 
-    let tempFileCreated = true;
+    const tempFileCreated = true;
 
     try {
       // Upload video to Gemini Files API
@@ -765,7 +765,6 @@ You are an expert interview assessor conducting a comprehensive evaluation of a 
       };
 
     } catch (geminiError) {
-      const errorMessage = geminiError instanceof Error ? geminiError.message : 'Unknown error';
       console.error('❌ Gemini API error:', geminiError);
       
       console.log('🔄 Updating status to error due to Gemini failure...');

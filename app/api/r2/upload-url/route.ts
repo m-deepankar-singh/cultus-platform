@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 // - /api/admin/job-readiness/expert-sessions/upload-video (for expert sessions)
 // - /api/admin/job-readiness/interviews/upload-video (for interviews)
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   return NextResponse.json(
     { 
       success: false, 

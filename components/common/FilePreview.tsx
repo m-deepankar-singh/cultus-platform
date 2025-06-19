@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Eye, 
   Download, 
@@ -19,7 +19,14 @@ import {
   ZoomIn,
   X 
 } from 'lucide-react';
-import { type UploadFile } from '@/hooks/useR2Upload';
+// Local type definition (replaces legacy useR2Upload import)
+interface UploadFile {
+  file: File;
+  key?: string;
+  url?: string;
+  progress?: number;
+  status?: 'uploading' | 'completed' | 'error';
+}
 
 interface FilePreviewProps {
   file: UploadFile;
@@ -123,7 +130,6 @@ function ImagePreview({
 // Video Preview Component
 function VideoPreview({ 
   publicUrl, 
-  file 
 }: { 
   publicUrl?: string; 
   file: UploadFile;

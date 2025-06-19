@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { analyzeInterview } from './analyze-function';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 

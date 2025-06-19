@@ -7,7 +7,7 @@ import gsap from "gsap";
 export function CustomCursor() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const cursorDotRef = useRef<HTMLDivElement>(null);
-  const { theme, resolvedTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   
   useEffect(() => {
     const cursor = cursorRef.current;

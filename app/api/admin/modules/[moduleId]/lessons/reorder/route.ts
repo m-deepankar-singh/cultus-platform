@@ -18,7 +18,7 @@ function debugLog(message: string, data: any) {
  */
 export async function PUT(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -29,7 +29,7 @@ export async function PUT(
     const { user, claims, supabase } = authResult;
 
     // Await params before destructuring to fix Next.js warning
-    const resolvedParams = await Promise.resolve(params);
+    const resolvedParams = await params;
     const { moduleId: rawModuleId } = resolvedParams;
     debugLog("Request params", { rawModuleId });
     

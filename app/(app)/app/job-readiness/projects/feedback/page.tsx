@@ -8,11 +8,11 @@ interface SearchParams {
 }
 
 interface ProjectFeedbackPageProps {
-  searchParams: SearchParams
+  searchParams: Promise<SearchParams>
 }
 
-export default function ProjectFeedbackPage({ searchParams }: ProjectFeedbackPageProps) {
-  const { submissionId } = searchParams
+export default async function ProjectFeedbackPage({ searchParams }: ProjectFeedbackPageProps) {
+  const { submissionId } = await searchParams
 
   // This page would typically fetch submission results by ID
   // For now, we'll redirect users to the main projects page

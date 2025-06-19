@@ -92,7 +92,7 @@ export async function callGeminiAPI<T>(
         // The API should return properly formatted JSON now
         const jsonData = JSON.parse(text) as T;
         return { data: jsonData, success: true };
-      } catch (parseError) {
+      } catch {
         console.error('Error parsing JSON from Gemini API response:', text);
         return {
           data: null as unknown as T,
@@ -117,7 +117,7 @@ export async function callGeminiAPI<T>(
       try {
         const jsonData = JSON.parse(text) as T;
         return { data: jsonData, success: true };
-      } catch (parseError) {
+      } catch {
         // If it's not valid JSON, return the raw text
         return { data: text as unknown as T, success: true };
       }

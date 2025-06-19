@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -15,7 +14,7 @@ import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selector
  */
 export async function GET(
   request: Request,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries)
@@ -29,8 +28,10 @@ export async function GET(
     const userRole = claims.user_role;
     const sessionClientId = claims.client_id;
 
-    // 2. Validate Route Parameter (studentId)
-    const validationResult = UserIdSchema.safeParse({ userId: params.studentId });
+    // Await params before validation
+    const resolvedParams = await params;
+    const { studentId: rawStudentId } = resolvedParams;
+    const validationResult = UserIdSchema.safeParse({ userId: rawStudentId });
 
     if (!validationResult.success) {
       return new NextResponse(
@@ -65,7 +66,7 @@ export async function GET(
     // 4. Verify Staff Access (Crucial Step)
     if (userRole === 'Staff') {
       if (!sessionClientId) {
-         console.warn(`Staff user ${user.id} accessing learner ${studentId} has no client_id assigned.`);
+         console.warn(`Staff user ${user.id} accessing learner ${rawStudentId} has no client_id assigned.`);
          return new NextResponse(JSON.stringify({ error: 'Forbidden: Staff user not assigned to a client' }), {
             status: 403,
             headers: { 'Content-Type': 'application/json' },

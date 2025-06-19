@@ -23,7 +23,7 @@ interface AddUserDialogProps {
 export function AddUserDialog({ clients: initialClients }: AddUserDialogProps) {
     const [open, setOpen] = React.useState(false);
     const [clients, setClients] = React.useState<Client[]>(initialClients || []);
-    const [isLoading, setIsLoading] = React.useState(false);
+    const [, setIsLoading] = React.useState(false);
 
     // Fetch clients when the dialog opens to ensure we have the most up-to-date list
     React.useEffect(() => {

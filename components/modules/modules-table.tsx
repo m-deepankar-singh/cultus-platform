@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { 
   ArrowUpDown, 
-  ChevronDown, 
   MoreHorizontal,
   Pencil,
   Trash,
@@ -78,7 +77,7 @@ export function ModulesTable({ initialModules = [], isAdmin, initialType = "all"
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize] = useState(20)
   
   // Filter and sort state
   const [searchTerm, setSearchTerm] = useState("")

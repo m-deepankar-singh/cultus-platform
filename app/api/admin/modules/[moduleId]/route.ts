@@ -13,7 +13,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -64,7 +64,7 @@ export async function GET(
  */
 export async function PUT(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -158,7 +158,7 @@ export async function PUT(
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -252,7 +252,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)

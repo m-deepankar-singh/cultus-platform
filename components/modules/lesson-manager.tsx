@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronUp, ChevronDown, Pencil, Trash, Grip, Plus, Save } from "lucide-react"
+import { ChevronUp, ChevronDown, Pencil, Trash, Plus, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { 
   Dialog, 
   DialogContent, 

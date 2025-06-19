@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MoreHorizontal, Search, SlidersHorizontal, Upload, Download } from "lucide-react"
+import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Learner } from "./learners-table"
 import { format } from "date-fns"
@@ -74,7 +74,7 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
   
   // State for all clients - used for edit dialog
   const [allClients, setAllClients] = useState<Client[]>([])
-  const [loadingClients, setLoadingClients] = useState(true)
+  const [, setLoadingClients] = useState(true)
   
   // State for edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -88,7 +88,6 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
   // Debounced search term
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   
-  const router = useRouter()
   const { toast } = useToast()
 
   // Debounce search term to avoid too many API calls

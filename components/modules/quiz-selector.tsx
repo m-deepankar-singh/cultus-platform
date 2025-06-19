@@ -48,7 +48,6 @@ export function QuizSelector({
   selectedQuestions = [], 
   onChange, 
   disabled = false,
-  lessonId 
 }: QuizSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])

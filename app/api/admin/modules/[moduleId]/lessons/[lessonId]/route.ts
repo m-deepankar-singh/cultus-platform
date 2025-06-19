@@ -22,7 +22,7 @@ const LessonUpdateSchema = z.object({
  */
 export async function GET(
   request: Request,
-  { params }: { params: { moduleId: string; lessonId: string } }
+  { params }: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
     // Await params before destructuring to fix Next.js warning
@@ -93,7 +93,7 @@ export async function GET(
  */
 export async function PUT(
   request: Request,
-  { params }: { params: { moduleId: string; lessonId: string } }
+  { params }: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
     // Await params before destructuring to fix Next.js warning
@@ -191,7 +191,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { moduleId: string; lessonId: string } }
+  { params }: { params: Promise<{ moduleId: string; lessonId: string }> }
 ) {
   try {
     // Await params before destructuring to fix Next.js warning

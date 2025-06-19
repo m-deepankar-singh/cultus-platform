@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -23,16 +23,7 @@ const generateLast30DaysTrendData = () => {
   return data;
 };
 
-// Dummy data for the chart trend (as live trend data is not available from the current action)
-const defaultWeeklyTrendData = [
-  { name: "Week 1", activeUsers: 1800 },
-  { name: "Week 2", activeUsers: 2100 },
-  { name: "Week 3", activeUsers: 2000 },
-  { name: "Week 4", activeUsers: 2400 },
-  { name: "Week 5", activeUsers: 2900 },
-  { name: "Week 6", activeUsers: 2800 },
-  { name: "Week 7", activeUsers: 3100 },
-];
+
 
 // Define props
 interface UserEngagementProps {

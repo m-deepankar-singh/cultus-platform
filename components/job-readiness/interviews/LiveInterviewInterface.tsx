@@ -16,17 +16,12 @@ interface LiveInterviewInterfaceProps {
 
 export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfaceProps) {
   const {
-    client,
     connected,
     connecting,
-    recording,
     timeRemaining,
     interviewStarted,
     audioInputEnabled,
-    sessionActive,
     inactivityWarning,
-    connect,
-    disconnect,
     startInterview,
     submitInterview,
     toggleAudioInput,
@@ -43,7 +38,6 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   } = useInterviewSession();
 
   // Local state for media controls
-  const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [submitting, setSubmitting] = useState(false);

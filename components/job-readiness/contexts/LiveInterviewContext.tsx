@@ -111,7 +111,6 @@ export function LiveInterviewProvider({
   const INACTIVITY_WARNING_TIME = 8 * 60 * 1000; // 8 minutes
   const INACTIVITY_DISCONNECT_TIME = 10 * 60 * 1000; // 10 minutes
   const HEARTBEAT_INTERVAL = 30 * 1000; // 30 seconds
-  const CONNECTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes max connection without activity
 
   // Initialize client
   useEffect(() => {

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, RotateCw, CheckCircle2, Star, AlertCircle } from 'lucide-react'
+import { Play, Pause, Volume2, VolumeX, Maximize, CheckCircle2, Star, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { 
   SAVE_TRIGGERS,
@@ -17,9 +17,7 @@ import {
   calculateCompletionPercentage,
   shouldSaveMilestone,
   shouldSaveOnPause,
-  shouldMarkAsCompleted,
   calculateDisplayProgress,
-  determineSaveTrigger,
   getPassedMilestones,
   getMilestoneMarkers
 } from '@/lib/utils/progress-utils'

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { createClient } from '@/lib/supabase/server';
 // Import the correct schema for module updates
-import { ModuleProgressUpdateSchema } from '@/lib/schemas/progress';
 import type { NextRequest } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -41,7 +39,7 @@ export async function PATCH(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     // Verify the module exists and is a course
     const { data: moduleData, error: moduleError } = await supabase
@@ -149,8 +147,8 @@ export async function PATCH(
  * - Returns the progress or a default 'NotStarted' state.
  */
 export async function GET(
-  request: Request, // Keep request parameter for consistency, though not used directly
-  { params }: { params: { moduleId: string } },
+  request: Request,
+  { params }: { params: Promise<{ moduleId: string }> },
 ) {
   try {
     // 1. Validate Route Parameter (moduleId)

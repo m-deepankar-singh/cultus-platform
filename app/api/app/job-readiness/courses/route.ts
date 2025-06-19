@@ -1,5 +1,4 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -11,14 +10,36 @@ interface CourseModuleOutput {
   id: string;
   name: string;
   type: string;
-  configuration?: Record<string, any> | null;
+  configuration?: Record<string, unknown> | null;
   sequence: number;
   is_unlocked: boolean;
   is_completed: boolean;
-  progress: any | null;
+  progress: StudentModuleProgress | null;
   lessons_count: number;
   description?: string | null;
   completion_percentage?: number;
+}
+
+interface StudentModuleProgress {
+  student_id: string;
+  module_id: string;
+  status: string;
+  progress_percentage: number;
+  completed_videos: string[];
+  video_completion_count: number;
+  course_completed_at?: string | null;
+  completed_at?: string | null;
+  last_updated?: string;
+}
+
+interface CourseModule {
+  id: string;
+  name: string;
+  type: string;
+  configuration?: Record<string, unknown> | null;
+  sequence: number;
+  student_module_progress?: StudentModuleProgress[];
+  lessons?: { id: string; module_id: string }[];
 }
 
 /**
@@ -127,13 +148,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Enhanced courses with simplified progress data and Job Readiness specific information
-    const enhancedCourses: CourseModuleOutput[] = (courses || []).map((course: any) => {
+    const enhancedCourses: CourseModuleOutput[] = (courses || []).map((course: CourseModule) => {
       const progress = course.student_module_progress?.[0] || null;
       const totalLessons = course.lessons?.length || 0;
       
       // Use new simplified progress tracking columns
       const videosCompleted = progress?.video_completion_count || 0;
-      const completedVideos = progress?.completed_videos || [];
       const isCompletedByStatus = progress?.status === 'Completed';
       const isCompletedByVideos = totalLessons > 0 && videosCompleted >= totalLessons;
       const isCompleted = isCompletedByStatus || isCompletedByVideos;
@@ -178,12 +198,20 @@ export async function GET(request: NextRequest) {
       .eq('student_module_progress.student_id', user.id)
       .eq('student_module_progress.status', 'Completed');
 
+    if (completedError) {
+      console.error('Error fetching completed courses:', completedError);
+    }
+
     // Get total course count
     const { count: totalCount, error: totalCountError } = await supabase
       .from('modules')
       .select('id', { count: 'exact' })
       .eq('product_id', validProductId)
       .eq('type', 'Course');
+
+    if (totalCountError) {
+      console.error('Error fetching total course count:', totalCountError);
+    }
 
     return NextResponse.json({
       courses: enhancedCourses,

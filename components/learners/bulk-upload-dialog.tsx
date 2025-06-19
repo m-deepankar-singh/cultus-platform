@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { Upload, FileUp, AlertCircle, Download, XCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { read, utils, WorkBook } from "xlsx"
+import { read, utils } from "xlsx"
 import { BulkUploadPreviewTable } from "./bulk-upload-preview-table"
 import { Progress } from "@/components/ui/progress"
 

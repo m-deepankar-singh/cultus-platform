@@ -49,7 +49,7 @@ export const audioContext: (
         audioContextMap.set(options.id, ctx);
       }
       return ctx;
-    } catch (e) {
+    } catch {
       await ensureUserInteraction();
       if (options?.id && audioContextMap.has(options.id)) {
         const ctx = audioContextMap.get(options.id);

@@ -25,8 +25,8 @@ interface Assessment {
 
 interface AssessmentCardProps {
   assessment: Assessment
-  current_tier?: string
-  current_star_level?: string
+  current_tier?: string | null
+  current_star_level?: string | null
 }
 
 const tierColors = {
@@ -35,7 +35,7 @@ const tierColors = {
   GOLD: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
 }
 
-export function AssessmentCard({ assessment, current_tier, current_star_level }: AssessmentCardProps) {
+export function AssessmentCard({ assessment }: AssessmentCardProps) {
   const {
     id,
     name,

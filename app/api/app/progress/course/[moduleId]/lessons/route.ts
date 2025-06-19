@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { createClient } from '@/lib/supabase/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define a schema for UUID validation (reuse or define locally)

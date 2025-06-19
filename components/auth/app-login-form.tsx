@@ -60,7 +60,6 @@ export function AppLoginForm() {
 			// Handle non-JSON responses
 			const contentType = response.headers.get("content-type");
 			if (!contentType || !contentType.includes("application/json")) {
-				const text = await response.text();
 				throw new Error("Server returned an invalid response format. Please try again later.");
 			}
 

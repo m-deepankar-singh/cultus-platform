@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Building2, Layers, Settings, Image as ImageIcon } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import NextImage from "next/image" // Renamed to avoid conflict with Lucide icon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ClientsList } from "@/components/products/clients-list"

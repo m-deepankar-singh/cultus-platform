@@ -13,7 +13,7 @@ export { useInterviewQuestions } from './useInterviewQuestions'
 export { usePromotionExamEligibility } from './usePromotionExamEligibility'
 
 // Mutation Hooks
-export { useSubmitQuiz, useUpdateProgress, useSubmitProject, useSubmitInterview, useUpdateExpertSessionProgress } from './useJobReadinessMutations'
+export { useSubmitQuiz, useUpdateProgress, useSubmitProject, useUpdateExpertSessionProgress } from './useJobReadinessMutations'
 export { useSubmitAssessment } from './useSubmitAssessment'
 export { useStartPromotionExam } from './useStartPromotionExam'
 export { useSubmitPromotionExam } from './useSubmitPromotionExam'

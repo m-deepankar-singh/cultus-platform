@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { createClient } from '@/lib/supabase/server';
 import { AssessmentSubmissionSchema } from '@/lib/schemas/progress';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -38,7 +37,7 @@ export async function POST(
     let body;
     try {
       body = await request.json();
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: 'Bad Request: Invalid JSON body' }, { status: 400 });
     }
 
@@ -104,7 +103,6 @@ export async function POST(
     }
 
     const moduleId = assessment.module_id;
-    const correctAnswers = assessment.questions; // Contains array of question objects with answers
 
     // 5. Verify Enrollment (Requires product_id from module)
     // 5a. Get product_id from module

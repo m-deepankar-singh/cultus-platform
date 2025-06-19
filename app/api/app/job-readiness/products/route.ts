@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selectors';
 
@@ -8,7 +7,7 @@ import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selector
  * Get assigned Job Readiness products and progress for the current student
  * Includes module lock/unlock status based on student's current star level and progress
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequest(['student']);
@@ -101,7 +100,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get the actual products with job readiness configurations
-    const productIds = assignments.map((a: any) => a.product_id);
+    const productIds = assignments.map((a: { product_id: string }) => a.product_id);
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select(`
@@ -121,7 +120,7 @@ export async function GET(req: NextRequest) {
       console.warn(`Client ${student.client_id} has ${products.length} Job Readiness products. Expected only 1.`);
     }
 
-    const clientProducts = products?.map((product: any) => ({
+    const clientProducts = products?.map((product: ProductData) => ({
       product_id: product.id,
       products: product
     })) || [];
@@ -132,15 +131,31 @@ export async function GET(req: NextRequest) {
       name: string;
       description: string;
       type: string;
-      job_readiness_products: any[];
+      job_readiness_products: Array<{
+        id: string;
+        product_id: string;
+        [key: string]: unknown;
+      }>;
+    };
+
+    type ModuleData = {
+      id: string;
+      type: string;
+      student_module_progress?: Array<{
+        status: string;
+        [key: string]: unknown;
+      }>;
+      [key: string]: unknown;
+    };
+
+    type AssignmentData = {
+      product_id: string;
+      products: ProductData;
     };
 
     // Get modules for each product with progress
     const productsWithModules = await Promise.all(
-      clientProducts.map(async (assignment: any) => {
-        // Access the products field
-        const productData = assignment.products as ProductData;
-
+      clientProducts.map(async (assignment: AssignmentData) => {
         const { data: modules, error: modulesError } = await supabase
           .from('modules')
           .select(`
@@ -164,8 +179,8 @@ export async function GET(req: NextRequest) {
         }
 
         // Check if all assessment modules are completed for tier eligibility
-        const assessmentModules = modules?.filter((m: any) => m.type === 'Assessment') || [];
-        const completedAssessments = assessmentModules.filter((m: any) => 
+        const assessmentModules = modules?.filter((m: ModuleData) => m.type === 'Assessment') || [];
+        const completedAssessments = assessmentModules.filter((m: ModuleData) => 
           m.student_module_progress?.[0]?.status === 'Completed'
         );
         
@@ -182,8 +197,14 @@ export async function GET(req: NextRequest) {
         console.log(`[TIER_CHECK] Product ${assignment.product_id} - Student has tier: ${studentWithClient.job_readiness_tier}, Assessments: ${completedAssessments.length}/${assessmentModules.length}, All Complete: ${allAssessmentsComplete}`);
 
         // For Expert Session modules, we need to get progress from the separate expert session progress table
-        let expertSessionProgress: any[] = [];
-        const expertSessionModules = modules?.filter((m: any) => 
+        let expertSessionProgress: Array<{
+          expert_session_id: string;
+          is_completed: boolean;
+          completion_percentage: number;
+          completed_at: string | null;
+          watch_time_seconds: number;
+        }> = [];
+        const expertSessionModules = modules?.filter((m: ModuleData) => 
           m.type === 'Expert_Session' || m.type === 'expert_session'
         ) || [];
 
@@ -208,7 +229,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Determine which modules are locked/unlocked based on star level
-        const modulesWithAccess = modules?.map((module: any) => {
+        const modulesWithAccess = modules?.map((module: ModuleData) => {
           let isUnlocked = false;
           const starLevel = student.job_readiness_star_level || 'ONE';
           
@@ -279,7 +300,7 @@ export async function GET(req: NextRequest) {
     // Determine if student should see tier information
     // If student already has a tier, show it directly
     // Otherwise, all products must have all assessments completed to show tier
-    let displayTier = student.job_readiness_tier;
+    const displayTier = student.job_readiness_tier;
     let globalAllAssessmentsComplete = false;
     
     if (displayTier) {

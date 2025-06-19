@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { AddClientDialog } from "@/components/clients/add-client-dialog"
 import { ClientForm } from "@/components/clients/client-form"
-import { Client, getClients, toggleClientStatus } from "@/app/actions/clientActions"
+import { Client, toggleClientStatus } from "@/app/actions/clientActions"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -153,7 +153,7 @@ export function ClientsTable() {
     if (!dateString) return "N/A"
     try {
       return format(new Date(dateString), "MMM d, yyyy")
-    } catch (error) {
+    } catch {
       return dateString
     }
   }

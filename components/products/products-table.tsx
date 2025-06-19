@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { BookOpen, FileText, MoreHorizontal, PlusCircle, Search, SlidersHorizontal, Image as ImageIcon } from "lucide-react"
+import { MoreHorizontal, PlusCircle, Search, Image as ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,9 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { ProductForm } from "@/components/products/product-form"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
@@ -63,7 +61,6 @@ export function ProductsTable({ products: initialProducts }: ProductsTableProps)
   // State
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
   const [showProductForm, setShowProductForm] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)

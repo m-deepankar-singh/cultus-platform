@@ -155,7 +155,9 @@ export default function JobReadinessProgressPage() {
     
     // Distribution by star level
     const starLevelCounts = progress.reduce((acc, p) => {
-      acc[p.job_readiness_star_level] = (acc[p.job_readiness_star_level] || 0) + 1
+      if (p.job_readiness_star_level) {
+        acc[p.job_readiness_star_level] = (acc[p.job_readiness_star_level] || 0) + 1
+      }
       return acc
     }, {} as Record<string, number>)
 

@@ -9,7 +9,7 @@ import { StandaloneModuleForm } from "@/components/modules/standalone-module-for
 export default async function CreateModulePage({
   searchParams
 }: {
-  searchParams: { type?: string }
+  searchParams: Promise<{ type?: string }>
 }) {
   const supabase = await createClient()
   
@@ -32,10 +32,10 @@ export default async function CreateModulePage({
   }
   
   // Validate and extract module type from query params
-  const resolvedParams = await Promise.resolve(searchParams);
-  const moduleType = resolvedParams.type?.toLowerCase() === "assessment" 
+  const { type: moduleTypeParam } = await searchParams;
+  const moduleType = moduleTypeParam?.toLowerCase() === "assessment" 
     ? "Assessment" 
-    : "Course"
+    : "Course";
   
   return (
     <div className="container py-10">

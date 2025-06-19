@@ -27,7 +27,7 @@ const AssessmentIdSchema = z.string().uuid({ message: 'Invalid Assessment ID for
  */
 export async function GET(
   request: NextRequest,
-  context: { params: { assessmentId: string } }
+  context: { params: Promise<{ assessmentId: string }> }
 ) {
   try {
     // Validate assessmentId
@@ -123,7 +123,7 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  context: { params: { assessmentId: string } }
+  context: { params: Promise<{ assessmentId: string }> }
 ) {
   try {
     // Validate assessmentId
@@ -284,7 +284,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  context: { params: { assessmentId: string } }
+  context: { params: Promise<{ assessmentId: string }> }
 ) {
   try {
     // Validate assessmentId

@@ -20,7 +20,6 @@ interface ProductHeaderProps {
 }
 
 export function ProductHeader({ product }: ProductHeaderProps) {
-  const router = useRouter()
   const [showEditForm, setShowEditForm] = useState(false)
   
   return (

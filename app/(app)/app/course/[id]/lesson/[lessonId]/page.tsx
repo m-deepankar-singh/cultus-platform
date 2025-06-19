@@ -10,7 +10,12 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 
 // Transform API response to LessonViewer component props
-function transformLessonData(apiResponse: any, lessonId: string) {
+interface LessonApiResponse {
+  course: any;
+  progress: any;
+}
+
+function transformLessonData(apiResponse: LessonApiResponse, lessonId: string) {
   const { course, progress } = apiResponse
   
   // Find the specific lesson
@@ -144,7 +149,7 @@ function EnhancedLessonPageContent() {
         />
       </div>
     )
-  } catch (transformError) {
+  } catch {
     return (
       <div className="container mx-auto p-4">
         <Card className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">

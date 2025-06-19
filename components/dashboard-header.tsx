@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Bell, BookOpen, Moon, Search, Sun, User } from "lucide-react"
+import { Bell, BookOpen, Moon, Sun, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,

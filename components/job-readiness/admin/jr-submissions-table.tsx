@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Eye, CheckCircle, XCircle, Clock, Filter } from "lucide-react"
+import { MoreHorizontal, Eye, CheckCircle, Clock, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -58,7 +58,6 @@ export function JrSubmissionsTable({
   filters,
   onFiltersChange,
   products = [],
-  clients = [],
 }: JrSubmissionsTableProps) {
   
   // Format student name display

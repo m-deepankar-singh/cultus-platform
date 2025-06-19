@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
-    const { user, claims, supabase } = authResult;
+    const { user, supabase } = authResult;
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const jobReadinessProductIds = jobReadinessProducts?.map((p: any) => p.id) || [];
+    const jobReadinessProductIds = jobReadinessProducts?.map((p: { id: string }) => p.id) || [];
 
     if (jobReadinessProductIds.length === 0) {
       // No Job Readiness products exist, return empty result

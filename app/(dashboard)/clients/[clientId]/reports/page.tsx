@@ -99,9 +99,9 @@ const getClientData = async (clientId: string) => {
 export default async function ClientReportsPage({
   params
 }: {
-  params: { clientId: string }
+  params: Promise<{ clientId: string }>
 }) {
-  const { clientId } = params;
+  const { clientId } = await params;
   
   // In a real implementation, we'd check if the client exists
   // For now, we'll just simulate the data

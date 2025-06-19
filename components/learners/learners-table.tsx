@@ -1,23 +1,6 @@
-import { Suspense } from "react"
-import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge" // Import Badge if needed for status/etc.
 import { createClient } from "@/lib/supabase/server"
 import { LearnersTableClient } from "./learners-table-client"
-import { format } from "date-fns"
 
 // Type definition for Learner from API response
 export interface Learner {

@@ -28,7 +28,7 @@ const CourseIdSchema = z.string().uuid({ message: 'Invalid Course ID format' });
  */
 export async function GET(
   request: NextRequest,
-  context: { params: { courseId: string } }
+  context: { params: Promise<{ courseId: string }> }
 ) {
   try {
     // Validate courseId
@@ -125,7 +125,7 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  context: { params: { courseId: string } }
+  context: { params: Promise<{ courseId: string }> }
 ) {
   try {
     // Validate courseId
@@ -290,7 +290,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  context: { params: { courseId: string } }
+  context: { params: Promise<{ courseId: string }> }
 ) {
   try {
     // Validate courseId

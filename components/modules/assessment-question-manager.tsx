@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Dialog,
@@ -59,7 +59,7 @@ export function AssessmentQuestionManager({
   const [searchQuery, setSearchQuery] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const { toast } = useToast()
-  const [error, setError] = useState<string | null>(null)
+  const [, setError] = useState<string | null>(null)
 
   // Fetch selected questions on mount
   useEffect(() => {

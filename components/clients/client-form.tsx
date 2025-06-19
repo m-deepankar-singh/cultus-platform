@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 import { createClient, updateClient } from "@/app/actions/clientActions"
 import { S3FileUpload } from "@/components/ui/s3-file-upload"
+import NextImage from "next/image"
 
 // Form schema for client creation/editing
 const formSchema = z.object({
@@ -218,9 +219,11 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
                     <div className="space-y-4">
                       {field.value && (
                         <div className="relative">
-                          <img 
+                          <NextImage 
                             src={field.value} 
                             alt="Client logo preview" 
+                            width={96}
+                            height={96}
                             className="w-24 h-24 object-cover rounded-md border"
                           />
                           <Button

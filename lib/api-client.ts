@@ -53,7 +53,7 @@ export async function apiClient<T>(
       try {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch (e) {
+      } catch {
         // Failed to parse error response as JSON, stick with statusText
       }
       return { data: null, error: errorMessage };

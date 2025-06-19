@@ -7,11 +7,12 @@ import { ClientDetail } from "@/components/clients/client-detail"
 import { Badge } from "@/components/ui/badge"
 import { AssignedProducts } from "@/components/clients/assigned-products"
 import { ManageStudents } from "@/components/clients/manage-students"
+import Link from "next/link"
 
 interface ClientDetailPageProps {
-  params: {
+  params: Promise<{
     clientId: string
-  }
+  }>
 }
 
 export default async function ClientDetailPage({ params }: ClientDetailPageProps) {
@@ -28,9 +29,9 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <a href="/clients">
+            <Link href="/clients">
               <ArrowLeft className="h-4 w-4" />
-            </a>
+            </Link>
           </Button>
           <h1 className="text-2xl font-bold">{client.name}</h1>
           <Badge variant={client.is_active ? "info" : "secondary"}>

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-import { createClient } from '@/lib/supabase/server';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { ProductIdSchema } from '@/lib/schemas/product';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -11,7 +10,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  */
 export async function DELETE(
   request: Request,
-  context: { params: { clientId: string; productId: string } }
+  context: { params: Promise<{ clientId: string; productId: string }> }
 ) {
   // Properly await the params object
   const params = await context.params;

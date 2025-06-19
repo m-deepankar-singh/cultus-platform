@@ -85,7 +85,7 @@ export function withAuth(requiredRoles?: string[]) {
   return function(
     handler: (req: NextRequest, auth: ApiAuthResult) => Promise<NextResponse>
   ) {
-    return async function(req: NextRequest, context?: any) {
+    return async function(req: NextRequest) {
       const authResult = await authenticateApiRequest(requiredRoles);
       
       if ('error' in authResult) {

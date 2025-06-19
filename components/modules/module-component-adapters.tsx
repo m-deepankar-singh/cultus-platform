@@ -69,7 +69,7 @@ export class ModuleCoreAdapter implements ModuleComponent {
           try {
             const errorData = await response.json()
             throw new Error(errorData.message || `Failed to save module core data: ${response.status} ${response.statusText}`)
-          } catch (jsonError) {
+          } catch {
             // If JSON parsing fails, use the status text
             throw new Error(`Failed to save module core data: ${response.status} ${response.statusText}`)
           }
@@ -171,7 +171,7 @@ export class CourseLessonsAdapter implements ModuleComponent {
           try {
             const errorData = await response.json()
             throw new Error(errorData.message || `Failed to save lesson order: ${response.status} ${response.statusText}`)
-          } catch (jsonError) {
+          } catch {
             // If JSON parsing fails, use the status text
             throw new Error(`Failed to save lesson order: ${response.status} ${response.statusText}`)
           }
@@ -279,7 +279,7 @@ export class AssessmentQuestionsAdapter implements ModuleComponent {
           try {
             const errorData = await response.json()
             throw new Error(errorData.message || `Failed to save assessment questions: ${response.status} ${response.statusText}`)
-          } catch (jsonError) {
+          } catch {
             // If JSON parsing fails, use the status text
             throw new Error(`Failed to save assessment questions: ${response.status} ${response.statusText}`)
           }

@@ -2,8 +2,6 @@
 
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 // Import the type, aliased to avoid naming conflict with component
 import type { ProductPerformance as ProductPerformanceData } from "@/app/actions/analytics"; 

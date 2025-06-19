@@ -32,7 +32,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  JrSubmission,
   JrSubmissionsFilters,
   formatSubmissionDate,
 } from "@/lib/api/job-readiness/submissions"
@@ -53,14 +52,11 @@ interface ProjectSubmissionsTableProps {
 export function ProjectSubmissionsTable({
   projects,
   isLoading = false,
-  onViewContent,
   onViewDetails,
   onRegrade,
-  onRefresh,
   filters,
   onFiltersChange,
   products = [],
-  clients = [],
 }: ProjectSubmissionsTableProps) {
   // State for project content viewer
   const [contentViewerOpen, setContentViewerOpen] = React.useState(false)
@@ -278,7 +274,6 @@ export function ProjectSubmissionsTable({
       header: "Actions",
       cell: ({ row }) => {
         const submission = row.original
-        const hasContent = submission.has_content || !!submission.submission_content
         const hasUrl = submission.has_url || !!submission.submission_url
 
         return (

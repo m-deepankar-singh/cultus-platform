@@ -25,7 +25,7 @@ interface AssignmentWithClient {
  */
 export async function GET(
   request: Request,
-  context: { params: { productId: string } }
+  context: { params: Promise<{ productId: string }> }
 ) {
   // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
   const authResult = await authenticateApiRequest(['Admin', 'Staff']);

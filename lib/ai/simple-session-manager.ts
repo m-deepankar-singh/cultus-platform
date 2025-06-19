@@ -81,7 +81,6 @@ class SimpleSessionManager {
    */
   getStats() {
     const sessions = Array.from(this.sessions.values());
-    const now = Date.now();
     
     return {
       total: sessions.length,

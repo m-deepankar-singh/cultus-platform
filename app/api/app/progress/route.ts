@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -6,7 +5,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  * GET /api/app/progress
  * Fetches the overall progress overview for the authenticated student across all their enrolled products/courses.
  */
-export async function GET(request: Request) {
+export async function GET() {
   try {
     // 1. 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequest(['student']);

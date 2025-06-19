@@ -27,7 +27,7 @@ function debugLog(message: string, data: any) {
  */
 export async function GET(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -38,7 +38,7 @@ export async function GET(
     const { user, claims, supabase } = authResult;
 
     // Await params before destructuring to fix Next.js warning
-    const resolvedParams = await Promise.resolve(params);
+    const resolvedParams = await params;
     const { moduleId: rawModuleId } = resolvedParams;
 
     // Check if the module exists and is a course
@@ -93,7 +93,7 @@ export async function GET(
  */
 export async function POST(
   request: Request,
-  { params }: { params: { moduleId: string } }
+  { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
@@ -104,7 +104,7 @@ export async function POST(
     const { user, claims, supabase } = authResult;
 
     // Await params before destructuring to fix Next.js warning
-    const resolvedParams = await Promise.resolve(params);
+    const resolvedParams = await params;
     const { moduleId: rawModuleId } = resolvedParams;
     
     let body;
