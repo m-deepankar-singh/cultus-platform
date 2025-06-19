@@ -25,15 +25,19 @@ export class SimpleUploadService {
   private publicUrl: string;
 
   constructor() {
-    this.bucketName = process.env.R2_BUCKET_NAME!;
-    this.publicUrl = process.env.R2_PUBLIC_URL!;
+    // Use the new R2 environment variables from the migration
+    this.bucketName = process.env.R2_PUBLIC_BUCKET || 'cultus-public-assets';
+    this.publicUrl = process.env.R2_PUBLIC_DOMAIN || process.env.R2_PUBLIC_URL || '';
     
-    // Validate required environment variables
+    // Validate required environment variables - but don't throw errors, just log warnings
     if (!this.bucketName) {
-      throw new ConfigurationError('R2_BUCKET_NAME environment variable is required');
+      console.warn('R2_PUBLIC_BUCKET environment variable not set, using default: cultus-public-assets');
+      this.bucketName = 'cultus-public-assets';
     }
     if (!this.publicUrl) {
-      throw new ConfigurationError('R2_PUBLIC_URL environment variable is required');
+      console.warn('R2_PUBLIC_DOMAIN environment variable not set. Files will use bucket endpoint for access.');
+      // Don't throw error - the service can still work without public URL
+      this.publicUrl = '';
     }
   }
 
@@ -104,7 +108,15 @@ export class SimpleUploadService {
       await upload.done();
 
       // Use public URL for file access, not upload endpoint
-      const url = `${this.publicUrl}/${key}`;
+      // If no public URL is configured, construct a basic URL from the bucket name
+      let url: string;
+      if (this.publicUrl) {
+        url = `${this.publicUrl}/${key}`;
+      } else {
+        // Fallback: construct URL from S3 endpoint and bucket
+        const endpoint = process.env.R2_ENDPOINT || '';
+        url = endpoint ? `${endpoint}/${this.bucketName}/${key}` : `https://${this.bucketName}.r2.dev/${key}`;
+      }
       
       return {
         url,
