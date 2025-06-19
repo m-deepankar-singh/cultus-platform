@@ -16,6 +16,15 @@ export const CLIENT_SELECTORS = {
   // For listing clients (dashboard, admin panel)
   LIST: 'id, name, is_active, created_at, logo_url',
   
+  // For listing clients with products (dashboard, admin panel) - optimized for N+1 prevention
+  LIST_WITH_PRODUCTS: `
+    id, name, contact_email, is_active, created_at, logo_url,
+    client_product_assignments(
+      product_id,
+      products(id, name, type, description)
+    )
+  `,
+  
   // For client detail view
   DETAIL: 'id, name, contact_email, address, is_active, created_at, updated_at, logo_url',
   

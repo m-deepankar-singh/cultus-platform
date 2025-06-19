@@ -4,16 +4,38 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
+// Types for the response data structure
+interface ClientProductAssignment {
+  product_id: string;
+  products: {
+    id: string;
+    name: string;
+    type: string;
+    description: string | null;
+  } | null;
+}
+
+interface ClientWithAssignments {
+  id: string;
+  name: string;
+  contact_email: string | null;
+  is_active: boolean;
+  created_at: string;
+  logo_url: string | null;
+  client_product_assignments?: ClientProductAssignment[];
+}
+
 /**
  * GET /api/admin/clients
  * 
- * Retrieves a list of all clients
+ * Retrieves a list of all clients with their assigned products
  * Accessible only by users with 'Admin' or 'Staff' roles
  * Supports pagination with page and pageSize parameters
  * 
  * OPTIMIZATIONS APPLIED:
  * ✅ JWT-based authentication (eliminates 1 DB query per request)
  * ✅ Specific column selection (reduces data transfer)
+ * ✅ Joined product data (prevents N+1 query problem)
  * ✅ Performance monitoring
  */
 export async function GET(request: NextRequest) {
@@ -62,10 +84,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to count clients" }, { status: 500 });
     }
 
-    // 5. Fetch paginated clients (OPTIMIZED - specific column selection)
+    // 5. Fetch paginated clients with products (OPTIMIZED - prevents N+1 queries)
     let query = supabase
       .from('clients')
-      .select(SELECTORS.CLIENT.LIST); // Instead of select('*')
+      .select(SELECTORS.CLIENT.LIST_WITH_PRODUCTS); // Includes products via join
       
     // Apply search filter if provided
     if (search) {
@@ -88,13 +110,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
     }
 
-    // 6. Performance monitoring
-    const responseTime = Date.now() - startTime;
-    console.log(`[OPTIMIZED] GET /api/admin/clients completed in ${responseTime}ms (JWT auth + selective fields)`);
+    // 6. Transform the data to extract products from the nested structure
+    const transformedClients = (clients as ClientWithAssignments[])?.map((client: ClientWithAssignments) => ({
+      ...client,
+      products: client.client_product_assignments?.map((assignment: ClientProductAssignment) => assignment.products).filter(Boolean) || []
+    })) || [];
 
-    // 7. Return paginated client list
+    // 7. Performance monitoring
+    const responseTime = Date.now() - startTime;
+    console.log(`[OPTIMIZED] GET /api/admin/clients completed in ${responseTime}ms (JWT auth + joined products - N+1 prevented)`);
+
+    // 8. Return paginated client list with products
     const paginatedResponse = createPaginatedResponse(
-      clients || [],
+      transformedClients,
       count || 0,
       page,
       pageSize

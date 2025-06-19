@@ -126,37 +126,47 @@ export async function GET(req: NextRequest) {
       }
 
       // Get completion statistics for each session
-      const sessionsWithStats = await Promise.all(
-        transformedSessions.map(async (session) => {
-          const { data: progressStats, error: statsError } = await supabase
-            .from('job_readiness_expert_session_progress')
-            .select('student_id, is_completed, watch_time_seconds')
-            .eq('expert_session_id', session.id);
+      // --- BEGIN N+1 FIX ---
+      // Batch fetch progress stats to avoid N+1 queries
+      const sessionIds = transformedSessions.map((s) => s.id);
 
-          let completionStats = {
-            total_viewers: 0,
-            completion_rate: 0,
-            average_watch_time: 0
-          };
+      const { data: allProgressStats, error: statsError } = await supabase
+        .from('job_readiness_expert_session_progress')
+        .select('expert_session_id, is_completed, watch_time_seconds')
+        .in('expert_session_id', sessionIds);
 
-          if (!statsError && progressStats) {
-            const totalViewers = progressStats.length;
-            const completedViewers = progressStats.filter((p: any) => p.is_completed).length;
-            const totalWatchTime = progressStats.reduce((sum: number, p: any) => sum + p.watch_time_seconds, 0);
+      if (statsError) {
+        console.error('Error fetching progress stats:', statsError);
+        return NextResponse.json({ error: 'Failed to fetch progress stats' }, { status: 500 });
+      }
 
-            completionStats = {
-              total_viewers: totalViewers,
-              completion_rate: totalViewers > 0 ? Math.round((completedViewers / totalViewers) * 100) : 0,
-              average_watch_time: totalViewers > 0 ? Math.round(totalWatchTime / totalViewers) : 0
-            };
-          }
+      // Build aggregation map
+      const statsMap = new Map<string, { total: number; completed: number; watchTime: number }>();
 
-          return {
-            ...session,
-            completion_stats: completionStats
-          };
-        })
-      );
+      (allProgressStats || []).forEach((row: any) => {
+        const entry = statsMap.get(row.expert_session_id) || { total: 0, completed: 0, watchTime: 0 };
+        entry.total += 1;
+        if (row.is_completed) entry.completed += 1;
+        entry.watchTime += row.watch_time_seconds || 0;
+        statsMap.set(row.expert_session_id, entry);
+      });
+
+      const sessionsWithStats = transformedSessions.map((session) => {
+        const agg = statsMap.get(session.id) || { total: 0, completed: 0, watchTime: 0 };
+
+        const completionStats = {
+          total_students: agg.total,
+          completed_students: agg.completed,
+          completion_rate: agg.total > 0 ? Math.round((agg.completed / agg.total) * 100) : 0,
+          average_completion_percentage: agg.total > 0 ? Math.round(agg.watchTime / agg.total) : 0,
+        };
+
+        return {
+          ...session,
+          completion_stats: completionStats,
+        };
+      });
+      // --- END N+1 FIX ---
 
       return NextResponse.json({ sessions: sessionsWithStats });
     }

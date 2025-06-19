@@ -5,7 +5,6 @@ import {
   ValidationError, 
   FileTypeError, 
   FileSizeError, 
-  ConfigurationError,
   createS3Error 
 } from './upload-errors';
 

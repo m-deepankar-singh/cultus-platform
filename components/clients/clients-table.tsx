@@ -71,7 +71,7 @@ export function ClientsTable() {
       if (searchTerm) params.append('search', searchTerm)
       if (statusFilter !== 'all') params.append('status', statusFilter)
       
-      // Fetch paginated clients from API
+      // Fetch paginated clients from API (includes products via join to prevent N+1 queries)
       const response = await fetch(`/api/admin/clients?${params.toString()}`)
       
       if (!response.ok) {
@@ -80,24 +80,8 @@ export function ClientsTable() {
       
       const result = await response.json()
       
-      // Create enhanced client objects with product data
-      const enhancedClients = await Promise.all(
-        result.data.map(async (client: Client) => {
-          try {
-            const response = await fetch(`/api/staff/clients/${client.id}/products`)
-            if (response.ok) {
-              const products = await response.json()
-              return { ...client, products }
-            }
-          } catch (error) {
-            console.error(`Failed to fetch products for client ${client.id}:`, error)
-          }
-          return { ...client, products: [] }
-        })
-      )
-      
-      // Update state with the paginated data
-      setClients(enhancedClients)
+      // API now includes products via join - no additional requests needed
+      setClients(result.data || [])
       setTotalCount(result.metadata.totalCount)
       setTotalPages(result.metadata.totalPages)
       
