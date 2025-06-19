@@ -18,6 +18,9 @@ export { useSubmitAssessment } from './useSubmitAssessment'
 export { useStartPromotionExam } from './useStartPromotionExam'
 export { useSubmitPromotionExam } from './useSubmitPromotionExam'
 
+// Upload Hooks
+export { useDirectUpload } from './useDirectUpload'
+
 // Other existing hooks
 export { useCurrentUser } from './useCurrentUser'
 export { useIsMobile } from './use-mobile'

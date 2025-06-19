@@ -182,65 +182,35 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT-based authentication (using existing auth pattern)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { user, supabase } = authResult;
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    // Parse JSON request body (replaces FormData parsing)
+    const body = await req.json();
+    const { 
+      title, 
+      description, 
+      product_ids: productIds, 
+      video_url, 
+      video_storage_path, 
+      video_duration 
+    } = body;
 
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
-
-    // Parse multipart form data
-    const formData = await req.formData();
-    const title = formData.get('title') as string;
-    const description = formData.get('description') as string;
-    const productIdsParam = formData.get('product_ids') as string;
-    const videoFile = formData.get('video_file') as File;
-
-    // Parse product IDs array
-    let productIds: string[] = [];
-    try {
-      if (productIdsParam) {
-        productIds = JSON.parse(productIdsParam);
-      }
-    } catch (parseError) {
+    // Validate required fields (video already uploaded via direct upload)
+    if (!title || !productIds?.length || !video_url || !video_storage_path) {
       return NextResponse.json({ 
-        error: 'Invalid product_ids format. Must be a JSON array of product IDs.' 
+        error: 'Missing required fields: title, product_ids (array), video_url, and video_storage_path are required' 
       }, { status: 400 });
     }
 
-    // Validate required fields
-    if (!title || !productIds.length || !videoFile) {
+    // Validate product IDs array
+    if (!Array.isArray(productIds)) {
       return NextResponse.json({ 
-        error: 'Missing required fields: title, product_ids (array), and video_file are required' 
-      }, { status: 400 });
-    }
-
-    // Validate video file
-    if (!videoFile.type.startsWith('video/')) {
-      return NextResponse.json({ error: 'File must be a video' }, { status: 400 });
-    }
-
-    // Check file size (limit to 500MB)
-    const maxSizeInMB = 500;
-    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
-    if (videoFile.size > maxSizeInBytes) {
-      return NextResponse.json({ 
-        error: `File size must be less than ${maxSizeInMB}MB` 
+        error: 'product_ids must be an array of product IDs' 
       }, { status: 400 });
     }
 
@@ -257,28 +227,18 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Extract video duration client-side before upload (client must provide this)
-    const videoDurationParam = formData.get('video_duration') as string;
-    let videoDuration = 3600; // Default 1 hour
-    
-    if (videoDurationParam) {
-      const parsedDuration = parseInt(videoDurationParam);
-      if (!isNaN(parsedDuration) && parsedDuration > 0) {
-        videoDuration = parsedDuration;
-      }
-    } else {
-      // Rough estimate based on file size if not provided
-      videoDuration = Math.max(Math.floor(videoFile.size / 1000000) * 60, 300); // ~60 seconds per MB, minimum 5 minutes
-    }
+    // Parse video duration (provided by client after upload)
+    const parsedDuration = video_duration ? parseInt(video_duration.toString()) : 3600; // Default 1 hour
+    const finalVideoDuration = !isNaN(parsedDuration) && parsedDuration > 0 ? parsedDuration : 3600;
 
-    // First create the expert session record to get the session ID
+    // Create the expert session record with pre-uploaded video data
     const { data: expertSession, error: dbError } = await supabase
       .from('job_readiness_expert_sessions')
       .insert({
         title,
         description: description || null,
-        video_url: '', // Will be updated after upload
-        video_duration: videoDuration,
+        video_url,
+        video_duration: finalVideoDuration,
         is_active: true
       })
       .select()
@@ -288,48 +248,6 @@ export async function POST(req: NextRequest) {
       console.error('Database error creating expert session:', dbError);
       return NextResponse.json({ 
         error: 'Failed to create expert session record' 
-      }, { status: 500 });
-    }
-
-    // Use the new S3 upload service instead of old R2 upload helper
-    const { uploadService } = await import('@/lib/r2/simple-upload-service');
-    
-    let uploadResult;
-    try {
-      // Generate key with session ID for organization (matches the old system)
-      const key = uploadService.generateKey(`expert-sessions/${expertSession.id}`, videoFile.name);
-      uploadResult = await uploadService.uploadFile(videoFile, key, videoFile.type);
-    } catch (uploadError: any) {
-      console.error('Video upload failed:', uploadError);
-      
-      // Clean up session record if upload fails
-      await supabase
-        .from('job_readiness_expert_sessions')
-        .delete()
-        .eq('id', expertSession.id);
-      
-      return NextResponse.json({ 
-        error: `Failed to upload video: ${uploadError.message}` 
-      }, { status: 500 });
-    }
-
-    // Update session record with video URL
-    const { error: updateError } = await supabase
-      .from('job_readiness_expert_sessions')
-      .update({ video_url: uploadResult.url })
-      .eq('id', expertSession.id);
-
-    if (updateError) {
-      console.error('Error updating session with video URL:', updateError);
-      
-      // Clean up session record (S3 file cleanup would require additional deletion logic)
-      await supabase
-        .from('job_readiness_expert_sessions')
-        .delete()
-        .eq('id', expertSession.id);
-      
-      return NextResponse.json({ 
-        error: 'Failed to update session with video URL' 
       }, { status: 500 });
     }
 
@@ -346,7 +264,7 @@ export async function POST(req: NextRequest) {
     if (associationError) {
       console.error('Error creating product associations:', associationError);
       
-      // Clean up session record (S3 file cleanup would require additional deletion logic)
+      // Clean up session record if association fails
       await supabase
         .from('job_readiness_expert_sessions')
         .delete()
@@ -398,28 +316,14 @@ export async function POST(req: NextRequest) {
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (consistent with GET and POST)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, supabase } = authResult;
+
     const body = await req.json();
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
 
     // Validate request body
     const { id, title, description, is_active, product_ids } = body;
@@ -491,7 +395,7 @@ export async function PATCH(req: NextRequest) {
         }, { status: 500 });
       }
 
-      const currentProductIds = currentAssociations?.map(a => a.product_id) || [];
+      const currentProductIds = currentAssociations?.map((a: any) => a.product_id) || [];
       const newProductIds = product_ids;
 
       // Calculate differences
@@ -575,32 +479,18 @@ export async function PATCH(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // JWT-based authentication (consistent with other methods)
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, supabase } = authResult;
+
     const url = new URL(req.url);
     const sessionId = url.searchParams.get('id');
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Expert session ID is required' }, { status: 400 });
-    }
-
-    // Verify admin role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile?.role || !(profile.role.toLowerCase() === 'admin')) {
-      console.log('User role check failed:', { user_id: user.id, role: profile?.role });
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Perform soft delete by setting is_active = false

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
-import { uploadService } from '@/lib/r2/simple-upload-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,45 +12,24 @@ export async function POST(request: NextRequest) {
 
     const studentId = user.id;
 
-    // Parse form data
-    const formData = await request.formData();
-    const videoFile = formData.get('video') as File;
-    const questionsJson = formData.get('questions') as string;
+    // Parse JSON request body (replaces FormData parsing)
+    const body = await request.json();
+    const { video_url, video_storage_path, questions, backgroundId } = body;
 
-    if (!videoFile || !questionsJson) {
+    if (!video_url || !video_storage_path || !questions) {
       return NextResponse.json(
-        { error: 'Missing required fields: video or questions' },
+        { error: 'Missing required fields: video_url, video_storage_path, or questions' },
         { status: 400 }
       );
     }
 
-    // Parse questions
-    const questions = JSON.parse(questionsJson);
-
     // Use a default product ID since we don't have a specific product for interviews yet
     const DEFAULT_PRODUCT_ID = '820b2dc4-e503-42f1-ab2a-fe47c331b335'; // "Unassigned Product"
 
-    // Create submission record first to get the ID
+    // Create submission record using pre-uploaded video data
     const submissionId = crypto.randomUUID();
     
-    // Upload video to R2 Storage using the same approach as the working admin endpoint
-    console.log('Uploading video to R2 Storage...');
-    
-    // Use the exact same upload logic as the working admin endpoints
-    const key = uploadService.generateKey(`interviews/${submissionId}`, videoFile.name);
-    
-    const uploadResult = await uploadService.uploadFile(
-      videoFile, 
-      key, 
-      videoFile.type,
-      {
-        allowedTypes: ['video/*'],
-        maxSize: 200 * 1024 * 1024, // 200MB for interview videos
-        minSize: 1024 // 1KB minimum
-      }
-    );
-    
-    console.log('Video uploaded successfully to R2:', uploadResult.key);
+    console.log('Creating interview submission with pre-uploaded video:', video_storage_path);
 
     // Get current student data for tier and background tracking
     const { data: studentData } = await supabase
@@ -60,15 +38,15 @@ export async function POST(request: NextRequest) {
       .eq('id', studentId)
       .single();
 
-    // Save submission to database using correct table
+    // Save submission to database using pre-uploaded video data
     const { data: submission, error: insertError } = await supabase
       .from('job_readiness_ai_interview_submissions')
       .insert({
         id: submissionId,
         student_id: studentId,
         product_id: DEFAULT_PRODUCT_ID,
-        video_storage_path: uploadResult.key,
-        video_url: uploadResult.url,
+        video_storage_path,
+        video_url,
         questions_used: questions,
         status: 'submitted',
         tier_when_submitted: studentData?.job_readiness_tier || 'BRONZE',
@@ -81,10 +59,6 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('Failed to save submission:', insertError);
-      
-      // Note: S3 file cleanup temporarily disabled during migration
-      // TODO: Implement S3 file deletion in future phase if needed
-      console.warn('Database insert failed, uploaded video cleanup skipped:', uploadResult.key);
       
       return NextResponse.json(
         { error: 'Failed to save submission to database' },

@@ -16,9 +16,12 @@ interface Module {
   type: "Course" | "Assessment"
   created_at: string
   updated_at: string
-  product_id: string | null
   configuration: Record<string, unknown>
-  products?: { name: string } | null
+  products?: Array<{ id: string; name: string; type: string }>
+  module_product_assignments?: Array<{ 
+    product_id: string;
+    products: { id: string; name: string; type: string };
+  }>
 }
 
 interface PaginatedResponse {
@@ -96,6 +99,9 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
         params.append('search', debouncedSearchQuery)
       }
       
+      // Include assignment data for filtering
+      params.append('include_assignments', 'true')
+      
       const response = await fetch(`/api/admin/modules?${params.toString()}`)
       
       if (!response.ok) {
@@ -121,13 +127,13 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
     setAssigning(true)
     
     try {
-      // For each selected module, update its product_id
+      // For each selected module, update its product assignments using the new many-to-many format
       const results = await Promise.all(
         selectedModules.map(moduleId => 
           fetch(`/api/admin/modules/${moduleId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ product_id: productId })
+            body: JSON.stringify({ product_ids: [productId] }) // Use new many-to-many format
           })
         )
       )
@@ -167,8 +173,13 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
   }
 
   // Filter modules to exclude ones already assigned to this product
-  // No need to filter by search, the API already does that
-  const filteredModules = modules.filter(module => module.product_id !== productId)
+  // Updated to work with the new many-to-many structure
+  const filteredModules = modules.filter(module => {
+    // Check if module is already assigned to this product
+    return !module.module_product_assignments?.some((assignment: any) => 
+      assignment.product_id === productId
+    )
+  })
 
   const toggleModuleSelection = (moduleId: string) => {
     setSelectedModules(prev => 
@@ -236,7 +247,9 @@ export function AssignModuleModal({ open, onOpenChange, productId, onAssigned }:
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{module.name}</div>
                         <div className="text-sm text-muted-foreground truncate">
-                          {module.products?.name ? `Currently in: ${module.products.name}` : "Not assigned"}
+                          {module.products && module.products.length > 0 
+                            ? `Currently in: ${module.products.map(p => p.name).join(', ')}` 
+                            : "Not assigned"}
                         </div>
                       </div>
                       <Badge>{module.type}</Badge>

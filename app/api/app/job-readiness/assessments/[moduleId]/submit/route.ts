@@ -106,12 +106,26 @@ export async function POST(
 
     const studentId = user.id;
 
-    // 5. Fetch Assessment Module Details (must be Job Readiness assessment)
+    // 5. Fetch Assessment Module Details with product assignment (must be Job Readiness assessment)
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('id, name, type, configuration, product_id')
+      .select(`
+        id, 
+        name, 
+        type, 
+        configuration,
+        module_product_assignments!inner (
+          product_id,
+          products!inner (
+            id,
+            name,
+            type
+          )
+        )
+      `)
       .eq('id', validModuleId)
       .eq('type', 'Assessment')
+      .eq('module_product_assignments.products.type', 'JOB_READINESS')
       .maybeSingle();
 
     if (moduleError) {
@@ -129,20 +143,16 @@ export async function POST(
       );
     }
 
-    // 6. Verify this is a Job Readiness product
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('id, name, type')
-      .eq('id', moduleData.product_id)
-      .eq('type', 'JOB_READINESS')
-      .single();
-
-    if (productError || !productData) {
+    // 6. Extract product data from junction table
+    const productAssignment = moduleData.module_product_assignments?.[0];
+    if (!productAssignment?.products) {
       return NextResponse.json(
         { error: 'This assessment is not part of a Job Readiness product' },
         { status: 404 }
       );
     }
+
+    const productData = productAssignment.products;
 
     // 7. Verify enrollment
     const { count, error: assignmentError } = await supabase
@@ -281,19 +291,10 @@ export async function POST(
 
     const finalTierConfig = tierConfig || defaultTierConfig;
 
-    // Determine tier achieved based on score
+    // Note: Tier determination will be done later when ALL assessments are completed
+    // For now, we just track this individual assessment score
     let tierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' | null = null;
-    if (percentage >= finalTierConfig.gold_assessment_min_score) {
-      tierAchieved = 'GOLD';
-    } else if (percentage >= finalTierConfig.silver_assessment_min_score) {
-      tierAchieved = 'SILVER';
-    } else if (percentage >= finalTierConfig.bronze_assessment_min_score) {
-      tierAchieved = 'BRONZE';
-    }
-
-    // Get current tier from JWT claims
-    const currentTier = claims.job_readiness_tier;
-    const tierChanged = currentTier !== tierAchieved;
+    let tierChanged = false;
 
     // 11. Create submission record in student_module_progress
     const submissionId = crypto.randomUUID();
@@ -332,29 +333,8 @@ export async function POST(
       );
     }
 
-    // 12. Update student tier if tier changed and it's higher
+    // 12. Tier assignment will be handled later when all assessments are completed
     let starLevelUnlocked = false;
-    if (tierChanged && tierAchieved) {
-      // Only update if new tier is "higher" than current tier
-      const tierOrder = { 'BRONZE': 1, 'SILVER': 2, 'GOLD': 3 };
-      const currentTierOrder = currentTier ? tierOrder[currentTier as keyof typeof tierOrder] : 0;
-      const newTierOrder = tierOrder[tierAchieved];
-
-      if (newTierOrder > currentTierOrder) {
-        const { error: tierUpdateError } = await supabase
-          .from('students')
-          .update({ 
-            job_readiness_tier: tierAchieved,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', studentId);
-
-        if (tierUpdateError) {
-          console.error('Error updating student tier:', tierUpdateError);
-          // Continue - don't fail the whole submission
-        }
-      }
-    }
 
     // 13. Check if student should get their first star (after completing ALL assessments)
     // Check the current database state, not JWT claims which might be stale
@@ -377,11 +357,15 @@ export async function POST(
         .from('modules')
         .select(`
           id,
+          module_product_assignments!inner (
+            product_id
+          ),
           student_module_progress!inner (
-            status
+            status,
+            progress_details
           )
         `)
-        .eq('product_id', productData.id)
+        .eq('module_product_assignments.product_id', productData.id)
         .eq('type', 'Assessment')
         .eq('student_module_progress.student_id', studentId)
         .eq('student_module_progress.status', 'Completed');
@@ -389,8 +373,8 @@ export async function POST(
       // Get total assessment count for this product
       const { count: totalAssessmentCount, error: totalCountError } = await supabase
         .from('modules')
-        .select('id', { count: 'exact' })
-        .eq('product_id', productData.id)
+        .select('id, module_product_assignments!inner(product_id)', { count: 'exact' })
+        .eq('module_product_assignments.product_id', productData.id)
         .eq('type', 'Assessment');
 
       if (!completedCountError && !totalCountError) {
@@ -399,26 +383,62 @@ export async function POST(
         
         console.log(`Assessment completion check: ${completedCount}/${totalCount} assessments completed for product ${productData.id}`);
         
-        // Award first star if ALL assessments are completed
+        // Award first star and assign tier if ALL assessments are completed
         if (completedCount === totalCount && totalCount > 0) {
-          console.log(`🌟 Student ${studentId} completed all ${totalCount} assessments. Awarding first star!`);
+          console.log(`🌟 Student ${studentId} completed all ${totalCount} assessments. Calculating tier and awarding first star!`);
           
-          const { error: starUpdateError } = await supabase
+          // Calculate tier based on average score of all completed assessments
+          let totalScore = 0;
+          let assessmentCount = 0;
+          
+          for (const assessment of completedAssessments) {
+            const progressDetails = assessment.student_module_progress?.[0]?.progress_details;
+            if (progressDetails?.score_percentage) {
+              totalScore += progressDetails.score_percentage;
+              assessmentCount++;
+            }
+          }
+          
+          const averageScore = assessmentCount > 0 ? totalScore / assessmentCount : 0;
+          
+          // Determine tier based on average score
+          if (averageScore >= finalTierConfig.gold_assessment_min_score) {
+            tierAchieved = 'GOLD';
+          } else if (averageScore >= finalTierConfig.silver_assessment_min_score) {
+            tierAchieved = 'SILVER';
+          } else if (averageScore >= finalTierConfig.bronze_assessment_min_score) {
+            tierAchieved = 'BRONZE';
+          }
+          
+          // Get current tier to check if it changed
+          const currentTier = claims.job_readiness_tier;
+          tierChanged = currentTier !== tierAchieved;
+          
+          console.log(`Calculated tier: ${tierAchieved} (average score: ${averageScore}%)`);
+          
+          // Update student with both star level and tier
+          const updateData: any = {
+            job_readiness_star_level: 'ONE',
+            job_readiness_last_updated: new Date().toISOString(),
+          };
+          
+          if (tierAchieved) {
+            updateData.job_readiness_tier = tierAchieved;
+          }
+          
+          const { error: updateError } = await supabase
             .from('students')
-            .update({
-              job_readiness_star_level: 'ONE',
-              job_readiness_last_updated: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq('id', studentId);
 
-          if (!starUpdateError) {
+          if (!updateError) {
             starLevelUnlocked = true;
-            console.log('🎉 Successfully awarded first star for completing all assessments!');
+            console.log(`🎉 Successfully awarded first star and ${tierAchieved} tier for completing all assessments!`);
           } else {
-            console.error('Error updating student star level:', starUpdateError);
+            console.error('Error updating student star level and tier:', updateError);
           }
         } else {
-          console.log(`Student ${studentId} completed ${completedCount}/${totalCount} assessments. First star will be awarded when all are complete.`);
+          console.log(`Student ${studentId} completed ${completedCount}/${totalCount} assessments. First star and tier will be awarded when all are complete.`);
         }
       } else {
         console.error('Error checking assessment completion:', { completedCountError, totalCountError });

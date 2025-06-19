@@ -160,12 +160,14 @@ export async function GET() {
           .from('modules')
           .select(`
             ${SELECTORS.MODULE.STUDENT},
-            product_id,
+            module_product_assignments!inner (
+              product_id
+            ),
             student_module_progress (
               ${STUDENT_MODULE_PROGRESS_SELECTORS.DETAIL}
             )
           `) // 📊 OPTIMIZED: Specific fields only
-          .eq('product_id', assignment.product_id)
+          .eq('module_product_assignments.product_id', assignment.product_id)
           .eq('student_module_progress.student_id', student.id)
           .order('sequence', { ascending: true });
 

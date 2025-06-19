@@ -100,12 +100,26 @@ export async function GET(
 
     const studentId = user.id;
 
-    // 4. Fetch Assessment Module Details (must be Job Readiness assessment)
+    // 4. Fetch Assessment Module Details with product assignment (must be Job Readiness assessment)
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('id, name, type, configuration, product_id')
+      .select(`
+        id, 
+        name, 
+        type, 
+        configuration,
+        module_product_assignments!inner (
+          product_id,
+          products!inner (
+            id,
+            name,
+            type
+          )
+        )
+      `)
       .eq('id', validModuleId)
       .eq('type', 'Assessment')
+      .eq('module_product_assignments.products.type', 'JOB_READINESS')
       .maybeSingle();
 
     if (moduleError) {
@@ -123,20 +137,16 @@ export async function GET(
       );
     }
 
-    // 5. Verify this is a Job Readiness product
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('id, name, type')
-      .eq('id', moduleData.product_id)
-      .eq('type', 'JOB_READINESS')
-      .single();
-
-    if (productError || !productData) {
+    // 5. Extract product data from junction table
+    const productAssignment = moduleData.module_product_assignments?.[0];
+    if (!productAssignment?.products) {
       return NextResponse.json(
         { error: 'This assessment is not part of a Job Readiness product' },
         { status: 404 }
       );
     }
+
+    const productData = productAssignment.products;
 
     // 6. Verify enrollment by checking if the student's client has access to this Job Readiness product
     const { count, error: assignmentError } = await supabase

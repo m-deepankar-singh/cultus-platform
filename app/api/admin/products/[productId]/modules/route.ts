@@ -36,11 +36,16 @@ export async function GET(
       );
     }
 
-    // Fetch modules for the product
+    // Fetch modules for the product using junction table
     const { data: modules, error: modulesError } = await supabase
       .from("modules")
-      .select("*")
-      .eq("product_id", paramsObj.productId)
+      .select(`
+        *,
+        module_product_assignments!inner (
+          product_id
+        )
+      `)
+      .eq("module_product_assignments.product_id", paramsObj.productId)
       .order("created_at", { ascending: true });
 
     // Handle database error
@@ -99,8 +104,8 @@ export async function POST(
     // Parse request body
     const body = await request.json();
     
-    // Inject productId from route parameter
-    const moduleData = { ...body, product_id: paramsObj.productId };
+    // Inject productId from route parameter as product_ids array
+    const moduleData = { ...body, product_ids: [paramsObj.productId] };
     
     // Validate module data with Zod schema
     const moduleValidation = ModuleSchema.safeParse(moduleData);
@@ -115,13 +120,13 @@ export async function POST(
       );
     }
     
-    // Extract validated data
-    const validatedModuleData = moduleValidation.data;
+    // Extract validated data and remove product assignment fields from module data
+    const { product_ids, ...moduleFields } = moduleValidation.data;
 
     // Insert new module into database
     const { data: newModule, error: createError } = await supabase
       .from("modules")
-      .insert(validatedModuleData)
+      .insert(moduleFields)
       .select()
       .single();
 
@@ -134,8 +139,53 @@ export async function POST(
       );
     }
 
+    // Create product assignment
+    const { error: assignmentError } = await supabase
+      .from('module_product_assignments')
+      .insert({
+        module_id: newModule.id,
+        product_id: paramsObj.productId
+      });
+
+    if (assignmentError) {
+      console.error('Error creating product assignment:', assignmentError);
+      
+      // Clean up module record if assignment fails
+      await supabase
+        .from('modules')
+        .delete()
+        .eq('id', newModule.id);
+      
+      return NextResponse.json(
+        { error: 'Server Error', message: 'Failed to create product assignment' },
+        { status: 500 }
+      );
+    }
+
+    // Get the created module with its product assignments
+    const { data: moduleWithProducts, error: fetchError } = await supabase
+      .from('modules')
+      .select(`
+        *,
+        module_product_assignments (
+          product_id,
+          products (
+            id,
+            name,
+            type
+          )
+        )
+      `)
+      .eq('id', newModule.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching created module:', fetchError);
+      return NextResponse.json(newModule, { status: 201 }); // Fallback to basic module data
+    }
+
     // Return the newly created module data
-    return NextResponse.json(newModule, { status: 201 });
+    return NextResponse.json(moduleWithProducts, { status: 201 });
   } catch (error) {
     console.error("Unexpected error in POST module:", error);
     return NextResponse.json(

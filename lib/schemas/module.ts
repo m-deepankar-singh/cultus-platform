@@ -10,9 +10,10 @@ export type ModuleType = z.infer<typeof ModuleTypeEnum>;
  * Base schema for module properties.
  */
 export const ModuleSchema = z.object({
-  product_id: z.string().uuid({ message: 'Invalid Product ID' }).nullable(),
+  product_ids: z.array(z.string().uuid({ message: 'Invalid Product ID' })).optional(),
   name: z.string().min(1, { message: 'Module name is required' }),
   type: ModuleTypeEnum,
+  sequence: z.number().int().default(0),
   configuration: z.record(z.unknown()).optional().default({}), 
   // Example configuration for Assessment:
   // { time_limit_minutes: 60, score_per_question: 10 }
@@ -41,7 +42,11 @@ export const CourseLessonSchema = z.object({
   // module_id is typically derived from the route parameter, not included here.
   sequence: z.number().int().min(0, { message: 'Sequence must be non-negative' }),
   title: z.string().min(1, { message: 'Lesson title is required' }),
-  video_url: z.string().url({ message: 'Invalid video URL' }).optional().nullable(),
+  video_url: z.union([
+    z.string().url(),
+    z.literal(''),
+    z.null()
+  ]).optional().nullable(),
   quiz_id: z.string().uuid({ message: 'Invalid Quiz Question ID' }).optional().nullable(), // FK to course_questions
 });
 

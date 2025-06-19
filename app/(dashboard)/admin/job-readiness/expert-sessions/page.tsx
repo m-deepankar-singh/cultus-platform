@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
+import { useDirectUpload } from '@/hooks/useDirectUpload';
 import { Upload, Edit, Trash2, Play, Users, Clock, TrendingUp, Plus, Eye, EyeOff } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -57,6 +59,7 @@ export default function ExpertSessionsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<ExpertSession | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -64,7 +67,24 @@ export default function ExpertSessionsPage() {
     description: '',
     product_ids: [] as string[],
     video_file: null as File | null,
-    video_duration: ''
+    video_duration: '',
+    video_url: '',
+    video_storage_path: ''
+  });
+
+  // Direct upload hook
+  const { uploadFile, uploading: videoUploading } = useDirectUpload({
+    uploadType: 'expertSessions',
+    onProgress: (progress) => {
+      setUploadProgress(progress.percentage);
+    },
+    onSuccess: (result) => {
+      handleSaveExpertSession(result);
+    },
+    onError: (error) => {
+      console.error('Upload error:', error);
+      setUploading(false);
+    },
   });
 
   useEffect(() => {
@@ -138,36 +158,27 @@ export default function ExpertSessionsPage() {
     }
   };
 
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.video_file || !formData.title || formData.product_ids.length === 0) {
-      toast({
-        title: 'Missing required fields',
-        description: 'Please fill in all required fields, select at least one product, and upload a video file',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setUploading(true);
+  // Handle successful video upload and save to database
+  const handleSaveExpertSession = async (uploadResult: { key: string; publicUrl: string }) => {
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('product_ids', JSON.stringify(formData.product_ids));
-      formDataToSend.append('video_file', formData.video_file);
-      if (formData.video_duration) {
-        formDataToSend.append('video_duration', formData.video_duration);
-      }
-
       const response = await fetch('/api/admin/job-readiness/expert-sessions', {
         method: 'POST',
-        body: formDataToSend
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          product_ids: formData.product_ids,
+          video_url: uploadResult.publicUrl,
+          video_storage_path: uploadResult.key,
+          video_duration: formData.video_duration ? parseInt(formData.video_duration) : null,
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to upload session');
+        throw new Error(error.error || 'Failed to save session');
       }
 
       toast({
@@ -181,18 +192,47 @@ export default function ExpertSessionsPage() {
         description: '',
         product_ids: [],
         video_file: null,
-        video_duration: ''
+        video_duration: '',
+        video_url: '',
+        video_storage_path: ''
       });
+      setUploadProgress(0);
       fetchSessions();
     } catch (error) {
-      console.error('Error creating session:', error);
+      console.error('Error saving session:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to upload session',
+        description: error instanceof Error ? error.message : 'Failed to save session',
         variant: 'destructive'
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleCreateSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.video_file || !formData.title || formData.product_ids.length === 0) {
+      toast({
+        title: 'Missing required fields',
+        description: 'Please fill in all required fields, select at least one product, and upload a video file',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Upload file directly to R2
+      await uploadFile(formData.video_file, {
+        title: formData.title,
+        duration: formData.video_duration || '',
+      });
+    } catch (error) {
+      console.error('Error uploading session:', error);
+      // Error handling is done in the hook's onError callback
     }
   };
 
@@ -321,7 +361,9 @@ export default function ExpertSessionsPage() {
       description: session.description,
       product_ids: currentProductIds,
       video_file: null,
-      video_duration: session.video_duration.toString()
+      video_duration: session.video_duration.toString(),
+      video_url: session.video_url,
+      video_storage_path: session.video_storage_path
     });
     setIsEditDialogOpen(true);
   };
@@ -454,19 +496,28 @@ export default function ExpertSessionsPage() {
                     type="number"
                     value={formData.video_duration}
                     onChange={(e) => setFormData(prev => ({ ...prev, video_duration: e.target.value }))}
-                    placeholder="Auto-detected from video file"
-                  />
+                                      placeholder="Auto-detected from video file"
+                />
+              </div>
+              )}
+              {(videoUploading || uploading) && uploadProgress > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Upload Progress</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="w-full" />
                 </div>
               )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={uploading}>
-                  {uploading ? (
+                <Button type="submit" disabled={uploading || videoUploading}>
+                  {uploading || videoUploading ? (
                     <>
                       <Upload className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
+                      {videoUploading ? `Uploading... ${uploadProgress}%` : 'Saving...'}
                     </>
                   ) : (
                     <>

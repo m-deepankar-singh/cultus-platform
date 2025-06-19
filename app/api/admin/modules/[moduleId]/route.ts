@@ -107,39 +107,153 @@ export async function PUT(
       );
     }
     
-    const moduleValidation = ModuleSchema.partial().safeParse(body);
-    if (!moduleValidation.success) {
-      return NextResponse.json(
-        { 
-          error: "Bad Request", 
-          message: "Invalid module data",
-          details: moduleValidation.error.format() 
-        },
-        { status: 400 }
-      );
+    // Handle product assignment updates separately from other module fields
+    const { product_ids, product_id, ...moduleFields } = body;
+    
+    // Determine product IDs to assign
+    let productIdsToAssign: string[] = [];
+    if (product_ids) {
+      // New many-to-many format
+      productIdsToAssign = Array.isArray(product_ids) ? product_ids : [];
+    } else if (product_id) {
+      // Legacy single product format - convert to array
+      productIdsToAssign = [product_id];
     }
 
-    const validatedModuleData = moduleValidation.data;
+    // Validate product IDs if provided
+    if (productIdsToAssign.length > 0) {
+      const { data: products, error: productError } = await supabase
+        .from('products')
+        .select('id')
+        .in('id', productIdsToAssign);
 
-    const { data: updatedModule, error: updateError } = await supabase
-      .from("modules")
-      .update({
-        ...validatedModuleData,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", paramsObj.moduleId)
-      .select()
+      if (productError || !products || products.length !== productIdsToAssign.length) {
+        return NextResponse.json(
+          { error: 'Bad Request', message: 'One or more invalid product IDs' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update module fields if provided (excluding product assignments)
+    if (Object.keys(moduleFields).length > 0) {
+      const moduleValidation = ModuleSchema.partial().safeParse(moduleFields);
+      if (!moduleValidation.success) {
+        return NextResponse.json(
+          { 
+            error: "Bad Request", 
+            message: "Invalid module data",
+            details: moduleValidation.error.format() 
+          },
+          { status: 400 }
+        );
+      }
+
+      const { data: updatedModule, error: updateError } = await supabase
+        .from("modules")
+        .update({
+          ...moduleValidation.data,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", paramsObj.moduleId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error("Error updating module:", updateError);
+        return NextResponse.json(
+          { error: "Server Error", message: "Error updating module" },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Update product assignments if product IDs were provided
+    if (productIdsToAssign.length >= 0) { // Allow empty array to clear all assignments
+      // Get current assignments
+      const { data: currentAssignments, error: currentError } = await supabase
+        .from('module_product_assignments')
+        .select('product_id')
+        .eq('module_id', paramsObj.moduleId);
+
+      if (currentError) {
+        console.error('Error fetching current assignments:', currentError);
+        return NextResponse.json(
+          { error: 'Server Error', message: 'Failed to fetch current product assignments' },
+          { status: 500 }
+        );
+      }
+
+      const currentProductIds = currentAssignments?.map((a: any) => a.product_id) || [];
+      
+      // Calculate differences
+      const toRemove = currentProductIds.filter((pid: string) => !productIdsToAssign.includes(pid));
+      const toAdd = productIdsToAssign.filter(productId => !currentProductIds.includes(productId));
+
+      // Remove old assignments
+      if (toRemove.length > 0) {
+        const { error: removeError } = await supabase
+          .from('module_product_assignments')
+          .delete()
+          .eq('module_id', paramsObj.moduleId)
+          .in('product_id', toRemove);
+
+        if (removeError) {
+          console.error('Error removing product assignments:', removeError);
+          return NextResponse.json(
+            { error: 'Server Error', message: 'Failed to remove old product assignments' },
+            { status: 500 }
+          );
+        }
+      }
+
+      // Add new assignments
+      if (toAdd.length > 0) {
+        const newAssignments = toAdd.map(productId => ({
+          module_id: paramsObj.moduleId,
+          product_id: productId
+        }));
+
+        const { error: addError } = await supabase
+          .from('module_product_assignments')
+          .insert(newAssignments);
+
+        if (addError) {
+          console.error('Error adding product assignments:', addError);
+          return NextResponse.json(
+            { error: 'Server Error', message: 'Failed to add new product assignments' },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
+    // Get the updated module with its product assignments
+    const { data: moduleWithProducts, error: fetchError } = await supabase
+      .from('modules')
+      .select(`
+        *,
+        module_product_assignments (
+          product_id,
+          products (
+            id,
+            name,
+            type
+          )
+        )
+      `)
+      .eq('id', paramsObj.moduleId)
       .single();
 
-    if (updateError) {
-      console.error("Error updating module:", updateError);
+    if (fetchError) {
+      console.error('Error fetching updated module:', fetchError);
       return NextResponse.json(
-        { error: "Server Error", message: "Error updating module" },
+        { error: 'Server Error', message: 'Error fetching updated module' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(updatedModule);
+    return NextResponse.json(moduleWithProducts);
 
   } catch (error) {
     console.error("Unexpected error in PUT module:", error);

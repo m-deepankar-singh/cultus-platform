@@ -73,7 +73,7 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
       const response = await fetch(`/api/admin/modules/${moduleId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: UNASSIGNED_MODULES_REPOSITORY })
+        body: JSON.stringify({ product_ids: [UNASSIGNED_MODULES_REPOSITORY] })
       })
       
       if (!response.ok) {
@@ -83,7 +83,7 @@ export function ModuleManager({ productId }: ModuleManagerProps) {
       
       toast({
         title: "Module unassigned",
-        description: "The module has been removed from this product."
+        description: "The module has been moved to the Unassigned Modules Repository."
       })
       
       fetchModules()

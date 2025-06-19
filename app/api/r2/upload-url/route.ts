@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // ⚠️ DEPRECATED: This endpoint is deprecated and should not be used.
-// Use the new S3 upload endpoints instead:
+// Use the new upload system instead:
 // - /api/admin/products/upload-image (for product images)
 // - /api/admin/clients/upload-logo (for client logos)
 // - /api/admin/lessons/upload-video (for lesson videos)
-// - /api/admin/job-readiness/expert-sessions/upload-video (for expert sessions)
-// - /api/admin/job-readiness/interviews/upload-video (for interviews)
+// - /api/r2/presigned-upload (for direct uploads - expert sessions & interviews)
 
 export async function POST() {
   return NextResponse.json(
@@ -18,8 +17,8 @@ export async function POST() {
         "client-logo": "/api/admin/clients/upload-logo",
         "product-image": "/api/admin/products/upload-image", 
         "course-material": "/api/admin/lessons/upload-video",
-        "interview-recording": "/api/admin/job-readiness/interviews/upload-video",
-        "expert-session": "/api/admin/job-readiness/expert-sessions/upload-video"
+        "interview-recording": "/api/r2/presigned-upload (direct upload)",
+        "expert-session": "/api/r2/presigned-upload (direct upload)"
       }
     },
     { status: 410 } // 410 Gone - indicates the endpoint is permanently unavailable

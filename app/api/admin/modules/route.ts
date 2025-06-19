@@ -9,6 +9,7 @@ const ModuleSchema = z.object({
   name: z.string().min(3, { message: "Module name must be at least 3 characters long" }),
   type: z.enum(["Course", "Assessment"], { message: "Module type must be 'Course' or 'Assessment'" }),
   product_id: z.string().uuid().optional(),
+  product_ids: z.array(z.string().uuid()).optional(),
   sequence: z.number().int().default(0),
   configuration: z.record(z.any()).default({}),
   // description field is not in the actual database schema, so we'll remove it
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
     const moduleType = searchParams.get('type');
+    const includeAssignments = searchParams.get('include_assignments') === 'true';
     
     // Calculate range for pagination
     const { from, to } = calculatePaginationRange(page, pageSize);
@@ -43,11 +45,13 @@ export async function GET(request: NextRequest) {
     // First, get total count with filters
     let countQuery = supabase
       .from("modules")
-      .select('id', { count: 'exact', head: true });
+      .select('id, module_product_assignments(product_id)', { count: 'exact', head: true });
     
-    // Apply filters
+    // Apply filters - use junction table for product filtering
     if (productId) {
-      countQuery = countQuery.eq("product_id", productId);
+      countQuery = countQuery
+        .eq("module_product_assignments.product_id", productId)
+        .not("module_product_assignments", "is", null);
     }
     
     if (search) {
@@ -68,14 +72,24 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Build main data query
+    // Build main data query with conditional assignment data
+    let selectFields = "*, products(id, name)";
+    if (includeAssignments) {
+      selectFields = `*, products(id, name), module_product_assignments(
+        product_id,
+        products(id, name, type)
+      )`;
+    }
+    
     let dataQuery = supabase
       .from("modules")
-      .select("*, products(id, name)");
+      .select(selectFields);
     
-    // Apply the same filters
+    // Apply the same filters - use junction table for product filtering
     if (productId) {
-      dataQuery = dataQuery.eq("product_id", productId);
+      dataQuery = dataQuery
+        .eq("module_product_assignments.product_id", productId)
+        .not("module_product_assignments", "is", null);
     }
     
     if (search) {
@@ -102,13 +116,26 @@ export async function GET(request: NextRequest) {
 
     // Format modules to have a consistent "products" array (needed for the ModulesTable component)
     const formattedModules = modules?.map((module: any) => {
-      // Transform products relation into an array
+      // For new many-to-many structure, extract products from assignments
+      if (module.module_product_assignments) {
+        const assignedProducts = module.module_product_assignments
+          .map((assignment: any) => assignment.products)
+          .filter((product: any) => product !== null);
+        
+        return {
+          ...module,
+          products: assignedProducts,
+        };
+      }
+      
+      // Fallback for backward compatibility
       if (module.products) {
         return {
           ...module,
-          products: module.product_id ? [module.products] : [],
+          products: [module.products],
         };
       }
+      
       return {
         ...module,
         products: [],
@@ -166,38 +193,101 @@ export async function POST(request: Request) {
 
     const moduleData = validation.data;
 
-    // If product_id is provided, verify it exists
-    if (moduleData.product_id) {
-      const { data: product, error: productError } = await supabase
+    // Handle product assignment using new product_ids array
+    let productIdsToAssign: string[] = [];
+    if (moduleData.product_ids && Array.isArray(moduleData.product_ids)) {
+      productIdsToAssign = moduleData.product_ids;
+    } else {
+      // Default to "Unassigned Modules Repository" if no products specified
+      productIdsToAssign = ["3f9a1ea0-5942-4ef1-bdb6-183d5add4b52"];
+    }
+
+    // Validate all product IDs
+    if (productIdsToAssign.length > 0) {
+      const { data: products, error: productError } = await supabase
         .from("products")
         .select("id")
-        .eq("id", moduleData.product_id)
-        .single();
+        .in("id", productIdsToAssign);
 
-      if (productError || !product) {
+      if (productError || !products || products.length !== productIdsToAssign.length) {
         return NextResponse.json(
-          { error: "Bad Request", message: "Product not found" },
+          { error: "Bad Request", message: "One or more invalid product IDs" },
           { status: 400 }
         );
       }
     }
 
-    // Create the module
-    const { data: newModule, error: createError } = await supabase
+    // Extract configuration and other fields (exclude product_ids from module record)
+    const { product_ids, ...moduleFields } = moduleData;
+
+    // Create the module record
+    const { data: module, error: moduleError } = await supabase
       .from("modules")
-      .insert(moduleData)
+      .insert({
+        ...moduleFields,
+        created_by: user.id
+      })
       .select()
       .single();
 
-    if (createError) {
-      console.error("Error creating module:", createError);
+    if (moduleError) {
+      console.error("Error creating module:", moduleError);
       return NextResponse.json(
         { error: "Server Error", message: "Error creating module" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(newModule, { status: 201 });
+    // Create product assignments
+    if (productIdsToAssign.length > 0) {
+      const productAssignments = productIdsToAssign.map((productId: string) => ({
+        module_id: module.id,
+        product_id: productId
+      }));
+
+      const { error: assignmentError } = await supabase
+        .from('module_product_assignments')
+        .insert(productAssignments);
+
+      if (assignmentError) {
+        console.error('Error creating product assignments:', assignmentError);
+        
+        // Clean up module record if assignment fails
+        await supabase
+          .from('modules')
+          .delete()
+          .eq('id', module.id);
+        
+        return NextResponse.json(
+          { error: 'Server Error', message: 'Failed to create product assignments' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Get the created module with its product assignments
+    const { data: moduleWithProducts, error: fetchError } = await supabase
+      .from('modules')
+      .select(`
+        *,
+        module_product_assignments (
+          product_id,
+          products (
+            id,
+            name,
+            type
+          )
+        )
+      `)
+      .eq('id', module.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching created module:', fetchError);
+      return NextResponse.json(module); // Fallback to basic module data
+    }
+
+    return NextResponse.json(moduleWithProducts, { status: 201 });
 
   } catch (error) {
     console.error("Unexpected error in POST modules:", error);

@@ -95,6 +95,9 @@ export async function GET(req: NextRequest) {
         type,
         configuration,
         sequence,
+        module_product_assignments!inner (
+          product_id
+        ),
         student_module_progress (
           student_id,
           module_id,
@@ -110,7 +113,7 @@ export async function GET(req: NextRequest) {
           sequence
         )
       `)
-      .eq('product_id', productId)
+      .eq('module_product_assignments.product_id', productId)
       .eq('type', 'Assessment')
       .eq('student_module_progress.student_id', user.id)
       .order('sequence', { ascending: true });
@@ -185,11 +188,14 @@ export async function GET(req: NextRequest) {
       .from('modules')
       .select(`
         id,
+        module_product_assignments!inner (
+          product_id
+        ),
         student_module_progress!inner (
           status
         )
       `)
-      .eq('product_id', productId)
+      .eq('module_product_assignments.product_id', productId)
       .eq('type', 'Assessment')
       .eq('student_module_progress.student_id', user.id)
       .eq('student_module_progress.status', 'Completed');
@@ -197,8 +203,8 @@ export async function GET(req: NextRequest) {
     // Get total assessment count
     const { count: totalCount, error: totalCountError } = await supabase
       .from('modules')
-      .select('id', { count: 'exact' })
-      .eq('product_id', productId)
+      .select('id, module_product_assignments!inner(product_id)', { count: 'exact' })
+      .eq('module_product_assignments.product_id', productId)
       .eq('type', 'Assessment');
 
     // Calculate completion status

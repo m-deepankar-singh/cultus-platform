@@ -7,6 +7,7 @@ import { audioContext } from '@/lib/ai/utils';
 import { InterviewQuestion } from '@/lib/types';
 import { Modality } from '@google/genai';
 import { sessionManager } from '@/lib/ai/simple-session-manager';
+import { useDirectUpload } from '@/hooks/useDirectUpload';
 
 export interface LiveInterviewContextType {
   // WebSocket client and connection state
@@ -22,6 +23,10 @@ export interface LiveInterviewContextType {
   // Video recording
   videoRecorder: WebMVideoRecorder | null;
   videoBlob: Blob | null;
+  
+  // Upload state
+  uploading: boolean;
+  uploadProgress: number;
   
   // Audio streaming for AI voice playback
   audioStreamer: AudioStreamer | null;
@@ -76,6 +81,10 @@ export function LiveInterviewProvider({
   const [videoRecorder, setVideoRecorder] = useState<WebMVideoRecorder | null>(null);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   
+  // Upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
   // Audio streaming for playback
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
   
@@ -111,6 +120,22 @@ export function LiveInterviewProvider({
   const INACTIVITY_WARNING_TIME = 8 * 60 * 1000; // 8 minutes
   const INACTIVITY_DISCONNECT_TIME = 10 * 60 * 1000; // 10 minutes
   const HEARTBEAT_INTERVAL = 30 * 1000; // 30 seconds
+
+  // Direct upload hook for interview recordings
+  const { uploadFile, uploading: videoUploading } = useDirectUpload({
+    uploadType: 'interviewRecordings',
+    onProgress: (progress) => {
+      setUploadProgress(progress.percentage);
+    },
+    onSuccess: (result) => {
+      handleSubmitToAPI(result);
+    },
+    onError: (error) => {
+      console.error('Upload error:', error);
+      setError(`Upload failed: ${error}`);
+      setUploading(false);
+    },
+  });
 
   // Initialize client
   useEffect(() => {
@@ -286,11 +311,50 @@ export function LiveInterviewProvider({
     }
   }, []);
 
-  // Submit interview - moved up to fix dependency order
+  // Handle successful video upload and save to database
+  const handleSubmitToAPI = useCallback(async (uploadResult: { key: string; publicUrl: string }): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/app/job-readiness/interviews/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          video_url: uploadResult.publicUrl,
+          video_storage_path: uploadResult.key,
+          questions: generatedQuestions,
+          backgroundId: backgroundId,
+        }),
+      });
+
+      const submitResult = await response.json();
+
+      if (submitResult.success) {
+        console.log('Interview submitted successfully:', submitResult.submissionId);
+        setUploading(false);
+        setUploadProgress(0);
+        return submitResult.submissionId;
+      } else {
+        throw new Error(submitResult.error || 'Failed to submit interview');
+      }
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit interview';
+      setError(errorMessage);
+      setUploading(false);
+      setUploadProgress(0);
+      return null;
+    }
+  }, [generatedQuestions, backgroundId]);
+
+  // Submit interview with direct upload
   const submitInterview = useCallback(async (): Promise<string | null> => {
     if (!recording || !videoRecorder) return null;
     
     try {
+      setUploading(true);
+      setUploadProgress(0);
+      
       // Stop recording
       const recordingResult = await videoRecorder.stopRecording();
       setVideoBlob(recordingResult.blob);
@@ -308,31 +372,28 @@ export function LiveInterviewProvider({
       // Disconnect from Live API
       disconnect();
       
-      // Submit to backend
-      const formData = new FormData();
-      formData.append('video', recordingResult.blob);
-      formData.append('questions', JSON.stringify(generatedQuestions));
-      formData.append('backgroundId', backgroundId);
-      
-      const response = await fetch('/api/app/job-readiness/interviews/submit', {
-        method: 'POST',
-        body: formData
+      // Convert Blob to File for upload
+      const videoFile = new File([recordingResult.blob], 'interview-recording.webm', {
+        type: recordingResult.blob.type || 'video/webm',
       });
       
-      const submitResult = await response.json();
+      // Upload video directly to R2
+      await uploadFile(videoFile, {
+        backgroundId: backgroundId,
+        questions: JSON.stringify(generatedQuestions),
+      });
       
-      if (submitResult.success) {
-        console.log('Interview submitted successfully:', submitResult.submissionId);
-        return submitResult.submissionId;
-      } else {
-        throw new Error('Failed to submit interview');
-      }
+      // Return will be handled by the onSuccess callback
+      return null;
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit interview');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit interview';
+      setError(errorMessage);
+      setUploading(false);
+      setUploadProgress(0);
       return null;
     }
-  }, [recording, videoRecorder, generatedQuestions, backgroundId, stopTimer]);
+  }, [recording, videoRecorder, backgroundId, generatedQuestions, stopTimer, uploadFile]);
 
   // Session management functions - moved up to fix dependency order
   const clearSessionTimers = useCallback(() => {
@@ -824,6 +885,8 @@ export function LiveInterviewProvider({
     interviewStarted,
     videoRecorder,
     videoBlob,
+    uploading: uploading || videoUploading,
+    uploadProgress,
     audioStreamer: audioStreamerRef.current,
     audioRecorder,
     audioInputEnabled,

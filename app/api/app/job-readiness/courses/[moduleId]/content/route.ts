@@ -114,7 +114,19 @@ export async function GET(
     // Fetch Course Module Details with Job Readiness verification
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('id, name, configuration, product_id')
+      .select(`
+        id, 
+        name, 
+        configuration,
+        module_product_assignments!inner (
+          product_id,
+          products (
+            id,
+            name,
+            type
+          )
+        )
+      `)
       .eq('id', moduleId)
       .eq('type', 'Course')
       .single();
@@ -131,15 +143,14 @@ export async function GET(
         return NextResponse.json({ error: 'Course module not found' }, { status: 404 });
     }
 
-    // Verify this is a Job Readiness product
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('id, name, type')
-      .eq('id', moduleData.product_id)
-      .eq('type', 'JOB_READINESS')
-      .single();
+    // Verify this is a Job Readiness product using the junction table data
+    const productAssignment = moduleData.module_product_assignments?.[0];
+    if (!productAssignment?.products) {
+      return NextResponse.json({ error: 'This course is not assigned to any product' }, { status: 404 });
+    }
 
-    if (productError || !productData) {
+    const productData = productAssignment.products;
+    if (productData.type !== 'JOB_READINESS') {
       return NextResponse.json({ error: 'This course is not part of a Job Readiness product' }, { status: 404 });
     }
 

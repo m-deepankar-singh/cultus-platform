@@ -88,22 +88,24 @@ export async function POST(
       .select(`
         id, 
         name, 
-        type, 
-        product_id,
-        products!inner (
-          id, 
-          name, 
-          type,
-          client_product_assignments!inner (
-            client_id
+        type,
+        module_product_assignments!inner (
+          product_id,
+          products!inner (
+            id, 
+            name, 
+            type,
+            client_product_assignments!inner (
+              client_id
+            )
           )
         ),
         lessons (count)
       `)
       .eq('id', validModuleId)
       .eq('type', 'Course')
-      .eq('products.type', 'JOB_READINESS')
-      .eq('products.client_product_assignments.client_id', clientId)
+      .eq('module_product_assignments.products.type', 'JOB_READINESS')
+      .eq('module_product_assignments.products.client_product_assignments.client_id', clientId)
       .single();
 
     if (courseError || !courseData) {
@@ -192,7 +194,7 @@ export async function POST(
 
     if (courseCompleted && !existingProgress?.course_completed_at) {
       // Check if ALL course modules for this product are now completed
-      const productId = courseData.product_id;
+      const productId = courseData.module_product_assignments?.[0]?.product_id;
       
       // Get current star level
       const { data: studentData, error: studentError } = await supabase
@@ -204,17 +206,21 @@ export async function POST(
       if (!studentError && studentData) {
         const currentStarLevel = studentData.job_readiness_star_level;
         
-        if (currentStarLevel === 'ONE') {
+        // Only award second star if student doesn't already have TWO or higher
+        if (currentStarLevel !== 'TWO' && currentStarLevel !== 'THREE') {
           // Check if ALL course modules for this product are completed
           const { data: completedCourses, error: completedCoursesError } = await supabase
             .from('modules')
             .select(`
               id,
+              module_product_assignments!inner (
+                product_id
+              ),
               student_module_progress!inner (
                 status
               )
             `)
-            .eq('product_id', productId)
+            .eq('module_product_assignments.product_id', productId)
             .eq('type', 'Course')
             .eq('student_module_progress.student_id', studentId)
             .eq('student_module_progress.status', 'Completed');
@@ -222,8 +228,8 @@ export async function POST(
           // Get total course count for this product
           const { count: totalCourseCount, error: totalCountError } = await supabase
             .from('modules')
-            .select('id', { count: 'exact' })
-            .eq('product_id', productId)
+            .select('id, module_product_assignments!inner(product_id)', { count: 'exact' })
+            .eq('module_product_assignments.product_id', productId)
             .eq('type', 'Course');
 
           if (!completedCoursesError && !totalCountError) {
@@ -258,7 +264,7 @@ export async function POST(
             console.error('Error checking course completion:', { completedCoursesError, totalCountError });
           }
         } else {
-          console.log(`Student ${studentId} star level is ${currentStarLevel}, not ONE. No second star awarding.`);
+          console.log(`Student ${studentId} already has star level ${currentStarLevel}. No second star awarding needed.`);
         }
       } else {
         console.error('Error fetching student star level:', studentError);

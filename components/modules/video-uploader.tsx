@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
+import { useDirectUpload } from "@/hooks/useDirectUpload"
 
 interface VideoUploaderProps {
   onUploadComplete: (videoUrl: string, videoPath: string) => void
@@ -13,37 +14,45 @@ interface VideoUploaderProps {
   moduleId?: string
 }
 
-interface UploadResult {
-  success: boolean
-  url?: string
-  key?: string
-  error?: string
-}
+
 
 export function VideoUploader({ 
   onUploadComplete, 
   currentVideoUrl, 
 }: VideoUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | undefined>(currentVideoUrl)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  // Simulated progress function for S3 upload (actual progress would require special upload handling)
-  const simulateProgress = () => {
-    setUploadProgress(0)
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        const newProgress = prev + Math.random() * 10
-        // Cap at 90% until we get actual completion confirmation
-        return newProgress < 90 ? newProgress : 90
-      })
-    }, 300)
-    return interval
-  }
+  // Direct upload hook for lesson videos
+  const { uploadFile, uploading: isUploading } = useDirectUpload({
+    uploadType: 'lessonVideos',
+    onProgress: (progress) => {
+      setUploadProgress(progress.percentage);
+    },
+    onSuccess: (result) => {
+      setVideoUrl(result.publicUrl);
+      onUploadComplete(result.publicUrl, result.key);
+      
+      toast({
+        title: "Upload successful",
+        description: "Video has been uploaded successfully",
+      });
+    },
+    onError: (errorMessage) => {
+      setError(errorMessage);
+      setUploadProgress(0);
+      
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: errorMessage,
+      });
+    },
+  });
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -79,57 +88,17 @@ export function VideoUploader({
   const handleUpload = async () => {
     if (!file) return
     
-    setIsUploading(true)
     setError(null)
-    
-    // Start progress simulation
-    const progressInterval = simulateProgress()
+    setUploadProgress(0)
     
     try {
-      // Use new S3 upload endpoint instead of old R2 upload helper
-      const formData = new FormData()
-      formData.append('file', file)
-      
-      const response = await fetch('/api/admin/lessons/upload-video', {
-        method: 'POST',
-        body: formData,
-      })
-      
-      const result: UploadResult = await response.json()
-      
-      clearInterval(progressInterval)
-      
-      if (result.success && result.url && result.key) {
-        // Complete the progress bar
-        setUploadProgress(100)
-        
-        // Set the video URL from the S3 response
-        setVideoUrl(result.url)
-        
-        // Call the callback with the new video URL and key (as path)
-        // This maintains the same interface as the old R2 system
-        onUploadComplete(result.url, result.key)
-        
-        toast({
-          title: "Upload successful",
-          description: "Video has been uploaded successfully",
-        })
-      } else {
-        throw new Error(result.error || 'Upload failed')
-      }
+      // Upload file directly to R2 using the hook
+      await uploadFile(file, {
+        moduleId: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for module ID
+      });
     } catch (err) {
-      clearInterval(progressInterval)
-      setUploadProgress(0)
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
-      setError(errorMessage)
-      
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: errorMessage,
-      })
-    } finally {
-      setIsUploading(false)
+      // Error handling is done in the hook's onError callback
+      console.error('Upload error:', err);
     }
   }
 

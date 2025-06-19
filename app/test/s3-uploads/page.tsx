@@ -5,7 +5,6 @@ import {
   ProductImageUploadExample,
   ClientLogoUploadExample, 
   LessonVideoUploadExample,
-  ExpertSessionVideoUploadExample,
   InterviewVideoUploadExample
 } from '@/components/ui/s3-upload-examples';
 
@@ -92,10 +91,12 @@ export default function S3UploadTestPage() {
         {/* Expert Session Video Upload */}
         <div className="border rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Expert Session Video Upload</h2>
-          <ExpertSessionVideoUploadExample 
-            sessionId="test-session-123"
-            onVideoUpload={(url) => addResult(`Expert session video uploaded: ${url}`)}
-          />
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+            <p className="text-sm text-yellow-800">
+              <strong>DEPRECATED:</strong> Expert Session uploads now use direct upload system. 
+              See app/(dashboard)/admin/job-readiness/expert-sessions/page.tsx for the updated implementation.
+            </p>
+          </div>
         </div>
 
         {/* Interview Video Upload */}

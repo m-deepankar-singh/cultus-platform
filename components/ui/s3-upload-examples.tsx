@@ -84,60 +84,9 @@ export function LessonVideoUploadExample({ onVideoUpload }: { onVideoUpload: (ur
 
 /**
  * Example usage for expert session video uploads
- * Use this in expert session forms where you need to upload videos
+ * DEPRECATED: Use the direct upload system with useDirectUpload hook instead
+ * See app/(dashboard)/admin/job-readiness/expert-sessions/page.tsx for the updated implementation
  */
-export function ExpertSessionVideoUploadExample({ 
-  sessionId, 
-  onVideoUpload 
-}: { 
-  sessionId: string;
-  onVideoUpload: (url: string) => void;
-}) {
-  const handleUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('sessionId', sessionId);
-
-    const response = await fetch('/api/admin/job-readiness/expert-sessions/upload-video', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const result = await response.json();
-    
-    if (result.success) {
-      onVideoUpload(result.url);
-    } else {
-      throw new Error(result.error || 'Upload failed');
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-        <input
-          type="file"
-          accept="video/mp4,video/webm"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file);
-          }}
-          className="hidden"
-          id="expert-session-upload"
-        />
-        <button
-          onClick={() => document.getElementById('expert-session-upload')?.click()}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-        >
-          Upload Expert Session Video
-        </button>
-        <p className="text-sm text-gray-500 mt-2">
-          Maximum file size: 500MB
-        </p>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Example usage for interview video uploads

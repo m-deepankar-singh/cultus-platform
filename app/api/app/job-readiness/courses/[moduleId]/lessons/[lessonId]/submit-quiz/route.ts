@@ -118,12 +118,25 @@ export async function POST(
       );
     }
 
-    // 5. Verify module is a Job Readiness course
+    // 5. Verify module is a Job Readiness course with product assignment
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('id, name, type, product_id')
+      .select(`
+        id, 
+        name, 
+        type,
+        module_product_assignments!inner (
+          product_id,
+          products!inner (
+            id,
+            name,
+            type
+          )
+        )
+      `)
       .eq('id', validModuleId)
       .eq('type', 'Course')
+      .eq('module_product_assignments.products.type', 'JOB_READINESS')
       .single();
 
     if (moduleError || !moduleData) {
@@ -133,20 +146,16 @@ export async function POST(
       );
     }
 
-    // 6. Verify this is a Job Readiness product
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('id, name, type')
-      .eq('id', moduleData.product_id)
-      .eq('type', 'JOB_READINESS')
-      .single();
-
-    if (productError || !productData) {
+    // 6. Extract product data from junction table
+    const productAssignment = moduleData.module_product_assignments?.[0];
+    if (!productAssignment?.products) {
       return NextResponse.json(
         { error: 'This course is not part of a Job Readiness product' },
         { status: 404 }
       );
     }
+
+    const productData = productAssignment.products;
 
     // 7. Verify enrollment using client_id from JWT claims
     const { count, error: assignmentError } = await supabase

@@ -34,7 +34,7 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
     serverActions: {
-      bodySizeLimit: '100mb', // Allow larger uploads for video files
+      bodySizeLimit: '1mb', // ✅ Reduced from 100mb - only for metadata now
     },
   },
   webpack: (config) => {
