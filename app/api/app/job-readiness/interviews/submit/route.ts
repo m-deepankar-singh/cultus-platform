@@ -83,11 +83,23 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to trigger video analysis:', triggerError);
     }
 
-    return NextResponse.json({
+    // Create response with cache invalidation headers
+    const response = NextResponse.json({
       success: true,
       submissionId: submission.id,
-      message: 'Interview submitted successfully. Analysis will begin shortly.'
+      message: 'Interview submitted successfully. Analysis will begin shortly.',
+      // Add a timestamp to help with cache busting
+      timestamp: Date.now()
     });
+
+    // Add cache invalidation headers to ensure frontend refreshes
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    // Custom header to signal frontend to invalidate interview cache
+    response.headers.set('X-Interview-Cache-Invalidate', 'true');
+
+    return response;
 
   } catch (error) {
     console.error('Error in interview submission:', error);

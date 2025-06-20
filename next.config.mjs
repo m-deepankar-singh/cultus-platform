@@ -27,6 +27,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'assests.cultuslearn.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   experimental: {

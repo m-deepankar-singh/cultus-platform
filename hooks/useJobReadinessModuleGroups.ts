@@ -76,7 +76,15 @@ export function useJobReadinessModuleGroups() {
   return useQuery<JobReadinessModuleGroups>({
     queryKey: ['job-readiness', 'module-groups'],
     queryFn: async () => {
-      const response = await fetch('/api/app/job-readiness/products')
+      // Add cache-busting parameter and headers to ensure fresh data for interview status
+      const timestamp = Date.now();
+      const response = await fetch(`/api/app/job-readiness/products?_t=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
       if (!response.ok) {
         throw new Error('Failed to fetch Job Readiness module groups')
       }
@@ -215,8 +223,10 @@ export function useJobReadinessModuleGroups() {
         interviewStatus: data.interviewStatus
       }
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // Reduced from 2 minutes to 30 seconds for more frequent interview status updates
+    gcTime: 2 * 60 * 1000, // Reduced from 5 minutes to 2 minutes
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnMount: 'always', // Always refetch on mount to get latest data
   })
 } 
  

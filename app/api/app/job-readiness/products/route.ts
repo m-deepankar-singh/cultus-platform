@@ -316,7 +316,7 @@ export async function GET() {
       console.log(`[TIER_DISPLAY] Student ${student.id} - Global assessments complete: ${globalAllAssessmentsComplete}, Display tier: ${displayTier}`);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       student: {
         id: student.id,
         name: student.full_name,
@@ -340,6 +340,13 @@ export async function GET() {
       }),
       interviewStatus
     });
+
+    // Add cache control headers to prevent caching of interview status
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (error) {
     console.error('Unexpected error in job-readiness products GET:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayout';
 import { InterviewSessionProvider } from '@/components/job-readiness/providers/InterviewSessionProvider';
 import { LiveInterviewProvider } from '@/components/job-readiness/contexts/LiveInterviewContext';
@@ -10,16 +10,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, Clock, AlertCircle, Video, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Video, ArrowLeft, AlertTriangle, Play, ArrowRight } from 'lucide-react';
 import { useJobReadinessModuleGroups } from '@/hooks/useJobReadinessModuleGroups';
 import Link from 'next/link';
+import { useInvalidateInterviewCache } from '@/hooks/useInvalidateInterviewCache';
 
 const TEST_BACKGROUND_ID = 'df8e996e-df6f-43f0-9bfa-c308a7604624'; // Computer Science background ID
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 export default function InterviewsPage() {
   const [currentStep, setCurrentStep] = useState<'landing' | 'setup' | 'interview'>('landing');
   const { data: moduleGroups, isLoading } = useJobReadinessModuleGroups();
+  const { invalidateInterviewCache, forceRefreshInterviewStatus } = useInvalidateInterviewCache();
 
   // Check if interviews are unlocked
   const interviewModule = moduleGroups?.moduleGroups.find(g => g.type === 'interviews');
@@ -45,8 +47,20 @@ export default function InterviewsPage() {
     setCurrentStep('landing');
   };
 
-  const handleInterviewComplete = (submissionId?: string) => {
+  const handleInterviewComplete = async (submissionId?: string) => {
     console.log('🎯 Interview completed callback received with submission ID:', submissionId);
+    
+    // Force refresh interview status to get the latest submission data
+    try {
+      console.log('🔄 Force refreshing interview status...');
+      await forceRefreshInterviewStatus();
+      console.log('✅ Cache invalidated and refreshed successfully');
+      
+      // Small delay to ensure data is fresh
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      console.error('❌ Failed to refresh interview status:', error);
+    }
     
     // Use the new submission ID if provided, otherwise fall back to cached one
     const targetSubmissionId = submissionId || interviewStatus?.submissionId;
