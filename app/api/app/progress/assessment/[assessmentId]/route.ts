@@ -108,7 +108,10 @@ export async function POST(
     // 5a. Get product_id from module
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('product_id')
+      .select(`
+        id,
+        module_product_assignments!inner(product_id)
+      `)
       .eq('id', moduleId)
       .maybeSingle();
 
@@ -116,12 +119,12 @@ export async function POST(
       console.error('Error fetching module for enrollment check:', moduleError);
       return NextResponse.json({ error: 'Internal Server Error fetching module data' }, { status: 500 });
     }
-    if (!moduleData || !moduleData.product_id) {
+    if (!moduleData || !moduleData.module_product_assignments?.length) {
         // This case should ideally not happen if assessment.module_id is a valid FK, but good to check
-      console.error(`Module ${moduleId} linked to assessment ${assessmentId} not found or has no product.`);
+      console.error(`Module ${moduleId} linked to assessment ${assessmentId} not found or has no product assignment.`);
       return NextResponse.json({ error: 'Internal Server Error: Inconsistent assessment/module link' }, { status: 500 });
     }
-    const productId = moduleData.product_id;
+    const productId = moduleData.module_product_assignments[0].product_id;
 
     // 5b. Check client assignment to the product
     const { count, error: assignmentError } = await supabase

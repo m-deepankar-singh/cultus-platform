@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { SELECTORS } from '@/lib/api/selectors';
 
 // Import the correct schema for module updates
 import type { NextRequest } from 'next/server';
@@ -41,18 +42,18 @@ export async function PATCH(
     }
     const { user, supabase } = authResult;
 
-    // Verify the module exists and is a course
+    // Get the detailed module information first 
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('id, type')
+      .select(SELECTORS.MODULE.DETAIL)
       .eq('id', moduleId)
       .eq('type', 'Course')
       .maybeSingle();
 
     if (moduleError && moduleError.code !== 'PGRST116') {
-      console.error(`Error verifying module ${moduleId}:`, moduleError);
+      console.error(`Error fetching module ${moduleId}:`, moduleError);
       return NextResponse.json({ 
-        error: 'Failed to verify course module', 
+        error: 'Failed to fetch module data', 
         details: moduleError.message 
       }, { status: 500 });
     }
@@ -66,7 +67,7 @@ export async function PATCH(
     // Get current progress record if it exists
     const { data: existingProgress, error: progressError } = await supabase
       .from('student_module_progress')
-      .select('*')
+      .select(SELECTORS.STUDENT_MODULE_PROGRESS.DETAIL)
       .eq('student_id', user.id)
       .eq('module_id', moduleId)
       .maybeSingle();
@@ -190,7 +191,10 @@ export async function GET(
     // 3. Verify Enrollment (Similar to PATCH)
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('product_id')
+      .select(`
+        id,
+        module_product_assignments!inner(product_id)
+      `)
       .eq('id', moduleId)
       .maybeSingle();
 
@@ -198,10 +202,10 @@ export async function GET(
       console.error('GET Progress - Error fetching module:', moduleError);
       return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-    if (!moduleData || !moduleData.product_id) {
-      return NextResponse.json({ error: 'Not Found: Module does not exist' }, { status: 404 });
+    if (!moduleData || !moduleData.module_product_assignments?.length) {
+      return NextResponse.json({ error: 'Not Found: Module does not exist or not assigned to any product' }, { status: 404 });
     }
-    const productId = moduleData.product_id;
+    const productId = moduleData.module_product_assignments[0].product_id;
 
     const { count, error: assignmentError } = await supabase
       .from('client_product_assignments')

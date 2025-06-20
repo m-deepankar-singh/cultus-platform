@@ -65,7 +65,14 @@ export async function GET(req: NextRequest) {
     // Check if promotion exams are enabled for this product
     const { data: examConfigs, error: configError } = await supabase
       .from('job_readiness_promotion_exam_config')
-      .select('*')
+      .select(`
+        id,
+        product_id,
+        is_enabled,
+        pass_threshold,
+        created_at,
+        updated_at
+      `)
       .eq('product_id', productId);
       
     if (configError) {
@@ -120,7 +127,16 @@ export async function GET(req: NextRequest) {
     // Check if the student has already passed a promotion exam for this star level
     const { data: previousAttempts, error: attemptsError } = await supabase
       .from('job_readiness_promotion_exam_attempts')
-      .select('*')
+      .select(`
+        id,
+        student_id,
+        product_id,
+        star_level,
+        passed,
+        score,
+        created_at,
+        status
+      `)
       .eq('student_id', user.id)
       .eq('product_id', productId)
       .eq('star_level', starLevel)

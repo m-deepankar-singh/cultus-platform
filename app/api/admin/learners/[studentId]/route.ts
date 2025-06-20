@@ -5,6 +5,7 @@ import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
 import { z } from 'zod';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { SELECTORS } from '@/lib/api/selectors';
 
 /**
  * GET /api/admin/learners/[studentId]
@@ -67,7 +68,7 @@ export async function GET(
     // 3.5 Fetch Student Data (including temporary_password)
     const { data: studentData, error: studentError } = await supabase
       .from('students')
-      .select('*')
+      .select(SELECTORS.STUDENT.DETAIL)
       .eq('id', studentId)
       .single();
 
@@ -81,7 +82,7 @@ export async function GET(
     // Example: Fetch course progress from 'student_course_progress'
     const { data: courseProgress, error: progressError } = await supabase
         .from('student_course_progress') // Using existing table
-        .select('*') // Select relevant fields: course_id, status, completed_at, percentage_complete etc.
+        .select(SELECTORS.STUDENT_MODULE_PROGRESS.DETAIL) // Select relevant fields: course_id, status, completed_at, percentage_complete etc.
         .eq('student_id', studentId);
 
     if (progressError) {
@@ -257,7 +258,7 @@ export async function PATCH(
       // Fetch and return updated student
       const { data: updatedStudent, error: fetchError } = await serviceClient
         .from('students')
-        .select('*')
+        .select(SELECTORS.STUDENT.DETAIL)
         .eq('id', studentId)
         .single();
       

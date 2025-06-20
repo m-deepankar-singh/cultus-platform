@@ -132,7 +132,12 @@ export async function GET(
     // 3. Fetch Course Module Details with Product Information
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('id, name, configuration, product_id')
+      .select(`
+        id, 
+        name, 
+        configuration,
+        module_product_assignments!inner(product_id)
+      `)
       .eq('id', moduleId)
       .eq('type', 'Course')
       .maybeSingle();
@@ -142,16 +147,18 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch course details' }, { status: 500 });
     }
     
-    if (!moduleData) {
-      return NextResponse.json({ error: 'Course module not found' }, { status: 404 });
+    if (!moduleData || !moduleData.module_product_assignments?.length) {
+      return NextResponse.json({ error: 'Course module not found or not assigned to any product' }, { status: 404 });
     }
+
+    const productId = moduleData.module_product_assignments[0].product_id;
 
     // 4. 🚀 NEW: Verify Enrollment (check if client is assigned to the module's product)
     const { count: assignmentCount, error: assignmentError } = await supabase
       .from('client_product_assignments')
       .select('*', { count: 'exact', head: true })
       .eq('client_id', clientId)
-      .eq('product_id', moduleData.product_id);
+      .eq('product_id', productId);
 
     if (assignmentError) {
       console.error('Error checking client enrollment:', assignmentError);

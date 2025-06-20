@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'; // May not be needed for save, but good practice if UI might reflect save state elsewhere
+import { SELECTORS } from '@/lib/api/selectors';
 
 // Schema for input data when saving assessment progress
 const AssessmentProgressSaveDataSchema = z.object({
@@ -77,28 +78,32 @@ export async function saveAssessmentProgressAction(
       return { success: false, error: 'Student not linked to a client' };
     }
 
-    const { data: moduleData, error: moduleError } = await supabase
+    const { data: moduleData, error: moduleFetchError } = await supabase
       .from('modules')
-      .select('id, type, product_id')
+      .select(`
+        id, 
+        type, 
+        configuration,
+        module_product_assignments!inner(product_id)
+      `)
       .eq('id', moduleId)
-      .eq('type', 'Assessment')
-      .maybeSingle();
+      .single();
+      
+    if (moduleFetchError) return { success: false, error: moduleFetchError.code === 'PGRST116' ? 'Module not found' : `DB error (module): ${moduleFetchError.message}` };
+    if (!moduleData) return { success: false, error: 'Module data not found after fetch.' }; 
+    if (moduleData.type !== 'Assessment') return { success: false, error: 'Module is not an assessment' };
+    if (!moduleData.module_product_assignments?.length) return { success: false, error: 'Module not assigned to any product' };
 
-    if (moduleError) {
-      return { success: false, error: 'Failed to verify assessment module', errorDetails: moduleError.message };
-    }
-    if (!moduleData) {
-      return { success: false, error: 'Assessment module not found or not an assessment type' };
-    }
+    const productId = moduleData.module_product_assignments[0].product_id;
 
-    const { count, error: assignmentError } = await supabase
+    const { count, error: enrollmentError } = await supabase
       .from('client_product_assignments')
       .select('*', { count: 'exact', head: true })
       .eq('client_id', studentRecord.client_id)
-      .eq('product_id', moduleData.product_id);
+      .eq('product_id', productId);
 
-    if (assignmentError) {
-      return { success: false, error: 'Failed to verify enrollment', errorDetails: assignmentError.message };
+    if (enrollmentError) {
+      return { success: false, error: 'Failed to verify enrollment', errorDetails: enrollmentError.message };
     }
     if (count === 0) {
       return { success: false, error: 'Student not enrolled in this assessment' };
@@ -122,7 +127,16 @@ export async function saveAssessmentProgressAction(
 
     const { data: existingProgress, error: progressFetchError } = await supabase
       .from('assessment_progress')
-      .select('*')
+      .select(`
+        student_id,
+        module_id,
+        saved_answers,
+        started_at,
+        last_updated,
+        submitted_at,
+        remaining_time_seconds,
+        timer_paused
+      `)
       .eq('student_id', user.id)
       .eq('module_id', moduleId)
       .is('submitted_at', null)
@@ -250,16 +264,28 @@ export async function submitAssessmentAction(
     if (!studentRecord.client_id) return { success: false, error: 'Student not linked to a client' };
 
     const { data: moduleData, error: moduleFetchError } = await supabase
-      .from('modules').select('id, type, product_id, configuration').eq('id', moduleId).single();
+      .from('modules')
+      .select(`
+        id, 
+        type, 
+        configuration,
+        module_product_assignments!inner(product_id)
+      `)
+      .eq('id', moduleId)
+      .single();
+      
     if (moduleFetchError) return { success: false, error: moduleFetchError.code === 'PGRST116' ? 'Module not found' : `DB error (module): ${moduleFetchError.message}` };
     if (!moduleData) return { success: false, error: 'Module data not found after fetch.' }; 
     if (moduleData.type !== 'Assessment') return { success: false, error: 'Module is not an assessment' };
+    if (!moduleData.module_product_assignments?.length) return { success: false, error: 'Module not assigned to any product' };
+
+    const productId = moduleData.module_product_assignments[0].product_id;
 
     const { count, error: enrollmentError } = await supabase
       .from('client_product_assignments')
       .select('*', { count: 'exact', head: true })
       .eq('client_id', studentRecord.client_id)
-      .eq('product_id', moduleData.product_id);
+      .eq('product_id', productId);
     if (enrollmentError) return { success: false, error: `Error checking enrollment: ${enrollmentError.message}` };
     if (count === 0) return { success: false, error: 'Student not enrolled in this assessment' };
 
@@ -480,7 +506,7 @@ export async function submitAssessmentAction(
     revalidatePath(`/app/assessment/${moduleId}`);
     revalidatePath(`/app/assessment/${moduleId}/take`);
     // Also revalidate product details page where the modal is used
-    revalidatePath(`/app/product-details/${moduleData.product_id}`);
+    revalidatePath(`/app/product-details/${productId}`);
 
     return {
       success: true,

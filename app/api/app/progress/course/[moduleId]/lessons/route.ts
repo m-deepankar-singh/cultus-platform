@@ -61,7 +61,10 @@ export async function GET(
     // 3. Verify Enrollment (check if client is assigned to the module's product)
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
-      .select('product_id')
+      .select(`
+        id,
+        module_product_assignments!inner(product_id)
+      `)
       .eq('id', moduleId)
       .maybeSingle();
 
@@ -69,11 +72,11 @@ export async function GET(
       console.error('GET Lessons Progress - Error fetching module:', moduleError);
       return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-    if (!moduleData || !moduleData.product_id) {
+    if (!moduleData || !moduleData.module_product_assignments?.length) {
       // Module itself not found, so can't fetch lessons for it
-      return NextResponse.json({ error: 'Not Found: Module does not exist' }, { status: 404 });
+      return NextResponse.json({ error: 'Not Found: Module does not exist or not assigned to any product' }, { status: 404 });
     }
-    const productId = moduleData.product_id;
+    const productId = moduleData.module_product_assignments[0].product_id;
 
     const { count, error: assignmentError } = await supabase
       .from('client_product_assignments')

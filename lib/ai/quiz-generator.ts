@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { callGeminiWithRetry, logAICall } from './gemini-client';
+import { SELECTORS } from '@/lib/api/selectors';
 
 // Define type interfaces for quiz data
 interface QuizQuestion {
@@ -325,7 +326,7 @@ export async function getFallbackQuestions(
     // Fetch the actual questions from assessment_questions
     const { data: questions, error: questionsError } = await supabase
       .from('assessment_questions')
-      .select('*')
+      .select(SELECTORS.QUESTION_BANK.DETAIL)
       .in('id', questionIds);
       
     if (questionsError || !questions || questions.length === 0) {

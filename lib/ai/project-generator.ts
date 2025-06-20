@@ -58,7 +58,15 @@ export async function generateProject(
     // Step 2: Fetch project configuration
     const { data: projectConfig, error: configError } = await supabase
       .from('job_readiness_background_project_types')
-      .select('*')
+      .select(`
+        background_type,
+        bronze_system_prompt,
+        bronze_input_prompt,
+        silver_system_prompt,
+        silver_input_prompt,
+        gold_system_prompt,
+        gold_input_prompt
+      `)
       .eq('background_type', backgroundType)
       .single();
       
@@ -239,7 +247,15 @@ async function getFallbackProject(
     // Try to get a generic project configuration
     const { data: fallbackConfig, error: fallbackError } = await supabase
       .from('job_readiness_background_project_types')
-      .select('*')
+      .select(`
+        background_type,
+        bronze_system_prompt,
+        bronze_input_prompt,
+        silver_system_prompt,
+        silver_input_prompt,
+        gold_system_prompt,
+        gold_input_prompt
+      `)
       .eq('background_type', fallbackBackground)
       .single();
       
