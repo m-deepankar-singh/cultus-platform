@@ -23,104 +23,39 @@ export async function GET(request: NextRequest) {
     const roleFilter = searchParams.get('role');
     const clientIdFilter = searchParams.get('clientId');
 
-    // Role is Admin, proceed to fetch the list of users
     // Use admin client to bypass RLS completely for admin operations
     const supabaseAdmin = createAdminClient();
     
     // Calculate range for pagination
     const { from, to } = calculatePaginationRange(page, pageSize);
 
-    // First get total count with filters
-    let countQuery = supabaseAdmin
-      .from('profiles')
-      .select('id', { count: 'exact', head: true });
+    // 🚀 PHASE 1 OPTIMIZATION: Single RPC call replaces multiple queries
+    // This replaces:
+    // 1. profiles count query
+    // 2. profiles data query with join
+    // 3. auth.users query
+    // Total: 3 database calls → 1 database call (67% reduction)
+    const { data: usersData, error: rpcError } = await supabaseAdmin
+      .rpc('get_users_with_auth_details', {
+        p_search_query: searchQuery,
+        p_role_filter: roleFilter,
+        p_client_id_filter: clientIdFilter ? clientIdFilter : null,
+        p_limit: pageSize,
+        p_offset: from
+      });
 
-    // Apply filters to count query
-    if (searchQuery) {
-      countQuery = countQuery.ilike('full_name', `%${searchQuery}%`);
-    }
-
-    if (roleFilter) {
-      countQuery = countQuery.ilike('role', roleFilter);
-    }
-
-    if (clientIdFilter) {
-      countQuery = countQuery.eq('client_id', clientIdFilter);
-    }
-
-    const { count, error: countError } = await countQuery;
-
-    if (countError) {
-      console.error('Error counting users:', countError);
-      return NextResponse.json({ error: 'Failed to count users' }, { status: 500 });
-    }
-
-    // Then fetch paginated data
-    let query = supabaseAdmin
-      .from('profiles')
-      .select(`${SELECTORS.USER.LIST}, client:clients(${SELECTORS.CLIENT.DROPDOWN})`); // 📊 OPTIMIZED: Specific fields only
-
-    // Apply the same filters to data query
-    if (searchQuery) {
-      query = query.ilike('full_name', `%${searchQuery}%`);
-    }
-
-    if (roleFilter) {
-      query = query.ilike('role', roleFilter);
-    }
-
-    if (clientIdFilter) {
-      query = query.eq('client_id', clientIdFilter);
-    }
-
-    // Apply sorting and pagination
-    const { data: profilesData, error: dbError } = await query
-      .order('updated_at', { ascending: false })
-      .range(from, to);
-
-    if (dbError) {
-      console.error('Error fetching users:', dbError);
+    if (rpcError) {
+      console.error('Error fetching users via RPC:', rpcError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
-    // Now we need to fetch auth users to get emails and other auth data
-    // Get user IDs from profiles
-    const userIds = profilesData?.map(profile => profile.id) || [];
-
-    // Early return if no users found
-    if (userIds.length === 0) {
-      return NextResponse.json(createPaginatedResponse([], count || 0, page, pageSize));
-    }
-    
-    // Fetch auth users using the admin API
-    const { data: authUsersData, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
-      perPage: userIds.length,
-      page: 1
-    });
-    
-    if (authUsersError) {
-      console.error('Error fetching auth users:', authUsersError);
-      return NextResponse.json({ error: 'Failed to fetch user email data' }, { status: 500 });
-    }
-    
-    // Combine profile data with auth user data
-    const enrichedProfiles = profilesData?.map(profile => {
-      // Find matching auth user
-      const authUser = authUsersData?.users?.find(user => user.id === profile.id);
-      return {
-        ...profile,
-        email: authUser?.email,
-        last_sign_in_at: authUser?.last_sign_in_at,
-        banned_until: authUser ? (authUser as any).banned_until : null,
-        user_metadata: authUser?.user_metadata,
-        app_metadata: authUser?.app_metadata
-      };
-    });
+    // Extract total count from first record (all records have same total_count)
+    const totalCount = usersData?.[0]?.total_count || 0;
 
     // Create standardized paginated response
     const paginatedResponse = createPaginatedResponse(
-      enrichedProfiles || [],
-      count || 0,
+      usersData || [],
+      Number(totalCount),
       page,
       pageSize
     );

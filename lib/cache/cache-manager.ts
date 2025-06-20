@@ -297,6 +297,248 @@ export class DatabaseCacheManager {
 
     return freshData;
   }
+
+  // 🚀 PHASE 2: Cache Expansion - New Methods for Optimized RPC Functions
+
+  /**
+   * Get cached users with auth details (Phase 1 RPC optimization)
+   */
+  async getCachedUsersWithAuth(
+    searchQuery?: string,
+    roleFilter?: string,
+    clientIdFilter?: string,
+    limit: number = 20,
+    offset: number = 0,
+    duration: string = '30 minutes'
+  ): Promise<any> {
+    const cacheKey = `users_auth:${searchQuery || 'all'}:${roleFilter || 'all'}:${clientIdFilter || 'all'}:${limit}:${offset}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_users_with_auth_details', {
+        p_search_query: searchQuery,
+        p_role_filter: roleFilter,
+        p_client_id_filter: clientIdFilter,
+        p_limit: limit,
+        p_offset: offset
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['users', 'auth', 'admin', ...(clientIdFilter ? [`client_${clientIdFilter}`] : []), ...(roleFilter ? [`role_${roleFilter}`] : [])]
+    });
+  }
+
+  /**
+   * Get cached client dashboard data (Phase 1 RPC optimization)
+   */
+  async getCachedClientDashboard(
+    clientId?: string,
+    limit: number = 20,
+    offset: number = 0,
+    duration: string = '2 hours'
+  ): Promise<any> {
+    const cacheKey = `clients_dashboard:${clientId || 'all'}:${limit}:${offset}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_client_dashboard_data', {
+        p_client_id: clientId,
+        p_limit: limit,
+        p_offset: offset
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['clients', 'dashboard', 'students', 'products', ...(clientId ? [`client_${clientId}`] : [])]
+    });
+  }
+
+  /**
+   * Get cached analytics dashboard data (Phase 1 RPC optimization)
+   */
+  async getCachedAnalyticsDashboard(
+    dateFrom?: string,
+    dateTo?: string,
+    clientId?: string,
+    duration: string = '1 hour'
+  ): Promise<any> {
+    const cacheKey = `analytics_dashboard:${dateFrom || 'default'}:${dateTo || 'default'}:${clientId || 'all'}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_analytics_dashboard_data', {
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_client_id: clientId
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['analytics', 'dashboard', 'stats', 'performance', ...(clientId ? [`client_${clientId}`] : [])]
+    });
+  }
+
+  /**
+   * Get cached job readiness products (static configuration data)
+   */
+  async getCachedJobReadinessProducts(
+    clientId?: string,
+    duration: string = '4 hours'
+  ): Promise<any> {
+    const cacheKey = `jr_products:${clientId || 'all'}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_job_readiness_products_cached', {
+        p_client_id: clientId,
+        p_cache_duration: duration
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['products', 'job_readiness', 'modules', ...(clientId ? [`client_${clientId}`] : [])]
+    });
+  }
+
+  /**
+   * Get cached expert sessions (static content that changes infrequently)
+   */
+  async getCachedExpertSessionsContent(
+    productId?: string,
+    duration: string = '6 hours'
+  ): Promise<any> {
+    const cacheKey = `expert_sessions_content:${productId || 'all'}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_expert_sessions_cached', {
+        p_product_id: productId,
+        p_cache_duration: duration
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['expert_sessions', 'content', 'job_readiness', ...(productId ? [`product_${productId}`] : [])]
+    });
+  }
+
+  /**
+   * Get cached module content (static educational content)
+   */
+  async getCachedModuleContent(
+    moduleId: string,
+    duration: string = '8 hours'
+  ): Promise<any> {
+    const cacheKey = `module_content:${moduleId}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_module_content_cached', {
+        p_module_id: moduleId,
+        p_cache_duration: duration
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['module_content', 'modules', 'lessons', 'quizzes', `module_${moduleId}`]
+    });
+  }
+
+  /**
+   * Get cached client configurations (relatively static settings)
+   */
+  async getCachedClientConfigurations(
+    clientId?: string,
+    duration: string = '4 hours'
+  ): Promise<any> {
+    const cacheKey = `client_configs:${clientId || 'all'}`;
+    
+    return this.withCache(cacheKey, async () => {
+      const supabase = await this.getSupabaseClient();
+      const { data, error } = await supabase.rpc('get_client_configurations_cached', {
+        p_client_id: clientId,
+        p_cache_duration: duration
+      });
+      
+      if (error) throw error;
+      return data;
+    }, { 
+      duration, 
+      tags: ['client_configs', 'clients', 'settings', ...(clientId ? [`client_${clientId}`] : [])]
+    });
+  }
+
+  /**
+   * Cache invalidation service for Phase 2 optimizations
+   */
+  async invalidateUserCache(userId?: string): Promise<number> {
+    const tags = ['users', 'auth', 'admin'];
+    if (userId) {
+      tags.push(`user_${userId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
+
+  async invalidateClientCache(clientId?: string): Promise<number> {
+    const tags = ['clients', 'dashboard', 'students', 'products'];
+    if (clientId) {
+      tags.push(`client_${clientId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
+
+  async invalidateAnalyticsCache(clientId?: string): Promise<number> {
+    const tags = ['analytics', 'dashboard', 'stats', 'performance'];
+    if (clientId) {
+      tags.push(`client_${clientId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
+
+  async invalidateProductCache(productId?: string): Promise<number> {
+    const tags = ['products', 'job_readiness', 'modules'];
+    if (productId) {
+      tags.push(`product_${productId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
+
+  async invalidateExpertSessionsCache(productId?: string): Promise<number> {
+    const tags = ['expert_sessions', 'content', 'job_readiness'];
+    if (productId) {
+      tags.push(`product_${productId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
+
+  async invalidateModuleContentCache(moduleId?: string): Promise<number> {
+    const tags = ['module_content', 'modules', 'lessons', 'quizzes'];
+    if (moduleId) {
+      tags.push(`module_${moduleId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
+
+  async invalidateClientConfigCache(clientId?: string): Promise<number> {
+    const tags = ['client_configs', 'clients', 'settings'];
+    if (clientId) {
+      tags.push(`client_${clientId}`);
+    }
+    return this.invalidateByTags(tags);
+  }
 }
 
 // Singleton instance
@@ -305,10 +547,28 @@ export const cacheManager = new DatabaseCacheManager();
 // Utility functions for common cache patterns
 export const CacheUtils = {
   /**
-   * Generate cache key for student progress
+   * Generate cache key for job readiness products
    */
-  studentProgressKey: (studentId: string, moduleId?: string) => 
-    `student_progress:${studentId}${moduleId ? `:${moduleId}` : ''}`,
+  jobReadinessProductsKey: (clientId?: string) => 
+    `jr_products:${clientId || 'all'}`,
+
+  /**
+   * Generate cache key for expert sessions content
+   */
+  expertSessionsContentKey: (productId?: string) => 
+    `expert_sessions_content:${productId || 'all'}`,
+
+  /**
+   * Generate cache key for module content
+   */
+  moduleContentKey: (moduleId: string) => 
+    `module_content:${moduleId}`,
+
+  /**
+   * Generate cache key for client configurations
+   */
+  clientConfigurationsKey: (clientId?: string) => 
+    `client_configs:${clientId || 'all'}`,
 
   /**
    * Generate cache key for product performance
@@ -317,36 +577,27 @@ export const CacheUtils = {
     `product_performance:${clientId || 'all'}`,
 
   /**
-   * Generate cache key for expert sessions
-   */
-  expertSessionsKey: (productId?: string) => 
-    `expert_sessions:${productId || 'all'}`,
-
-  /**
-   * Generate cache key for module analytics
-   */
-  moduleAnalyticsKey: (moduleId: string, dateRange?: string) => 
-    `module_analytics:${moduleId}:${dateRange || 'default'}`,
-
-  /**
-   * Common cache durations
+   * Common cache durations optimized for data update frequency
    */
   durations: {
-    SHORT: '2 minutes',
-    MEDIUM: '5 minutes', 
-    LONG: '15 minutes',
-    EXTENDED: '1 hour',
-    DAILY: '24 hours'
+    VERY_SHORT: '2 minutes',    // For frequently changing data (don't cache student progress)
+    SHORT: '5 minutes',         // For semi-dynamic data
+    MEDIUM: '30 minutes',       // For user/auth data
+    LONG: '2 hours',           // For client dashboard data
+    EXTENDED: '4 hours',       // For products/configurations
+    CONTENT: '8 hours',        // For static content (modules, lessons)
+    DAILY: '24 hours'          // For rarely changing reference data
   },
 
   /**
-   * Common cache tag patterns
+   * Common cache tag patterns for Phase 2 static data caching
    */
   tags: {
-    STUDENT_PROGRESS: ['student_progress', 'progress'],
-    EXPERT_SESSIONS: ['expert_sessions', 'sessions', 'stats'],
-    PRODUCT_PERFORMANCE: ['products', 'performance', 'analytics'],
-    MODULE_DATA: ['modules', 'module_completion'],
-    ANALYTICS: ['analytics', 'stats', 'performance']
+    JOB_READINESS_PRODUCTS: ['products', 'job_readiness', 'modules'],
+    EXPERT_SESSIONS: ['expert_sessions', 'content', 'job_readiness'],
+    MODULE_CONTENT: ['module_content', 'modules', 'lessons', 'quizzes'],
+    CLIENT_CONFIGS: ['client_configs', 'clients', 'settings'],
+    ANALYTICS: ['analytics', 'dashboard', 'stats', 'performance'],
+    USERS: ['users', 'auth', 'admin']
   }
 }; 

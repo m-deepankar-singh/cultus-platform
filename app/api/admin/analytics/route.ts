@@ -1,156 +1,53 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/auth/api-auth";
+import { createAdminClient } from '@/lib/supabase/admin';
 
-// Simulated database query - replace with actual database query in production
-async function fetchAnalyticsData() {
-  // Simulated data
-  const statsData = {
-    totalLearners: {
-      value: 1284,
-      trend: { value: 12.5, direction: "up" }
-    },
-    activeModules: {
-      value: 32,
-      trend: { value: 4.0, direction: "up" }
-    },
-    overallCompletionRate: {
-      value: 78.5,
-      trend: { value: -2.1, direction: "down" }
-    },
-    overallAverageScore: {
-      value: 82.3
-    },
-    totalClients: {
-      value: 15,
-      trend: { value: 1.0, direction: "up" }
-    }
-  };
-
-  const progressOverTime = [
-    { periodLabel: "Jan", completions: 38, enrollments: 65 },
-    { periodLabel: "Feb", completions: 42, enrollments: 59 },
-    { periodLabel: "Mar", completions: 55, enrollments: 80 },
-    { periodLabel: "Apr", completions: 62, enrollments: 75 },
-    { periodLabel: "May", completions: 78, enrollments: 90 },
-    { periodLabel: "Jun", completions: 84, enrollments: 101 }
-  ];
-
-  const assessmentScoreDistribution = [
-    { rangeLabel: "0-50%", count: 150 },
-    { rangeLabel: "51-70%", count: 250 },
-    { rangeLabel: "71-85%", count: 400 },
-    { rangeLabel: "86-100%", count: 200 }
-  ];
-
-  const moduleCompletions = [
-    { 
-      moduleId: "uuid-module-1", 
-      moduleName: "Introduction to Sales", 
-      completedCount: 920, 
-      inProgressCount: 450 
-    },
-    { 
-      moduleId: "uuid-module-2", 
-      moduleName: "Customer Service Excellence", 
-      completedCount: 780, 
-      inProgressCount: 620 
-    },
-    { 
-      moduleId: "uuid-module-3", 
-      moduleName: "Leadership Fundamentals", 
-      completedCount: 650, 
-      inProgressCount: 350 
-    },
-    { 
-      moduleId: "uuid-module-4", 
-      moduleName: "Digital Marketing", 
-      completedCount: 450, 
-      inProgressCount: 580 
-    },
-    { 
-      moduleId: "uuid-module-5", 
-      moduleName: "Project Management", 
-      completedCount: 350, 
-      inProgressCount: 290 
-    }
-  ];
-
-  const recentActivity = [
-    { 
-      activityId: "uuid-activity-1",
-      learnerName: "Alex Johnson",
-      clientName: "Acme Corp",
-      moduleName: "Leadership Fundamentals",
-      activityType: "completion",
-      timestamp: "2023-11-01T10:30:00Z",
-      score: 95
-    },
-    { 
-      activityId: "uuid-activity-2",
-      learnerName: "Samantha Wells",
-      clientName: "TechSolutions",
-      moduleName: "Digital Marketing",
-      activityType: "enrollment",
-      timestamp: "2023-11-02T14:15:00Z"
-    },
-    { 
-      activityId: "uuid-activity-3",
-      learnerName: "Derek Miller",
-      clientName: "Global Industries",
-      moduleName: "Customer Service Excellence",
-      activityType: "completion",
-      timestamp: "2023-11-03T09:45:00Z",
-      score: 88
-    },
-    { 
-      activityId: "uuid-activity-4",
-      learnerName: "Emily Chen",
-      clientName: "Acme Corp",
-      moduleName: "Project Management",
-      activityType: "completion",
-      timestamp: "2023-11-03T16:20:00Z",
-      score: 75
-    },
-    { 
-      activityId: "uuid-activity-5",
-      learnerName: "Jason Parker",
-      clientName: "NextGen Inc",
-      moduleName: "Introduction to Sales",
-      activityType: "assessment_failed",
-      timestamp: "2023-11-04T11:10:00Z",
-      score: 45
-    }
-  ];
-
-  return {
-    stats: statsData,
-    progressOverTime,
-    assessmentScoreDistribution,
-    moduleCompletions,
-    recentActivity
-  };
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // JWT-based authentication (0 database queries for auth)
+    // 🚀 OPTIMIZED: JWT-based authentication (0 database queries for auth)
     const authResult = await authenticateApiRequest(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
     const { user, supabase } = authResult;
-    
-    // In a real implementation, we'd:
-    // 1. ✅ User authentication and authorization completed (Admin/Staff roles verified)
-    // 2. Query the database for real analytics data based on user permissions
-    // 3. Process and aggregate the data as needed
-    
-    const analyticsData = await fetchAnalyticsData();
 
-    return NextResponse.json(analyticsData, { status: 200 });
+    // Get optional query parameters for filtering
+    const { searchParams } = new URL(request.url);
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const clientId = searchParams.get('clientId');
+
+    // Use admin client for analytics access
+    const supabaseAdmin = createAdminClient();
+    
+    // 🚀 PHASE 1 OPTIMIZATION: Single RPC call replaces multiple analytics queries
+    // This replaces multiple separate queries for:
+    // 1. Total learners count
+    // 2. Active learners count  
+    // 3. Module statistics
+    // 4. Assessment submissions analysis
+    // 5. Progress over time calculations
+    // 6. Score distributions
+    // 7. Recent activity queries
+    // Total: 7+ database calls → 1 database call (85%+ reduction)
+    const { data: analyticsData, error: rpcError } = await supabaseAdmin
+      .rpc('get_analytics_dashboard_data', {
+        p_date_from: dateFrom || undefined,
+        p_date_to: dateTo || undefined,
+        p_client_id: clientId || null
+      });
+
+    if (rpcError) {
+      console.error('Error fetching analytics via RPC:', rpcError);
+      return NextResponse.json({ error: 'Failed to fetch analytics data' }, { status: 500 });
+    }
+
+    // Return the consolidated analytics data
+    return NextResponse.json(analyticsData || {}, { status: 200 });
+
   } catch (error) {
-    console.error("Error fetching analytics data:", error);
+    console.error("Unexpected error in GET /api/admin/analytics:", error);
     return NextResponse.json(
       { error: "Failed to fetch analytics data" },
       { status: 500 }
