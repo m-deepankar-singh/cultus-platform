@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { useInvalidateInterviewCache } from '@/hooks/useInvalidateInterviewCache';
 
 const TEST_BACKGROUND_ID = 'df8e996e-df6f-43f0-9bfa-c308a7604624'; // Computer Science background ID
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
 export default function InterviewsPage() {
   const [currentStep, setCurrentStep] = useState<'landing' | 'setup' | 'interview'>('landing');
