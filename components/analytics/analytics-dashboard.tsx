@@ -15,7 +15,7 @@ import type {
   ClientUsageMetrics, 
   // Define or import the type for filterApplied if not already done
   // Assuming it's: { year: number; month: number } | 'last30days' | undefined
-} from "@/app/actions/analytics";
+} from "@/app/actions/analytics-optimized";
 
 interface AnalyticsDashboardProps {
   summary?: AnalyticsSummary;

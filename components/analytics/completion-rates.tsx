@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { ModuleCompletionRate } from "@/app/actions/analytics"; // Import the type
+import type { ModuleCompletionRate } from "@/app/actions/analytics-optimized"; // Import the type
 
 // Define props for the component
 interface CompletionRatesProps {

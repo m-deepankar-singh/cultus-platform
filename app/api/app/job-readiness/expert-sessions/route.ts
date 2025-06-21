@@ -2,6 +2,26 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
+interface ExpertSession {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string;
+  video_duration: number;
+  created_at: string;
+}
+
+interface SessionProgress {
+  expert_session_id: string;
+  watch_time_seconds: number;
+  completion_percentage: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  last_milestone_reached: number;
+  resume_from_milestone: number;
+  session_data: any;
+}
+
 /**
  * GET /api/app/job-readiness/expert-sessions
  * List all available Expert Session videos with student's progress for each
@@ -88,33 +108,12 @@ export async function GET(req: NextRequest) {
       created_at: session.created_at
     })) || [];
 
-    // For each session, create fresh signed URLs since the stored URLs may be expired
-    const sessionsWithSignedUrls = await Promise.all(
-      (expertSessions || []).map(async (session: any) => {
-        // Extract path from stored URL to create new signed URL
-        const urlParts = session.video_url.split('/expert_session_videos/');
-        if (urlParts.length === 2) {
-          const filePath = urlParts[1].split('?')[0]; // Remove any query params
-          
-          const { data: signedData, error: signError } = await supabase.storage
-            .from('expert_session_videos')
-            .createSignedUrl(filePath, 60 * 60 * 24); // 24 hours
-
-          if (!signError && signedData) {
-            return {
-              ...session,
-              video_url: signedData.signedUrl
-            };
-          }
-        }
-        
-        // If we can't create a signed URL, return the original (may be expired)
-        return session;
-      })
-    );
+    // Expert sessions are public and stored on assests.cultuslearn.com
+    // No signed URL generation needed - use direct public URLs for optimal performance
+    const sessionsWithPublicUrls = expertSessions;
 
     // Get student's progress for all expert sessions with enhanced resume data
-    const sessionIds = sessionsWithSignedUrls?.map(session => session.id) || [];
+    const sessionIds = sessionsWithPublicUrls?.map((session: ExpertSession) => session.id) || [];
     const { data: progressData, error: progressError } = await supabase
       .from('job_readiness_expert_session_progress')
       .select(`
@@ -142,7 +141,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Combine sessions with enhanced student progress
-    const sessionsWithProgress = sessionsWithSignedUrls?.map((session: any) => {
+    const sessionsWithProgress = sessionsWithPublicUrls?.map((session: ExpertSession) => {
       const progress = progressMap.get(session.id) || {
         watch_time_seconds: 0,
         completion_percentage: 0,
@@ -191,7 +190,7 @@ export async function GET(req: NextRequest) {
 
     // Count completed sessions
     const completedSessionsCount = sessionsWithProgress.filter(
-      session => session.student_progress.is_completed
+      (session: any) => session.student_progress.is_completed
     ).length;
 
     // Required sessions for 3rd star (as per requirements)

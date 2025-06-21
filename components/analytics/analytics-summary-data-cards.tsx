@@ -11,7 +11,7 @@ import {
   Activity // For MAL or could use Users again
 } from "lucide-react";
 // Import the type, no need for the action itself here anymore
-import type { AnalyticsSummary } from "@/app/actions/analytics"; 
+import type { AnalyticsSummary } from "@/app/actions/analytics-optimized"; 
 
 // Helper to format large numbers
 const formatNumber = (num: number): string => {

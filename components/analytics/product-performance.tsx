@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 // Import the type, aliased to avoid naming conflict with component
-import type { ProductPerformance as ProductPerformanceData } from "@/app/actions/analytics"; 
+import type { ProductPerformance as ProductPerformanceData } from "@/app/actions/analytics-optimized"; 
 
 // Define props
 interface ProductPerformanceProps {

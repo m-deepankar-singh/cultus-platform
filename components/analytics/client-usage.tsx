@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 // Import the type
-import type { ClientUsageMetrics } from "@/app/actions/analytics"; 
+import type { ClientUsageMetrics } from "@/app/actions/analytics-optimized"; 
 
 // Define props
 interface ClientUsageProps {

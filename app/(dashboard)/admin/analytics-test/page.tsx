@@ -1,20 +1,20 @@
-import { getMonthlyActiveLearners, getModuleCompletionRates, getProductPerformance, getClientUsage, getAnalyticsSummary } from "@/app/actions/analytics";
+import { getOptimizedMonthlyActiveLearners, getOptimizedModuleCompletionRates, getOptimizedProductPerformance, getOptimizedClientUsage, getOptimizedAnalyticsSummary } from "@/app/actions/analytics-optimized";
 
 export default async function AnalyticsTestPage() {
   // Test MAL (Optional - can comment out if focusing on module rates)
-  const malResult = await getMonthlyActiveLearners();
+  const malResult = await getOptimizedMonthlyActiveLearners();
 
   // Test Module Completion Rates
-  const moduleRatesResult = await getModuleCompletionRates();
+  const moduleRatesResult = await getOptimizedModuleCompletionRates();
   
   // Test Product Performance
-  const productPerformanceResult = await getProductPerformance();
+  const productPerformanceResult = await getOptimizedProductPerformance();
   
   // Test Client Usage
-  const clientUsageResult = await getClientUsage();
+  const clientUsageResult = await getOptimizedClientUsage();
 
   // Test Analytics Summary
-  const analyticsSummaryResult = await getAnalyticsSummary();
+  const analyticsSummaryResult = await getOptimizedAnalyticsSummary();
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>

@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
-import { SELECTORS } from '@/lib/api/selectors';
 
+/**
+ * GET /api/staff/clients
+ * 
+ * Retrieves a list of clients assigned to the staff member with dashboard data
+ * Accessible only by users with 'Staff' or 'Admin' roles
+ * Supports filtering by search query and active status
+ * 
+ * OPTIMIZED: Single RPC call replaces multiple N+1 queries
+ */
 export async function GET(request: Request) {
   try {
     // JWT-based authentication (0 database queries)
@@ -9,43 +17,61 @@ export async function GET(request: Request) {
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const {  supabase } = authResult;
+    const { user, supabase } = authResult;
 
-    // --- User is authenticated and has an allowed role (Staff or Admin), proceed --- 
-
-    // 3. Parse Query Parameters
+    // Parse Query Parameters
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get('search');
     const isActiveFilter = searchParams.get('isActive');
 
-    // 4. Build Supabase Query (RLS Enforced)
-    // RLS policies will automatically scope the results based on the user's role.
-    // Admins should see all clients (if RLS allows), Staff should only see their assigned clients.
-    let query = supabase.from('clients').select(SELECTORS.CLIENT.LIST); // 📊 OPTIMIZED: Specific fields only
+    // 🚀 OPTIMIZED: Single RPC call replaces multiple N+1 queries
+    // This replaces:
+    // 1. Basic clients query
+    // 2. N x student count queries (one per client)
+    // 3. N x product assignment queries (one per client) 
+    // 4. N x recent activity queries (one per client)
+    // Total: 1 + 3N database calls → 1 database call (90%+ reduction)
+    
+    const { data: clientsData, error: rpcError } = await supabase
+      .rpc('get_staff_client_dashboard_data', {
+        p_staff_id: user.id
+      });
 
-    // Apply optional filters
-    if (searchQuery) {
-      query = query.ilike('name', `%${searchQuery}%`);
+    if (rpcError) {
+      console.error('Error fetching staff clients via RPC:', rpcError);
+      return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });
     }
 
+    let filteredClients = clientsData || [];
+    
+    // Apply client-side filtering (consider moving to RPC for better performance)
+    if (searchQuery) {
+      filteredClients = filteredClients.filter((client: any) => 
+        client.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
     if (isActiveFilter !== null) {
       const isActive = isActiveFilter.toLowerCase() === 'true';
-      query = query.eq('is_active', isActive);
+      filteredClients = filteredClients.filter((client: any) => client.is_active === isActive);
     }
 
-    // Add ordering
-    query = query.order('name', { ascending: true });
+    // Transform to match expected response format
+    const transformedClients = filteredClients.map((client: any) => ({
+      id: client.id,
+      name: client.name,
+      contact_email: client.contact_email,
+      is_active: client.is_active,
+      created_at: client.created_at,
+      logo_url: client.logo_url,
+      // Enhanced dashboard data from RPC
+      total_students: client.total_students,
+      active_students: client.active_students,
+      assigned_products: client.assigned_products,
+      recent_activity: client.recent_activity
+    }));
 
-    // 5. Execute Query & Handle Response
-    const { data: clients, error: dbError } = await query;
-
-    if (dbError) {
-      console.error('Supabase DB Error (Staff Get Clients):', dbError);
-      return NextResponse.json({ error: 'Failed to fetch clients', details: dbError.message }, { status: 500 });
-    }
-
-    // Return the (potentially RLS-filtered) list of clients
-    return NextResponse.json(clients || [], { status: 200 });
+    return NextResponse.json(transformedClients, { status: 200 });
 
   } catch (error) {
     console.error('GET /api/staff/clients Error:', error);
