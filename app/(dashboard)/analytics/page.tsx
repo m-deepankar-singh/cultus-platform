@@ -33,8 +33,8 @@ export default async function AnalyticsPage({
   const moduleRates = analyticsData?.moduleRates;
   const productPerformance = analyticsData?.productPerformance;
   const clientMetrics = analyticsData?.clientUsage;
-  const malCount = analyticsData?.malData.malCount;
-  const filterApplied = analyticsData?.malData.filterApplied;
+  const malCount = analyticsData?.malData?.malCount;
+  const filterApplied = analyticsData?.malData?.filterApplied;
   
   const combinedError = analyticsError;
 

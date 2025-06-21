@@ -142,7 +142,6 @@ export async function GET(request: NextRequest) {
       `)
       .eq('module_product_assignments.product_id', validProductId)
       .eq('type', 'Course')
-      .eq('student_module_progress.student_id', user.id)
       .order('sequence', { ascending: true });
 
     if (coursesError) {
@@ -152,7 +151,8 @@ export async function GET(request: NextRequest) {
 
     // Enhanced courses with simplified progress data and Job Readiness specific information
     const enhancedCourses: CourseModuleOutput[] = (courses || []).map((course: CourseModule) => {
-      const progress = course.student_module_progress?.[0] || null;
+      // Filter progress records for the current student
+      const progress = course.student_module_progress?.find(p => p.student_id === user.id) || null;
       const totalLessons = course.lessons?.length || 0;
       
       // Use new simplified progress tracking columns
@@ -196,6 +196,7 @@ export async function GET(request: NextRequest) {
           product_id
         ),
         student_module_progress!inner (
+          student_id,
           status
         )
       `)

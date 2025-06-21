@@ -64,7 +64,7 @@ export function AssignProductModal({
   const fetchProducts = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/admin/products")
+      const response = await fetch("/api/admin/products?pageSize=100")
       
       if (!response.ok) {
         throw new Error(`Error: ${response.status}`)

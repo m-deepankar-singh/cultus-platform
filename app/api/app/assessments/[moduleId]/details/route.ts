@@ -116,9 +116,9 @@ export async function GET(
 
     // Verify enrollment by checking if the student's client has access to this module's product
     const { data: productData, error: productError } = await supabase
-      .from('modules')
+      .from('module_product_assignments')
       .select('product_id')
-      .eq('id', validModuleId)
+      .eq('module_id', validModuleId)
       .single();
 
     if (productError) {

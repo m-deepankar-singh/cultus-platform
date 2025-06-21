@@ -79,17 +79,57 @@ export async function GET() {
        return NextResponse.json([], { status: 200 });
     }
 
-    // 3. Fetch Modules for these Products
-    const { data: modules, error: modulesError } = await supabase
-      .from('modules')
-      .select('id, product_id, name, type, sequence') // Select 'name' and 'sequence' instead of 'title' and 'order'
-      .in('product_id', productIds)
-      .order('sequence', { ascending: true }); // Order by 'sequence'
+    // 3. Fetch Modules for these Products through module_product_assignments
+    const { data: moduleAssignments, error: modulesError } = await supabase
+      .from('module_product_assignments')
+      .select(`
+        product_id,
+        modules (
+          id,
+          name,
+          type,
+          sequence,
+          lessons (
+            id,
+            title,
+            description,
+            video_url,
+            sequence,
+            has_quiz,
+            quiz_data,
+            quiz_questions
+          ),
+          assessment_module_questions (
+            sequence,
+            assessment_questions (
+              id,
+              question_text,
+              options,
+              correct_answer,
+              question_type,
+              difficulty,
+              topic
+            )
+          )
+        )
+      `)
+      .in('product_id', productIds);
 
     if (modulesError) {
-      console.error(`GET /progress - Error fetching modules for products ${productIds}:`, modulesError);
+      console.error(`GET /progress - Error fetching module assignments for products ${productIds}:`, modulesError);
       return NextResponse.json({ error: 'Internal Server Error fetching modules' }, { status: 500 });
     }
+
+    // Transform module assignments into modules with product_id
+    const modules = moduleAssignments?.flatMap((assignment: any) => {
+      if (assignment.modules) {
+        return {
+          ...assignment.modules,
+          product_id: assignment.product_id
+        };
+      }
+      return [];
+    }).filter(Boolean).sort((a: any, b: any) => a.sequence - b.sequence) || [];
 
     if (!modules || modules.length === 0) {
       // Products exist, but have no modules yet. Return products basic info.
@@ -173,6 +213,17 @@ export async function GET() {
           status: progress?.status || 'NotStarted',
           progress_percentage: progress?.progress_percentage || 0,
           completed_at: progress?.completed_at || null,
+          // Include lessons for course modules
+          lessons: module.lessons || [],
+          // Include assessment questions for assessment modules
+          questions: module.assessment_module_questions 
+            ? module.assessment_module_questions
+                .sort((a: any, b: any) => a.sequence - b.sequence)
+                .map((amq: any) => ({
+                  ...amq.assessment_questions,
+                  sequence: amq.sequence
+                }))
+            : [],
           // Add assessment specific details if an attempt exists
           ...(assessmentAttempt && {
             assessment_score: assessmentAttempt.score,

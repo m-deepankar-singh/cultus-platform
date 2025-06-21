@@ -8,7 +8,7 @@ import { Gauge } from "@/components/ui/gauge";
 import { GaugeProgress } from "@/components/analytics/gauge-progress-display";
 import gsap from "gsap";
 import { Clock } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+
 import Link from "next/link";
 
 // TypeScript interfaces for the data structure
@@ -40,135 +40,70 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>(undefined);
   
-  // Fetch data from Supabase
+  // Fetch data from API
   useEffect(() => {
     async function fetchData() {
       try {
-        const supabase = createClient();
+        // Use the existing progress API endpoint
+        const response = await fetch('/api/app/progress');
         
-        // Check if user is authenticated
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-          window.location.href = '/app/login';
-          return;
-        }
-        
-        // Get the student record to ensure we have the correct client_id
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
-      .select('client_id')
-      .eq('id', user.id)
-      .single();
-    
-    if (studentError) {
-      console.error('Error fetching student data:', studentError);
-          setError('Unable to fetch your student profile');
-          setLoading(false);
-          return;
-    }
-
-    if (!studentData || !studentData.client_id) {
-      console.error('No client_id found for student');
-          setError('Your account is not properly set up with a school or organization');
-          setLoading(false);
-          return;
-        }
-
-        // Fetch product assignments using the client_id from the student record
-        const { data, error: productsError } = await supabase
-      .from('client_product_assignments')
-      .select(`
-        product_id,
-        products:product_id (
-          id,
-          name,
-          description,
-          image_url,
-          modules (
-            id,
-            name,
-            type,
-            sequence
-          )
-        )
-      `)
-      .eq('client_id', studentData.client_id);
-
-        if (productsError) {
-          console.error('Error fetching products:', productsError);
-          setError(productsError.message);
-          setLoading(false);
-          return;
-        }
-
-        if (data && data.length > 0) {
-          // Get progress data for each module
-      const { data: progressData, error: progressError } = await supabase
-        .from('student_module_progress')
-        .select('module_id, status, progress_percentage, completed_at')
-        .eq('student_id', user.id);
-      
-      if (progressError) {
-        console.error('Error fetching module progress:', progressError);
-      }
-      
-      // Map progress data to a lookup object for easier access
-      const progressMap = new Map();
-      if (progressData) {
-            progressData.forEach((progress: any) => {
-          progressMap.set(progress.module_id, progress);
-        });
-      }
-      
-      // Transform data to the expected format with product status and progress calculation
-          const formattedProducts = data.map((item: any) => {
-        const modules = item.products.modules.map((module: any) => {
-          const progress = progressMap.get(module.id);
-          return {
-            id: module.id,
-            name: module.name,
-            type: module.type as 'Course' | 'Assessment',
-            sequence: module.sequence,
-            status: progress ? progress.status : 'NotStarted',
-            progress_percentage: progress ? (progress.progress_percentage || 0) : 0,
-            completed_at: progress ? progress.completed_at : null
-          };
-        });
-        
-        // Calculate product progress percentage
-        let totalProgress = 0;
-        modules.forEach((m: Module) => {
-          totalProgress += m.progress_percentage;
-        });
-        const productProgressPercentage = modules.length > 0 ? Math.round(totalProgress / modules.length) : 0;
-        
-        // Determine product status
-        let productStatus: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed' = 'NotStarted';
-        if (modules.length > 0) {
-          const allNotStarted = modules.every((m: Module) => m.status === 'NotStarted');
-          const allCompleted = modules.every((m: Module) => m.status === 'Completed');
-          
-          if (allNotStarted) {
-            productStatus = 'NotStarted';
-          } else if (allCompleted) {
-            productStatus = 'Completed';
-          } else {
-            productStatus = 'InProgress';
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = '/app/login';
+            return;
           }
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
         }
+
+        const data = await response.json();
         
-        return {
-          id: item.products.id,
-          name: item.products.name,
-          description: item.products.description,
-          image_url: item.products.image_url,
-          modules,
-          product_progress_percentage: productProgressPercentage,
-          product_status: productStatus
-        };
-      });
-      
+        if (data && data.length > 0) {
+          // Transform data to the expected format with product status and progress calculation
+          const formattedProducts = data.map((product: any) => {
+            const modules = product.modules.map((module: any) => ({
+              id: module.id,
+              name: module.name,
+              type: module.type as 'Course' | 'Assessment',
+              sequence: module.sequence,
+              status: module.status || 'NotStarted',
+              progress_percentage: module.progress_percentage || 0,
+              completed_at: module.completed_at || null
+            }));
+            
+            // Calculate product progress percentage
+            let totalProgress = 0;
+            modules.forEach((m: Module) => {
+              totalProgress += m.progress_percentage;
+            });
+            const productProgressPercentage = modules.length > 0 ? Math.round(totalProgress / modules.length) : 0;
+            
+            // Determine product status
+            let productStatus: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed' = 'NotStarted';
+            if (modules.length > 0) {
+              const allNotStarted = modules.every((m: Module) => m.status === 'NotStarted');
+              const allCompleted = modules.every((m: Module) => m.status === 'Completed');
+              
+              if (allNotStarted) {
+                productStatus = 'NotStarted';
+              } else if (allCompleted) {
+                productStatus = 'Completed';
+              } else {
+                productStatus = 'InProgress';
+              }
+            }
+            
+            return {
+              id: product.id,
+              name: product.name,
+              description: product.description,
+              image_url: product.image_url || null,
+              modules,
+              product_progress_percentage: productProgressPercentage,
+              product_status: productStatus
+            };
+          });
+          
           setProducts(formattedProducts);
         }
         

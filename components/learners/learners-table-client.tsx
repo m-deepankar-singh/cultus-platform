@@ -402,7 +402,7 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
                       )}
                     </TableCell>
                     <TableCell>{learner.phone_number || "—"}</TableCell>
-                    <TableCell>{learner.client.name}</TableCell>
+                    <TableCell>{learner.client?.name || "—"}</TableCell>
                     <TableCell>
                       {learner.job_readiness_background_type ? (
                         <span className="text-sm">

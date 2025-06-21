@@ -16,12 +16,8 @@ export interface ApiAuthError {
 
 /**
  * Optimized authentication for API routes
- * Replaces the dual-call pattern (getUser + profiles query) with JWT claims
- * 
- * Performance Benefits:
- * - Eliminates 1 database query per request (profiles table lookup)
- * - Uses JWT custom claims for role authorization
- * - Maintains same security guarantees
+ * Handles both profile-based users (admin/staff) and students
+ * Falls back to database queries when JWT claims are missing
  * 
  * @param requiredRoles - Array of roles that are allowed to access the endpoint
  * @returns ApiAuthResult with user, claims, and supabase client OR ApiAuthError
@@ -51,12 +47,61 @@ export async function authenticateApiRequest(
       return { error: "Token expired", status: 401 };
     }
 
-    // Extract claims and check roles using JWT (ZERO database queries)
-    const claims = getClaimsFromToken(session.access_token);
+    // Extract claims from JWT
+    let claims = getClaimsFromToken(session.access_token);
 
-    // Role check using JWT claims only - no database queries needed!
-    if (requiredRoles && !hasAnyRole(session.access_token, requiredRoles)) {
-      return { error: "Forbidden", status: 403 };
+    // If JWT claims are missing critical data (common for students), fetch from database
+    if (!claims.client_id || !claims.user_role) {
+      // Try to get student data first
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('id, client_id, is_active, job_readiness_star_level, job_readiness_tier')
+        .eq('id', user.id)
+        .single();
+
+      if (student && !studentError) {
+        // User is a student - build claims from student data
+        claims = {
+          ...claims,
+          user_role: 'student',
+          client_id: student.client_id,
+          profile_is_active: student.is_active,
+          is_student: true,
+          student_is_active: student.is_active,
+          job_readiness_star_level: student.job_readiness_star_level,
+          job_readiness_tier: student.job_readiness_tier
+        };
+      } else {
+        // Try profile table for admin/staff users
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, client_id, is_active')
+          .eq('id', user.id)
+          .single();
+
+        if (profile && !profileError) {
+          claims = {
+            ...claims,
+            user_role: profile.role,
+            client_id: profile.client_id,
+            profile_is_active: profile.is_active,
+            is_student: false
+          };
+        } else {
+          return { error: "User profile not found", status: 403 };
+        }
+      }
+    }
+
+    // Role check - handle student role specially
+    if (requiredRoles) {
+      const userRole = claims.user_role || 'student';
+      const hasRequiredRole = requiredRoles.includes(userRole) || 
+        (requiredRoles.includes('student') && claims.is_student);
+      
+      if (!hasRequiredRole) {
+        return { error: "Forbidden", status: 403 };
+      }
     }
 
     return {

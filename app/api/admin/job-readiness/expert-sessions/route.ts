@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
-import { cacheManager, CacheUtils } from '@/lib/cache/cache-manager';
 
 /**
  * GET /api/admin/job-readiness/expert-sessions
@@ -10,7 +9,7 @@ import { cacheManager, CacheUtils } from '@/lib/cache/cache-manager';
 export async function GET(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -21,33 +20,7 @@ export async function GET(req: NextRequest) {
     const productId = url.searchParams.get('productId');
 
     try {
-      // Use the authenticated supabase client to call the cache function directly
-      const { data: sessionsWithStats, error: cacheError } = await supabase.rpc('get_expert_sessions_with_stats_cached', {
-        p_product_id: productId || null,
-        p_cache_duration: CacheUtils.durations.LONG // 15 minutes instead of 5 minutes
-      });
-
-      if (cacheError) {
-        console.error('Cache RPC error:', cacheError);
-        // If cache fails, fall back to the base function directly
-        console.log('Falling back to base function...');
-        const { data: fallbackSessions, error: fallbackError } = await supabase.rpc('get_expert_sessions_with_stats', {
-          p_product_id: productId || null
-        });
-        
-        if (fallbackError) {
-          throw new Error(`Both cache and fallback failed: ${fallbackError.message}`);
-        }
-        
-        return NextResponse.json({ sessions: fallbackSessions || [] });
-      }
-      
-      // Cache returns the data as an array, so return it directly
-      return NextResponse.json({ sessions: sessionsWithStats || [] });
-    } catch (cacheError) {
-      console.error('❌ Cache error, falling back to direct query:', cacheError);
-      
-      // Fallback to direct query if cache fails
+      // Simple direct query without caching
       let query = supabase
         .from('job_readiness_expert_sessions')
         .select(`
@@ -59,7 +32,7 @@ export async function GET(req: NextRequest) {
           is_active,
           created_at,
           updated_at,
-          job_readiness_expert_session_products (
+          job_readiness_expert_session_products!inner (
             product_id,
             products (
               id,
@@ -68,7 +41,6 @@ export async function GET(req: NextRequest) {
             )
           )
         `)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       // Filter by product if specified
@@ -99,76 +71,81 @@ export async function GET(req: NextRequest) {
             is_active: session.is_active,
             created_at: session.created_at,
             updated_at: session.updated_at,
-            products: []
+            job_readiness_expert_session_products: []
           });
         }
         
-        // Add product to the session's products array only if it's a Job Readiness product
-        if (session.job_readiness_expert_session_products?.products && 
-            session.job_readiness_expert_session_products.products.type === 'JOB_READINESS') {
-          sessionsMap.get(sessionId).products.push(session.job_readiness_expert_session_products.products);
+        // Add product associations with correct structure
+        if (session.job_readiness_expert_session_products?.products) {
+          const existingProducts = sessionsMap.get(sessionId).job_readiness_expert_session_products;
+          const productExists = existingProducts.some((p: any) => 
+            p.product_id === session.job_readiness_expert_session_products.product_id
+          );
+          
+          if (!productExists && session.job_readiness_expert_session_products.products) {
+            existingProducts.push({
+              product_id: session.job_readiness_expert_session_products.product_id,
+              products: {
+                id: session.job_readiness_expert_session_products.products.id,
+                name: session.job_readiness_expert_session_products.products.name || 'Unnamed Product',
+                type: session.job_readiness_expert_session_products.products.type || 'UNKNOWN'
+              }
+            });
+          }
         }
       });
 
-      // Filter sessions to only include those with at least one Job Readiness product (unless no productId filter)
-      let transformedSessions = Array.from(sessionsMap.values());
-      if (productId) {
-        // If filtering by specific product, only include sessions with that product
-        transformedSessions = transformedSessions.filter(session => 
-          session.products.some((p: any) => p.id === productId)
-        );
-      } else {
-        // For admin view, show all sessions but note which ones have no valid products
-        transformedSessions = transformedSessions.map(session => ({
-          ...session,
-          has_valid_products: session.products.length > 0
-        }));
-      }
+      const transformedSessions = Array.from(sessionsMap.values());
 
-      // Get completion statistics for each session
-      // --- BEGIN N+1 FIX ---
-      // Batch fetch progress stats to avoid N+1 queries
+      // Get completion statistics for each session in batches
       const sessionIds = transformedSessions.map((s) => s.id);
 
-      const { data: allProgressStats, error: statsError } = await supabase
-        .from('job_readiness_expert_session_progress')
-        .select('expert_session_id, is_completed, watch_time_seconds')
-        .in('expert_session_id', sessionIds);
+      let allProgressStats = [];
+      if (sessionIds.length > 0) {
+        const { data: progressData, error: statsError } = await supabase
+          .from('job_readiness_expert_session_progress')
+          .select('expert_session_id, is_completed, watch_time_seconds')
+          .in('expert_session_id', sessionIds);
 
-      if (statsError) {
-        console.error('Error fetching progress stats:', statsError);
-        return NextResponse.json({ error: 'Failed to fetch progress stats' }, { status: 500 });
+        if (statsError) {
+          console.error('Error fetching progress stats:', statsError);
+          // Continue without stats rather than failing
+        } else {
+          allProgressStats = progressData || [];
+        }
       }
 
       // Build aggregation map
-      const statsMap = new Map<string, { total: number; completed: number; watchTime: number }>();
+      const statsMap = new Map<string, { total: number; completed: number; totalWatchTime: number }>();
 
-      (allProgressStats || []).forEach((row: any) => {
-        const entry = statsMap.get(row.expert_session_id) || { total: 0, completed: 0, watchTime: 0 };
+      allProgressStats.forEach((row: any) => {
+        const entry = statsMap.get(row.expert_session_id) || { total: 0, completed: 0, totalWatchTime: 0 };
         entry.total += 1;
         if (row.is_completed) entry.completed += 1;
-        entry.watchTime += row.watch_time_seconds || 0;
+        entry.totalWatchTime += row.watch_time_seconds || 0;
         statsMap.set(row.expert_session_id, entry);
       });
 
       const sessionsWithStats = transformedSessions.map((session) => {
-        const agg = statsMap.get(session.id) || { total: 0, completed: 0, watchTime: 0 };
-
-        const completionStats = {
-          total_students: agg.total,
-          completed_students: agg.completed,
-          completion_rate: agg.total > 0 ? Math.round((agg.completed / agg.total) * 100) : 0,
-          average_completion_percentage: agg.total > 0 ? Math.round(agg.watchTime / agg.total) : 0,
-        };
+        const stats = statsMap.get(session.id) || { total: 0, completed: 0, totalWatchTime: 0 };
 
         return {
           ...session,
-          completion_stats: completionStats,
+          completion_stats: {
+            total_students: stats.total,
+            completed_students: stats.completed,
+            completion_rate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
+            average_completion_percentage: stats.total > 0 && session.video_duration > 0 
+              ? Math.round((stats.totalWatchTime / stats.total / session.video_duration) * 100) 
+              : 0,
+          }
         };
       });
-      // --- END N+1 FIX ---
 
       return NextResponse.json({ sessions: sessionsWithStats });
+    } catch (error) {
+      console.error('Error in expert sessions GET:', error);
+      return NextResponse.json({ error: 'Failed to fetch expert sessions' }, { status: 500 });
     }
   } catch (error) {
     console.error('Unexpected error in expert-sessions GET:', error);
@@ -183,7 +160,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     // JWT-based authentication (using existing auth pattern)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -317,7 +294,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     // JWT-based authentication (consistent with GET and POST)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -480,7 +457,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     // JWT-based authentication (consistent with other methods)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

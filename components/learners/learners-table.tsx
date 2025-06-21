@@ -19,7 +19,7 @@ export interface Learner {
   client: {
     id: string
     name: string
-  }
+  } | null
 }
 
 // Type for client objects
