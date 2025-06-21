@@ -2,57 +2,6 @@ import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 import { getClaimsFromToken, isStudentActive, hasAnyRole, hasRequiredRole } from './lib/auth/jwt-utils';
 
-// DEPRECATED: Helper function to fetch profile data - REPLACED WITH JWT CLAIMS
-// Note: This function is kept for fallback purposes during migration
-async function getRoleFromProfile(supabase: any, userId: string): Promise<string | null> {
-  console.warn('getRoleFromProfile is deprecated. Using JWT claims fallback.');
-  if (!userId) return null;
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (error || !data) {
-      if (error && error.code !== 'PGRST116') { // Ignore "No rows found" errors silently
-          // Error logged to monitoring in production environment
-      }
-      return null;
-    }
-    return data.role;
-  } catch (err) {
-      // Error logged to monitoring in production environment
-      return null;
-  }
-}
-
-// DEPRECATED: Helper function to check if user is a student - REPLACED WITH JWT CLAIMS
-// Note: This function is kept for fallback purposes during migration
-async function isUserStudent(supabase: any, userId: string): Promise<boolean> {
-  console.warn('isUserStudent is deprecated. Using JWT claims fallback.');
-  if (!userId) return false;
-  try {
-    const { data, error } = await supabase
-      .from('students')
-      .select('id, is_active')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (error) {
-      if (error.code !== 'PGRST116') { // Ignore "No rows found" errors silently
-        // Error logged to monitoring in production environment
-      }
-      return false;
-    }
-    
-    return data && data.is_active === true;
-  } catch (err) {
-    // Error logged to monitoring in production environment
-    return false;
-  }
-}
-
 // Admin-specific routes (only Admin can access)
 const ADMIN_ONLY_ROUTES = [
   // User management routes
@@ -202,7 +151,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  // --- 5. JWT-Based Role Authorization (OPTIMIZED - NO DATABASE QUERIES) ---
+  // --- 5. JWT-Based Role Authorization ---
   if (user) {
     // Get session to access JWT token
     const { data: { session } } = await supabase.auth.getSession();
