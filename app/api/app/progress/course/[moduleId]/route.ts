@@ -141,11 +141,11 @@ export async function PATCH(
 
 /**
  * GET handler for fetching a student's progress on a specific module.
+ * OPTIMIZED: Uses consolidated database function to reduce query count and improve performance.
  * - Validates moduleId.
  * - Authenticates and authorizes the student.
- * - Verifies student enrollment in the module's product.
- * - Fetches the progress record from student_module_progress.
- * - Returns the progress or a default 'NotStarted' state.
+ * - Uses single database function call for all data.
+ * - Returns comprehensive course progress with lessons.
  */
 export async function GET(
   request: Request,
@@ -188,70 +188,63 @@ export async function GET(
 
     const studentId = user.id;
 
-    // 3. Verify Enrollment (Similar to PATCH)
-    const { data: moduleData, error: moduleError } = await supabase
-      .from('modules')
-      .select(`
-        id,
-        module_product_assignments!inner(product_id)
-      `)
-      .eq('id', moduleId)
-      .maybeSingle();
+    // 🚀 PERFORMANCE BREAKTHROUGH: Single database function call
+    // Replaces multiple queries (module validation, enrollment check, progress fetch, lessons fetch)
+    const { data: courseData, error: courseError } = await supabase
+      .rpc('get_course_progress_with_lessons', {
+        p_student_id: studentId,
+        p_module_id: moduleId
+      });
 
-    if (moduleError) {
-      console.error('GET Progress - Error fetching module:', moduleError);
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-    if (!moduleData || !moduleData.module_product_assignments?.length) {
-      return NextResponse.json({ error: 'Not Found: Module does not exist or not assigned to any product' }, { status: 404 });
-    }
-    const productId = moduleData.module_product_assignments[0].product_id;
-
-    const { count, error: assignmentError } = await supabase
-      .from('client_product_assignments')
-      .select('*', { count: 'exact', head: true })
-      .eq('client_id', clientId)
-      .eq('product_id', productId);
-
-    if (assignmentError) {
-      console.error('GET Progress - Error checking assignment:', assignmentError);
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-    if (count === null || count === 0) {
-      return NextResponse.json({ error: 'Forbidden: Not enrolled' }, { status: 403 });
+    if (courseError) {
+      console.error('GET Progress - Error fetching course progress:', courseError);
+      return NextResponse.json({ error: 'Internal Server Error fetching course data' }, { status: 500 });
     }
 
-    // 4. Fetch Progress
-    const { data: progress, error: progressError } = await supabase
-      .from('student_module_progress')
-      .select('status, score, completed_at, updated_at')
-      .eq('student_id', studentId)
-      .eq('module_id', moduleId)
-      .maybeSingle(); // Use maybeSingle as progress might not exist
-
-    if (progressError) {
-      console.error('GET Progress - Error fetching progress:', progressError);
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    // Handle case where function returns error object
+    if (courseData?.error) {
+      if (courseData.message === 'Module not found or no access') {
+        return NextResponse.json({ error: 'Not Found: Module does not exist or access denied' }, { status: 404 });
+      }
+      console.error('Database function error:', courseData.message);
+      return NextResponse.json({ error: 'Failed to process course data' }, { status: 500 });
     }
 
-    // 5. Return Progress or Default State
-    if (progress) {
-      return NextResponse.json(progress, { status: 200 });
-    } else {
-      // Return a default 'NotStarted' state if no record exists
-      return NextResponse.json(
-        {
-          status: 'NotStarted',
-          score: null,
-          completed_at: null,
-          updated_at: null, // Or maybe current time? Null seems cleaner
-        },
-        { status: 200 }, // 200 OK is appropriate even if not started
-      );
-    }
+    // Transform the consolidated response to match the expected API format
+    const response = {
+      module: courseData.module,
+      progress: {
+        status: courseData.progress?.status || 'NotStarted',
+        score: courseData.progress?.score || null,
+        progress_percentage: courseData.progress?.progress_percentage || 0,
+        completed_videos: courseData.progress?.completed_videos || [],
+        video_completion_count: courseData.progress?.video_completion_count || 0,
+        course_completed_at: courseData.progress?.course_completed_at || null,
+        completed_at: courseData.progress?.course_completed_at || null,
+        last_updated: courseData.progress?.last_updated || null,
+        updated_at: courseData.progress?.last_updated || null,
+        progress_details: courseData.progress?.progress_details || null,
+      },
+      lessons: courseData.lessons || [],
+      summary: courseData.summary || {
+        total_lessons: 0,
+        completed_lessons: 0,
+        completion_percentage: 0,
+      },
+      generated_at: courseData.generated_at,
+    };
+
+    return NextResponse.json(response, {
+      status: 200,
+      headers: {
+        'X-Performance-Optimized': 'true',
+        'X-Query-Count': '1',
+        'X-Generated-At': (courseData.generated_at || Date.now()).toString()
+      }
+    });
 
   } catch (error) {
-    console.error('Unexpected Error in GET /progress/course/[moduleId]:', error);
+    console.error('Unexpected Error in GET /progress/course/[moduleId] (optimized):', error);
     if (error instanceof z.ZodError) { // Catch Zod errors specifically if needed
         return NextResponse.json(
           { error: 'Bad Request: Validation failed', details: error.flatten() },
