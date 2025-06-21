@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
@@ -23,15 +22,8 @@ export async function GET(
     // Await params before using
     const { id } = await params;
 
-    // For testing purposes, use service role client to bypass RLS
-    // In production, you should properly implement role-based access
-    const serviceClient = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    // Fetch the background using service role (bypasses RLS)
-    const { data: background, error } = await serviceClient
+    // Use the authenticated client - RLS policies will handle proper access control
+    const { data: background, error } = await supabase
       .from('job_readiness_background_project_types')
       .select('*')
       .eq('id', id)

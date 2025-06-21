@@ -182,41 +182,13 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: Request) {
   try {
-    // Create Supabase server client
-    const supabase = await createClient();
-
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
+    // Use standardized authentication check
+    const authResult = await authenticateApiRequest(['Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-
-    // Fetch user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error("Error fetching user profile:", profileError);
-      return NextResponse.json(
-        { error: "Server Error", message: "Error fetching user profile" },
-        { status: 500 }
-      );
-    }
-
-    // Strictly verify user is an Admin
-    if (profile.role !== "Admin") {
-      console.warn(`Unauthorized course creation attempt by ${user.id} with role ${profile.role}`);
-      return NextResponse.json(
-        { error: "Forbidden", message: "Only administrators can create Job Readiness courses" },
-        { status: 403 }
-      );
-    }
+    
+    const { user, claims, supabase } = authResult;
 
     // Parse and validate request body
     let body;
