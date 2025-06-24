@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Building2, MoreHorizontal, Search, SlidersHorizontal, Package } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { AddClientDialog } from "@/components/clients/add-client-dialog"
 import { ClientForm } from "@/components/clients/client-form"
-import { Client, toggleClientStatus } from "@/app/actions/clientActions"
+import { useClients, useToggleClientStatus, useClient, type Client } from "@/hooks/api/use-clients"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -43,69 +43,40 @@ const ITEMS_PER_PAGE = 10
 
 export function ClientsTable() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("all")
   const [showFilters, setShowFilters] = useState(false)
-  const [clients, setClients] = useState<ClientWithProducts[]>([])
-  const [loading, setLoading] = useState(true)
   const [editClient, setEditClient] = useState<Client | null>(null)
   const [showEditForm, setShowEditForm] = useState(false)
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
   
   const { toast } = useToast()
 
-  // Function to fetch clients with pagination
-  const fetchClients = async () => {
-    try {
-      setLoading(true)
-      
-      // Build query parameters for pagination and filtering
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        pageSize: ITEMS_PER_PAGE.toString(),
-      })
-      
-      if (searchTerm) params.append('search', searchTerm)
-      if (statusFilter !== 'all') params.append('status', statusFilter)
-      
-      // Fetch paginated clients from API (includes products via join to prevent N+1 queries)
-      const response = await fetch(`/api/admin/clients?${params.toString()}`)
-      
-      if (!response.ok) {
-        throw new Error(`Error fetching clients: ${response.status}`)
-      }
-      
-      const result = await response.json()
-      
-      // API now includes products via join - no additional requests needed
-      setClients(result.data || [])
-      setTotalCount(result.metadata.totalCount)
-      setTotalPages(result.metadata.totalPages)
-      
-    } catch (error) {
-      console.error("Failed to fetch clients:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load clients. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // API hooks
+  const {
+    data: clientsResponse,
+    isLoading: loading,
+    error,
+    refetch
+  } = useClients({
+    page: currentPage,
+    pageSize: ITEMS_PER_PAGE,
+    search: searchTerm || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  })
 
-  // Load clients on component mount and when page or filters change
-  useEffect(() => {
-    fetchClients()
-  }, [currentPage]) // Fetch when page changes, handle filters via search button
+  const toggleClientStatus = useToggleClientStatus()
+
+  // Extract data from response
+  const clients = clientsResponse?.data || []
+  const totalCount = clientsResponse?.pagination?.totalCount || 0
+  const totalPages = clientsResponse?.pagination?.totalPages || 0
 
   // Handle search and filter changes
   const handleFiltersChange = () => {
     setCurrentPage(1) // Reset to first page when filters change
-    fetchClients()
+    refetch()
   }
 
   // Handle page change
@@ -116,19 +87,14 @@ export function ClientsTable() {
   // Handle toggling a client's active status
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
     try {
-      await toggleClientStatus(id, !currentStatus)
-      toast({
-        title: "Success",
-        description: `Client ${currentStatus ? "deactivated" : "activated"} successfully.`,
+      await toggleClientStatus.mutateAsync({
+        id,
+        isActive: !currentStatus,
       })
-      fetchClients() // Refresh the list
+      // Success handled by the hook's onSuccess callback
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to ${currentStatus ? "deactivate" : "activate"} client.`,
-        variant: "destructive",
-      })
-      console.error(error)
+      // Error handled by the hook's onError callback
+      console.error('Toggle status error:', error)
     }
   }
 
@@ -143,26 +109,30 @@ export function ClientsTable() {
   }
 
   // Handle edit client action
-  const handleEditClient = async (client: Client) => {
-    try {
-      // Fetch complete client details to ensure we have all fields
-      const response = await fetch(`/api/admin/clients/${client.id}`)
-      
-      if (!response.ok) {
-        throw new Error(`Error fetching client details: ${response.status}`)
-      }
-      
-      const fullClientData = await response.json()
-      setEditClient(fullClientData)
-      setShowEditForm(true)
-    } catch (error) {
-      console.error("Error fetching client details:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load client details for editing.",
-        variant: "destructive",
-      })
-    }
+  const handleEditClient = (client: Client) => {
+    setEditClient(client)
+    setShowEditForm(true)
+  }
+
+  // Handle successful client operations
+  const handleClientUpdated = () => {
+    refetch()
+  }
+
+  // Handle status filter change
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value as "active" | "inactive" | "all")
+  }
+
+  if (error) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-destructive">Failed to load clients. Please try again.</p>
+        <Button onClick={() => refetch()} className="mt-4">
+          Retry
+        </Button>
+      </Card>
+    )
   }
 
   return (
@@ -194,7 +164,7 @@ export function ClientsTable() {
             <Button onClick={handleFiltersChange} disabled={loading}>
               {loading ? "Searching..." : "Search"}
             </Button>
-            <AddClientDialog onClientAdded={fetchClients} />
+            <AddClientDialog onClientAdded={handleFiltersChange} />
           </div>
         </div>
 
@@ -202,7 +172,7 @@ export function ClientsTable() {
           <div className="mt-4 flex flex-col gap-4 rounded-md border p-4 sm:flex-row">
             <div className="flex-1 space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
@@ -368,7 +338,7 @@ export function ClientsTable() {
           open={showEditForm}
           setOpen={setShowEditForm}
           client={editClient}
-          onSuccess={fetchClients}
+          onSuccess={handleClientUpdated}
         />
       )}
     </Card>

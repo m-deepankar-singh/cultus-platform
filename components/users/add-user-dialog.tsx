@@ -12,46 +12,24 @@ import {
 } from "@/components/ui/dialog"
 import { UserForm } from './user-form'
 import { UserPlus } from 'lucide-react'
-import { createUser } from '@/app/actions/userActions'
+import { useCreateUser } from '@/hooks/api/use-users'
+import { useClients } from '@/hooks/api/use-clients'
 
 interface Client { id: string; name: string; }
 
 interface AddUserDialogProps {
-    clients: Client[];
+    clients?: Client[];
 }
 
 export function AddUserDialog({ clients: initialClients }: AddUserDialogProps) {
     const [open, setOpen] = React.useState(false);
-    const [clients, setClients] = React.useState<Client[]>(initialClients || []);
-    const [, setIsLoading] = React.useState(false);
-
-    // Fetch clients when the dialog opens to ensure we have the most up-to-date list
-    React.useEffect(() => {
-        if (open) {
-            const fetchClients = async () => {
-                setIsLoading(true);
-                try {
-                    const response = await fetch('/api/admin/clients');
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch clients');
-                    }
-                    const data = await response.json();
-                    console.log('Clients fetched in AddUserDialog:', data);
-                    setClients(data || []);
-                } catch (error) {
-                    console.error('Error fetching clients:', error);
-                    // Fallback to the initial clients if the fetch fails
-                    if (initialClients?.length) {
-                        setClients(initialClients);
-                    }
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-
-            fetchClients();
-        }
-    }, [open, initialClients]);
+    
+    // Use API hooks instead of manual fetching
+    const { data: clientsResponse } = useClients();
+    const createUser = useCreateUser();
+    
+    // Use clients from props as fallback, then from API
+    const clients = clientsResponse?.data || initialClients || [];
 
     // Optional: Callback to close dialog after successful form submission
     const handleFormSubmit = () => {
@@ -77,7 +55,6 @@ export function AddUserDialog({ clients: initialClients }: AddUserDialogProps) {
                     <UserForm 
                         clients={clients} 
                         mode="create"
-                        serverAction={createUser} 
                         onFormSubmit={handleFormSubmit}
                     />
                 </div>

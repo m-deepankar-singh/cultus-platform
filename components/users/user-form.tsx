@@ -1,8 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useActionState } from 'react'
-import { useFormStatus } from 'react-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
@@ -19,123 +17,112 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from "@/components/ui/use-toast"
-import { UserFormState } from '@/app/actions/userActions'
+import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { useCreateUser, useUpdateUser, type CreateUserData, type UpdateUserData, type UserProfile } from '@/hooks/api/use-users'
+import type { UseMutationResult } from '@tanstack/react-query'
 
-// Define the schema again (can be imported from actions if preferred and compatible)
+// Define the schema for validation
 const BaseUserSchema = z.object({
     fullName: z.string().min(1, "Full name is required"),
     email: z.string().email("Invalid email address"),
-    // Password is required only for create mode
     password: z.string().optional(), 
     role: z.enum(["Admin", "Staff", "Viewer", "Client Staff"], { 
         required_error: "Role is required",
     }),
     clientId: z.string().optional(), 
-});
+})
 
-const UserFormSchema = BaseUserSchema.refine((data) => {
+const CreateUserFormSchema = BaseUserSchema.extend({
+    password: z.string().min(8, "Password must be at least 8 characters"),
+}).refine((data) => {
     if (data.role === 'Client Staff' && !data.clientId) return false;
     return true;
 }, { message: "Client selection is required for Client Staff role", path: ['clientId'] })
-  .refine(() => {
-      // Require password only in create mode (when initialData is not present)
-      // This logic depends on how you differentiate modes in the component call
-      // For simplicity, we'll handle this check outside the main zod schema for now
-      // or make password required in BaseUserSchema and omit for update.
-      // Let's stick to omitting for update schema and making it optional here
-      return true; // Placeholder - actual check might be more complex
-  });
 
+const UpdateUserFormSchema = BaseUserSchema.omit({ password: true, email: true }).refine((data) => {
+    if (data.role === 'Client Staff' && !data.clientId) return false;
+    return true;
+}, { message: "Client selection is required for Client Staff role", path: ['clientId'] })
 
-type UserFormValues = z.infer<typeof UserFormSchema>;
+type CreateUserFormValues = z.infer<typeof CreateUserFormSchema>
+type UpdateUserFormValues = z.infer<typeof UpdateUserFormSchema>
 
-interface Client { id: string; name: string; }
-
-interface UserProfile {
-    id: string;
-    email?: string;
-    // Updated to match the structure from paginated API
-    full_name?: string | null;
-    role?: string;
-    client_id?: string | null;
-    client?: {
-        id: string;
-        name: string;
-    };
+interface Client { 
+    id: string; 
+    name: string; 
 }
 
 interface UserFormProps {
     clients: Client[];
     mode: 'create' | 'edit';
-    initialData?: UserProfile | null; // Make optional, only present in edit mode
-    serverAction: (prevState: UserFormState, formData: FormData) => Promise<UserFormState>;
-    onFormSubmit?: () => void; // Optional: Callback to close dialog
+    initialData?: UserProfile | null;
+    onFormSubmit?: () => void;
 }
-
-const initialState: UserFormState = { message: null, errors: {} };
 
 export function UserForm({ 
     clients, 
     mode, 
-    initialData = null, // Default to null for create mode
-    serverAction, 
+    initialData = null,
     onFormSubmit 
 }: UserFormProps) {
-    const [state, formAction] = useActionState(serverAction, initialState);
-    const { toast } = useToast();
+    const createUserMutation = useCreateUser()
+    const updateUserMutation = useUpdateUser()
+    
+    const isLoading = createUserMutation.isPending || updateUserMutation.isPending
 
-    // Add debug logging for clients data
-    React.useEffect(() => {
-        console.log('Clients received in UserForm:', clients);
-    }, [clients]);
-
-    const form = useForm<UserFormValues>({
-        resolver: zodResolver(UserFormSchema),
+    // Use appropriate schema based on mode
+    const schema = mode === 'create' ? CreateUserFormSchema : UpdateUserFormSchema
+    
+    const form = useForm<CreateUserFormValues | UpdateUserFormValues>({
+        resolver: zodResolver(schema),
         defaultValues: {
             fullName: initialData?.full_name || '',
             email: initialData?.email || '',
             password: '',
-            role: initialData?.role as any || undefined,
+            role: (initialData?.role as any) || undefined,
             clientId: initialData?.client_id || undefined,
         },
-    });
+    })
 
-    const selectedRole = form.watch('role');
+    const selectedRole = form.watch('role')
 
-    React.useEffect(() => {
-        if (state.message && state.errors && Object.keys(state.errors).length === 0) {
-            toast({
-                title: "Success",
-                description: state.message,
-            });
+    const onSubmit = async (data: CreateUserFormValues | UpdateUserFormValues) => {
+        try {
             if (mode === 'create') {
-                 form.reset();
+                const createData = data as CreateUserFormValues
+                await createUserMutation.mutateAsync({
+                    full_name: createData.fullName,
+                    email: createData.email,
+                    password: createData.password,
+                    role: createData.role,
+                    client_id: createData.role === 'Client Staff' ? createData.clientId : undefined,
+                })
+                
+                form.reset()
+                onFormSubmit?.()
+            } else if (mode === 'edit' && initialData?.id) {
+                const updateData = data as UpdateUserFormValues
+                await updateUserMutation.mutateAsync({
+                    userId: initialData.id,
+                    data: {
+                        full_name: updateData.fullName,
+                        role: updateData.role,
+                        client_id: updateData.role === 'Client Staff' ? updateData.clientId : null,
+                    }
+                })
+                
+                onFormSubmit?.()
             }
-            onFormSubmit?.();
-        } else if (state.message && state.errors && Object.keys(state.errors).length > 0) {
-             toast({
-                variant: "destructive",
-                title: mode === 'create' ? "Error Creating User" : "Error Updating User",
-                description: state.errors?._form?.[0] || state.message || "Please check the form fields.",
-            });
-        } else if (!state.message && state.errors && Object.keys(state.errors).length > 0) {
-             toast({
-                variant: "destructive",
-                title: "Validation Error",
-                description: "Please check the highlighted fields.",
-             });
+        } catch (error) {
+            // Error handling is done in the mutation hooks
+            console.error('Form submission error:', error)
         }
-    }, [state, toast, form, mode, onFormSubmit]);
+    }
 
     return (
         <Form {...form}>
-            <form action={formAction} className="space-y-4">
-                {mode === 'edit' && initialData?.id && (
-                    <input type="hidden" name="userId" value={initialData.id} />
-                )}
-
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                     control={form.control}
                     name="fullName"
@@ -145,10 +132,11 @@ export function UserForm({
                             <FormControl>
                                 <Input placeholder="John Doe" {...field} />
                             </FormControl>
-                            <FormMessage>{state.errors?.fullName?.join(', ')}</FormMessage>
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
+                
                 <FormField
                     control={form.control}
                     name="email"
@@ -156,15 +144,17 @@ export function UserForm({
                         <FormItem>
                             <FormLabel>Email</FormLabel>
                             <FormControl>
-                                <Input type="email" placeholder="user@example.com" {...field} disabled={mode === 'edit'} />
+                                <Input 
+                                    type="email" 
+                                    placeholder="user@example.com" 
+                                    {...field} 
+                                    disabled={mode === 'edit'} 
+                                />
                             </FormControl>
-                            {mode === 'edit' && initialData?.email && (
-                                <input type="hidden" name="email" value={initialData.email} />
-                            )}
                             <FormDescription>
                                 {mode === 'edit' ? 'Email cannot be changed.' : ''}
                             </FormDescription>
-                            <FormMessage>{state.errors?.email?.join(', ')}</FormMessage>
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
@@ -179,7 +169,7 @@ export function UserForm({
                                 <FormControl>
                                     <Input type="password" placeholder="••••••••" {...field} />
                                 </FormControl>
-                                <FormMessage>{state.errors?.password?.join(', ')}</FormMessage>
+                                <FormMessage />
                             </FormItem>
                         )}
                     />
@@ -191,10 +181,10 @@ export function UserForm({
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Role</FormLabel>
-                             <Select 
+                            <Select 
                                 onValueChange={field.onChange} 
                                 value={field.value} 
-                             > 
+                            > 
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a role" />
@@ -207,8 +197,7 @@ export function UserForm({
                                     <SelectItem value="Client Staff">Client Staff</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <input type="hidden" {...field} name="role" value={field.value || ''} /> 
-                            <FormMessage>{state.errors?.role?.join(', ')}</FormMessage>
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
@@ -230,51 +219,37 @@ export function UserForm({
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        {/* Debug info moved outside JSX */}
-                                        {/* Filter out any clients with empty or null IDs */}
-                                        {(clients || [])
-                                          .filter(client => !!client && !!client.id)
-                                          .map(client => (
+                                        {clients.map(client => (
                                             <SelectItem key={client.id} value={client.id}>
                                                 {client.name}
                                             </SelectItem>
-                                          ))
-                                        }
+                                        ))}
                                         
-                                        {/* If no valid clients, display a message */}
-                                        {(!clients || clients.length === 0 || clients.every(c => !c || !c.id)) && (
+                                        {clients.length === 0 && (
                                             <div className="px-2 py-2 text-sm text-muted-foreground">
                                                 No clients available
                                             </div>
                                         )}
                                     </SelectContent>
                                 </Select>
-                                <input type="hidden" {...field} name="clientId" value={field.value || ''} /> 
-                                <FormMessage>{state.errors?.clientId?.join(', ')}</FormMessage>
+                                <FormMessage />
                             </FormItem>
                         )}
                     />
                 )} 
                 
-                {state.errors?._form && (
-                     <div className="text-sm font-medium text-destructive">
-                         {state.errors._form.join(', ')}
-                    </div>
-                 )} 
-
-                <SubmitButton mode={mode} />
+                <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full"
+                >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {mode === 'create' 
+                        ? (isLoading ? 'Creating...' : 'Create User')
+                        : (isLoading ? 'Updating...' : 'Update User')
+                    }
+                </Button>
             </form>
         </Form>
-    );
-}
-
-function SubmitButton({ mode }: { mode: 'create' | 'edit' }) {
-    const { pending } = useFormStatus();
-
-    return (
-        <Button type="submit" disabled={pending} className="w-full">
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} 
-            {mode === 'create' ? 'Create User' : 'Update User'} 
-        </Button>
-    );
+    )
 } 

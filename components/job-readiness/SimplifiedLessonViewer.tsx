@@ -87,11 +87,11 @@ export function SimplifiedLessonViewer({
     }
   }, [currentTime])
 
-  // Check for video completion (95% threshold)
+  // Check for video completion (100% threshold)
   useEffect(() => {
     if (duration > 0 && currentTime > 0) {
       const watchedPercent = (currentTime / duration) * 100
-      if (watchedPercent >= 95 && !isVideoCompleted && !isLessonCompleted) {
+      if (watchedPercent >= 100 && !isVideoCompleted && !isLessonCompleted) {
         setIsVideoCompleted(true)
         saveVideoCompletion()
       }
@@ -197,7 +197,7 @@ export function SimplifiedLessonViewer({
   }
 
   const handleManualCompletion = () => {
-    if (!isLessonCompleted && watchedPercentage >= 95) {
+    if (!isLessonCompleted && watchedPercentage >= 100) {
       setIsVideoCompleted(true)
       saveVideoCompletion()
     }
@@ -343,8 +343,8 @@ export function SimplifiedLessonViewer({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Manual completion button (only shows when video is nearly complete) */}
-                  {watchedPercentage >= 95 && !isLessonCompleted && (
+                                      {/* Manual completion button (only shows when video is fully complete) */}
+                    {watchedPercentage >= 100 && !isLessonCompleted && (
                     <Button
                       variant="ghost"
                       size="sm"

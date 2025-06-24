@@ -70,7 +70,7 @@ interface UseExpertSessionPlayerReturn {
 
 // Constants
 const MILESTONES = [10, 25, 50, 75, 90, 95, 100]
-const COMPLETION_THRESHOLD = 95
+const COMPLETION_THRESHOLD = 100
 const MIN_WATCH_TIME = 3
 const PAUSE_SAVE_THRESHOLD = 30
 const SAVE_THROTTLE_MS = 2000

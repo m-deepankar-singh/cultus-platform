@@ -274,17 +274,98 @@ export async function POST(
       }
     };
 
+    // 🚀 ENHANCED: Also update lesson_quiz_attempts for backwards compatibility
+    const existingAttempts = existingDetails.lesson_quiz_attempts || {};
+    const lessonAttempts = existingAttempts[lessonId] || [];
+    
+    // Add this attempt to the attempts array
+    const newAttempt = {
+      answers: submissionData.answers,
+      score: score,
+      total_questions_in_quiz: totalQuestions,
+      pass_fail_status: passed ? 'passed' : 'failed',
+      time_taken_seconds: submissionData.time_spent_seconds,
+      submitted_at: new Date().toISOString(),
+    };
+    
+    lessonAttempts.push(newAttempt);
+    
+    const updatedLessonQuizAttempts = {
+      ...existingAttempts,
+      [lessonId]: lessonAttempts,
+    };
+
     const updatedProgressDetails = {
       ...existingDetails,
       lesson_quiz_results: updatedLessonQuizResults,
+      lesson_quiz_attempts: updatedLessonQuizAttempts, // Add for backwards compatibility
     };
 
-    // 10. Update progress in database
+    // 10. 🚀 ENHANCED: Check for course completion after quiz submission
+    // Get all lessons to check if course is now complete
+    const { data: allLessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id, has_quiz')
+      .eq('module_id', moduleId);
+
+    let courseCompleted = false;
+    let completedLessonsCount = 0;
+    
+    if (!lessonsError && allLessons && allLessons.length > 0) {
+      // Get existing completed videos from the database
+      const { data: existingProgress } = await supabase
+        .from('student_module_progress')
+        .select('completed_videos')
+        .eq('student_id', user.id)
+        .eq('module_id', moduleId)
+        .maybeSingle();
+      
+      const completedVideos = existingProgress?.completed_videos || [];
+      
+      for (const lesson of allLessons) {
+        const isVideoWatched = completedVideos.includes(lesson.id);
+        let isQuizPassedOrNotRequired = true;
+
+        // If lesson has a quiz, check if it's been passed
+        if (lesson.has_quiz) {
+          // Check both possible quiz result formats for maximum compatibility
+          const quizResult = updatedProgressDetails.lesson_quiz_results?.[lesson.id];
+          const quizAttempts = updatedProgressDetails.lesson_quiz_attempts?.[lesson.id];
+          
+          const passedInQuizResults = quizResult?.passed === true;
+          const passedInQuizAttempts = Array.isArray(quizAttempts) && 
+            quizAttempts.some((att: any) => att.pass_fail_status === 'passed');
+          
+          isQuizPassedOrNotRequired = passedInQuizResults || passedInQuizAttempts;
+        }
+
+        // Lesson is complete if video watched AND (no quiz OR quiz passed)
+        if (isVideoWatched && isQuizPassedOrNotRequired) {
+          completedLessonsCount += 1;
+        }
+      }
+
+      courseCompleted = completedLessonsCount >= allLessons.length;
+    }
+
+    // Calculate overall progress based on completed lessons
+    const overallCompletionPercentage = allLessons && allLessons.length > 0 
+      ? Math.round((completedLessonsCount / allLessons.length) * 100) 
+      : 0;
+
+    const newStatus = courseCompleted ? 'Completed' : 'InProgress';
+
+    // 11. Update progress in database with course completion status
     const progressUpdateData = {
       student_id: user.id,
       module_id: moduleId,
       progress_details: updatedProgressDetails,
+      progress_percentage: overallCompletionPercentage,
+      status: newStatus,
       last_updated: new Date().toISOString(),
+      ...(courseCompleted && {
+        course_completed_at: new Date().toISOString()
+      })
     };
 
     const { error: upsertError } = await supabase
@@ -312,6 +393,14 @@ export async function POST(
       message = 'Quiz not passed. Maximum attempts reached.';
     }
 
+    // 12. Enhanced response with course completion info
+    let enhancedMessage = message;
+    if (passed && courseCompleted) {
+      enhancedMessage = `${message} 🎉 Course completed! Congratulations on finishing the entire course!`;
+    } else if (passed) {
+      enhancedMessage = `${message} You can now proceed to the next lesson.`;
+    }
+
     const response: QuizSubmissionResponse = {
       success: true,
       score: score,
@@ -322,7 +411,7 @@ export async function POST(
       can_retake: canRetake,
       attempts_used: newAttempts,
       max_attempts: maxAttempts,
-      message: message,
+      message: enhancedMessage,
     };
 
     return NextResponse.json(response);

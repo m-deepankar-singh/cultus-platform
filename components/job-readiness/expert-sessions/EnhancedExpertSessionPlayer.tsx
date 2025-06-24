@@ -58,7 +58,7 @@ interface MilestoneTrackingState {
 }
 
 const MILESTONES = [10, 25, 50, 75, 90, 95, 100] // percentages
-const COMPLETION_THRESHOLD = 95 // 95% for completion
+const COMPLETION_THRESHOLD = 100 // 100% for completion
 const MIN_WATCH_TIME = 3 // seconds before milestone counts
 const PAUSE_SAVE_THRESHOLD = 30 // save after 30s pause
 

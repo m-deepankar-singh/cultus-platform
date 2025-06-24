@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { COMPLETION_THRESHOLD } from '@/lib/constants/progress-milestones';
 
 // Schema for watch progress validation with milestone support and backward compatibility
 const WatchProgressSchema = z.object({
@@ -208,7 +209,7 @@ export async function POST(
     // 8. Calculate completion details
     const calculatedCompletionPercentage = Math.round((watchTimeSeconds / videoDurationSeconds) * 100);
     const finalCompletionPercentage = completion_percentage !== undefined ? completion_percentage : calculatedCompletionPercentage;
-    const isCompleted = finalCompletionPercentage >= 95 || force_completion; // 95% threshold or forced completion
+    const isCompleted = finalCompletionPercentage >= COMPLETION_THRESHOLD || force_completion; // 100% threshold or forced completion
 
     // 9. Get current progress to check if this is a new completion
     const { data: existingProgress } = await supabase

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 import { EditUserDialog } from './edit-user-dialog'
-import { toggleUserStatus } from '@/app/actions/userActions'
+import { useToggleUserStatus } from '@/hooks/api/use-users'
 import { toast } from '@/components/ui/use-toast'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 
@@ -46,8 +46,8 @@ interface UserActionsCellProps {
 }
 
 export function UserActionsCell({ user, clients, onUserUpdated }: UserActionsCellProps) {
-    const [isLoading, setIsLoading] = React.useState(false);
     const { currentUser } = useCurrentUser();
+    const toggleUserStatusMutation = useToggleUserStatus();
     
     // Check if user is active based on banned_until, status field or metadata
     const isUserActive = (): boolean => {
@@ -87,41 +87,24 @@ export function UserActionsCell({ user, clients, onUserUpdated }: UserActionsCel
         }
         
         try {
-            setIsLoading(true);
-            const result = await toggleUserStatus(user.id, !isUserActive());
+            await toggleUserStatusMutation.mutateAsync({ 
+                userId: user.id, 
+                isActive: !isUserActive() 
+            });
             
-            if (result.success) {
-                toast({
-                    title: 'Success',
-                    description: result.message,
-                });
-                
-                // Trigger refresh of user data if provided
-                if (onUserUpdated) {
-                    onUserUpdated();
-                }
-            } else {
-                toast({
-                    variant: 'destructive',
-                    title: 'Error',
-                    description: result.message,
-                });
+            // Trigger refresh of user data if provided
+            if (onUserUpdated) {
+                onUserUpdated();
             }
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: `Failed to ${isUserActive() ? 'deactivate' : 'activate'} user: ${error instanceof Error ? error.message : String(error)}`
-            });
-        } finally {
-            setIsLoading(false);
+            // Error handling is done in the mutation hook with toast
         }
     };
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" disabled={isLoading}>
+                <Button variant="ghost" size="icon" disabled={toggleUserStatusMutation.isPending}>
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">User Actions</span>
                 </Button>
@@ -144,7 +127,7 @@ export function UserActionsCell({ user, clients, onUserUpdated }: UserActionsCel
                     <DropdownMenuItem 
                         onClick={handleToggleStatus} 
                         className={isUserActive() ? "text-destructive" : "text-green-600"}
-                        disabled={isLoading}
+                        disabled={toggleUserStatusMutation.isPending}
                     >
                         {isUserActive() ? 'Deactivate User' : 'Activate User'}
                     </DropdownMenuItem>

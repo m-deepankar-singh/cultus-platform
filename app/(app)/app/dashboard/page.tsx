@@ -1,128 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { Gauge } from "@/components/ui/gauge";
 import { GaugeProgress } from "@/components/analytics/gauge-progress-display";
 import gsap from "gsap";
 import { Clock } from "lucide-react";
-
 import Link from "next/link";
-
-// TypeScript interfaces for the data structure
-interface Module {
-  id: string;
-  name: string;
-  type: 'Course' | 'Assessment';
-  sequence: number;
-  status: 'NotStarted' | 'InProgress' | 'Completed';
-  progress_percentage: number;
-  completed_at: string | null;
-  assessment_score?: number | null;
-  assessment_submitted_at?: string | null;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  product_progress_percentage: number;
-  product_status: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed';
-  image_url?: string | null;
-  modules: Module[];
-}
+import { useStudentDashboard } from "@/hooks/queries/student/useDashboard";
+import type { Product, Module } from "@/lib/query-options";
 
 export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>(undefined);
   
-  // Fetch data from API
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        // Use the existing progress API endpoint
-        const response = await fetch('/api/app/progress');
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            window.location.href = '/app/login';
-            return;
-          }
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(errorData.error || `HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (data && data.length > 0) {
-          // Transform data to the expected format with product status and progress calculation
-          const formattedProducts = data.map((product: any) => {
-            const modules = product.modules.map((module: any) => ({
-              id: module.id,
-              name: module.name,
-              type: module.type as 'Course' | 'Assessment',
-              sequence: module.sequence,
-              status: module.status || 'NotStarted',
-              progress_percentage: module.progress_percentage || 0,
-              completed_at: module.completed_at || null
-            }));
-            
-            // Calculate product progress percentage
-            let totalProgress = 0;
-            modules.forEach((m: Module) => {
-              totalProgress += m.progress_percentage;
-            });
-            const productProgressPercentage = modules.length > 0 ? Math.round(totalProgress / modules.length) : 0;
-            
-            // Determine product status
-            let productStatus: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed' = 'NotStarted';
-            if (modules.length > 0) {
-              const allNotStarted = modules.every((m: Module) => m.status === 'NotStarted');
-              const allCompleted = modules.every((m: Module) => m.status === 'Completed');
-              
-              if (allNotStarted) {
-                productStatus = 'NotStarted';
-              } else if (allCompleted) {
-                productStatus = 'Completed';
-              } else {
-                productStatus = 'InProgress';
-              }
-            }
-            
-            return {
-              id: product.id,
-              name: product.name,
-              description: product.description,
-              image_url: product.image_url || null,
-              modules,
-              product_progress_percentage: productProgressPercentage,
-              product_status: productStatus
-            };
-          });
-          
-          setProducts(formattedProducts);
-        }
-        
-        setLoading(false);
-  } catch (error: any) {
-    console.error('Error in dashboard page data fetching:', error);
-        setError(error.message || 'An unknown error occurred');
-        setLoading(false);
-      }
-    }
-    
-    fetchData();
-  }, []);
+  // Replace manual data fetching with TanStack Query
+  const { data: products = [], isPending, isError, error } = useStudentDashboard();
   
-  // GSAP animations
+  // GSAP animations (unchanged)
   useEffect(() => {
     setMounted(true);
     
-    if (!loading) {
+    if (!isPending) {
       // Animate cards on mount
       gsap.fromTo(
         ".dashboard-card",
@@ -153,16 +52,16 @@ export default function Dashboard() {
         }
       );
     }
-  }, [loading]);
+  }, [isPending]);
   
-  // Derived statistics
-  const coursesInProgress = products.filter(p => p.product_status === 'InProgress').length;
-  const completedProducts = products.filter(p => p.product_status === 'Completed').length;
+  // Derived statistics (unchanged logic)
+  const coursesInProgress = products.filter((p: Product) => p.product_status === 'InProgress').length;
+  const completedProducts = products.filter((p: Product) => p.product_status === 'Completed').length;
   
-  // Get mock upcoming assessments
+  // Get upcoming assessments (unchanged logic)
   const upcomingAssessments = products
-    .flatMap(p => p.modules.filter(m => m.type === 'Assessment' && m.status !== 'Completed'))
-    .map(assessment => ({
+    .flatMap((p: Product) => p.modules.filter((m: Module) => m.type === 'Assessment' && m.status !== 'Completed'))
+    .map((assessment: Module) => ({
       id: assessment.id,
       title: assessment.name,
       status: assessment.progress_percentage >= 100 ? 'Completed' : assessment.status,
@@ -170,15 +69,24 @@ export default function Dashboard() {
       }))
     .slice(0, 4); // Limit to 4 items
   
-  if (loading) {
-    return <div className="flex items-center justify-center h-full">Loading...</div>;
+  // Loading state (improved UX)
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-600"></div>
+        <span className="ml-2">Loading your dashboard...</span>
+      </div>
+    );
   }
   
-  if (error) {
+  // Error state (improved error handling)
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-4">
         <h2 className="text-xl font-semibold text-destructive">Error</h2>
-        <p>{error}</p>
+        <p className="text-center max-w-md">
+          {error?.message || 'Failed to load your dashboard. Please try again.'}
+        </p>
         <AnimatedButton onClick={() => window.location.reload()}>
           Try Again
         </AnimatedButton>
@@ -273,7 +181,7 @@ export default function Dashboard() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                   <div className="absolute bottom-2 left-2 right-2">
                     <div className="flex justify-between items-center text-sm text-white">
-                      <span>{product.modules.filter(m => m.status === 'Completed').length}/{product.modules.length} modules</span>
+                      <span>{product.modules.filter((m: Module) => m.status === 'Completed').length}/{product.modules.length} modules</span>
                     </div>
                     <div className="h-1 bg-white/30 rounded-full mt-1">
                       <div 

@@ -160,14 +160,15 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
           throw new Error('You do not have access to this product');
         }
 
-        // 3. Fetch Module Progress
+        // 3. 🚀 ENHANCED: Fetch Module Progress with proper completion calculation
         const moduleIds = productData.modules.map(m => m.id);
         let modulesWithProgress: ModuleDetail[] = [];
 
         if (moduleIds.length > 0) {
+          // Fetch progress with detailed progress_details for proper completion calculation
           const { data: progressData, error: progressError } = await supabase
             .from('student_module_progress')
-            .select('module_id, status, progress_percentage, completed_at')
+            .select('module_id, status, progress_percentage, completed_at, progress_details, completed_videos, video_completion_count')
             .eq('student_id', user.id)
             .in('module_id', moduleIds);
 
@@ -175,22 +176,109 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
             console.error('Error fetching module progress:', progressError);
           }
 
-          const progressMap = new Map<string, ModuleProgressDetail>();
+          const progressMap = new Map<string, any>();
           if (progressData) {
             progressData.forEach((p: any) => progressMap.set(p.module_id, p));
           }
 
-          // Combine module data with progress data
-          modulesWithProgress = productData.modules.map((module: any) => {
-            const progress = progressMap.get(module.id);
-            return {
-              ...module,
-              type: module.type as 'Course' | 'Assessment', // Type assertion
-              status: progress ? progress.status : 'NotStarted',
-              progress_percentage: progress ? (progress.progress_percentage ?? 0) : 0,
-              completed_at: progress ? progress.completed_at : null,
-            };
-          }).sort((a, b) => a.sequence - b.sequence); // Ensure sorted by sequence
+          // 🚀 ENHANCED: Calculate proper completion status for each module
+          const modulesWithCorrectStatus = await Promise.all(
+            productData.modules.map(async (module: any) => {
+              const progress = progressMap.get(module.id);
+              let correctStatus = progress ? progress.status : 'NotStarted';
+              let correctPercentage = progress ? (progress.progress_percentage ?? 0) : 0;
+
+              // For courses, recalculate status based on lesson completion + quiz completion
+              if (module.type === 'Course') {
+                const { data: allLessons, error: lessonsError } = await supabase
+                  .from('lessons')
+                  .select('id, has_quiz')
+                  .eq('module_id', module.id);
+
+                if (!lessonsError && allLessons && allLessons.length > 0) {
+                  let completedLessonsCount = 0;
+                  const progressDetails = progress?.progress_details || {};
+
+                                     for (const lesson of allLessons) {
+                    // Check video completion in both possible locations for maximum compatibility
+                    const isVideoWatchedInArray = progress?.completed_videos?.includes(lesson.id) || false;
+                    const isVideoWatchedInDetails = progressDetails.fully_watched_video_ids?.includes(lesson.id) || false;
+                    const isVideoWatched = isVideoWatchedInArray || isVideoWatchedInDetails;
+                    let isQuizPassedOrNotRequired = true;
+
+
+
+                    // If lesson has a quiz, check if it's been passed
+                    if (lesson.has_quiz) {
+                      // Check both possible quiz result formats for maximum compatibility
+                      const quizResult = progressDetails.lesson_quiz_results?.[lesson.id];
+                      const quizAttempts = progressDetails.lesson_quiz_attempts?.[lesson.id];
+                      
+                      const passedInQuizResults = quizResult?.passed === true;
+                      const passedInQuizAttempts = Array.isArray(quizAttempts) && 
+                        quizAttempts.some((att: any) => att.pass_fail_status === 'passed');
+                      
+                      isQuizPassedOrNotRequired = passedInQuizResults || passedInQuizAttempts;
+                    }
+
+                    // Lesson is complete if video watched AND (no quiz OR quiz passed)
+                    if (isVideoWatched && isQuizPassedOrNotRequired) {
+                      completedLessonsCount += 1;
+                    }
+                  }
+
+                                     // Recalculate status and percentage based on actual completion
+                   const allLessonsCompleted = completedLessonsCount >= allLessons.length;
+                   correctPercentage = allLessons.length > 0 
+                     ? Math.round((completedLessonsCount / allLessons.length) * 100) 
+                     : 0;
+
+
+                   
+                   if (allLessonsCompleted) {
+                     correctStatus = 'Completed';
+                     correctPercentage = 100;
+                     
+                     // 🚀 ENHANCEMENT: Update database if status is not already 'Completed'
+                     if (progress.status !== 'Completed') {
+                       console.log(`Course ${module.id} should be completed but is marked as ${progress.status}. Updating database...`);
+                       // Trigger a silent update to fix the database status
+                       supabase
+                         .from('student_module_progress')
+                         .update({ 
+                           status: 'Completed', 
+                           progress_percentage: 100,
+                           completed_at: new Date().toISOString()
+                         })
+                         .eq('student_id', user.id)
+                         .eq('module_id', module.id)
+                         .then(({ error }) => {
+                           if (error) {
+                             console.error('Failed to update course completion status:', error);
+                           } else {
+                             console.log(`Successfully updated course ${module.id} to completed status`);
+                           }
+                         });
+                     }
+                   } else if (completedLessonsCount > 0) {
+                     correctStatus = 'InProgress';
+                   } else {
+                     correctStatus = 'NotStarted';
+                   }
+                }
+              }
+
+              return {
+                ...module,
+                type: module.type as 'Course' | 'Assessment',
+                status: correctStatus,
+                progress_percentage: correctPercentage,
+                completed_at: progress ? progress.completed_at : null,
+              };
+            })
+          );
+
+          modulesWithProgress = modulesWithCorrectStatus.sort((a, b) => a.sequence - b.sequence);
           
         } else {
           modulesWithProgress = []; // No modules in the product

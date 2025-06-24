@@ -3,7 +3,12 @@ import { z } from 'zod';
 export const ClientSchema = z.object({
   name: z.string().min(1, { message: 'Client name is required' }),
   contact_email: z.string().email({ message: 'Invalid contact email' }).optional().nullable(),
-  // Add other relevant client fields (e.g., address, phone) as needed in the future
+  address: z.string().optional().nullable(),
+  logo_url: z.union([
+    z.string().url({ message: 'Invalid URL format' }),
+    z.string().length(0), // Allow empty string
+    z.null()
+  ]).optional().nullable(),
   is_active: z.boolean().default(true).optional(),
 });
 

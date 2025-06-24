@@ -62,17 +62,9 @@ export default function InterviewsPage() {
       console.error('❌ Failed to refresh interview status:', error);
     }
     
-    // Use the new submission ID if provided, otherwise fall back to cached one
-    const targetSubmissionId = submissionId || interviewStatus?.submissionId;
-    
-    if (targetSubmissionId) {
-      console.log('🔗 Navigating to feedback page:', targetSubmissionId);
-      window.location.href = `/app/job-readiness/interviews/feedback/${targetSubmissionId}`;
-    } else {
-      console.warn('⚠️ No submission ID available, refreshing page instead');
-      // Refresh the page to show updated status
-      window.location.reload();
-    }
+    // Redirect back to interviews page instead of feedback
+    console.log('🔗 Navigating back to interviews page');
+    window.location.href = `/app/job-readiness/interviews`;
   };
 
   if (isLoading) {

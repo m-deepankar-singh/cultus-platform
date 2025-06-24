@@ -14,6 +14,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InfoIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { DataPagination } from "@/components/ui/data-pagination"
+import { useUsers, type UserProfile as ApiUserProfile } from "@/hooks/api/use-users"
+import { useClients } from "@/hooks/api/use-clients"
+import { useCurrentUser } from "@/hooks/use-current-user"
 
 
 
@@ -22,34 +25,11 @@ interface Client {
   name: string
 }
 
-// Don't extend User directly to avoid type conflicts
-interface UserProfile {
-  id: string
-  email?: string
-  last_sign_in_at?: string
-  created_at?: string
-  updated_at?: string
-  role?: string
-  full_name?: string
-  client_id?: string
-  client?: {
-    id: string
-    name: string
-  }
-  banned_until?: string
-  status?: string
-  user_metadata?: {
-    status?: string
-    [key: string]: any
-  }
-  app_metadata?: {
-    status?: string
-    [key: string]: any
-  }
-}
+// Use the API UserProfile type
+type UserProfile = ApiUserProfile
 
 interface UsersTableProps {
-  clients: Client[]
+  clients?: Client[]
   initialCurrentUserRole?: string
 }
 
@@ -76,73 +56,45 @@ function isUserActive(user: UserProfile): boolean {
   return true;
 }
 
-export function UsersTable({ clients, initialCurrentUserRole }: UsersTableProps) {
+export function UsersTable({ clients: initialClients, initialCurrentUserRole }: UsersTableProps) {
   
   // Pagination and filter state
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
-  const [users, setUsers] = useState<UserProfile[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Filter state
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("")
   const [clientFilter, setClientFilter] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   
-  // Current user role (for permissions)
-  const [currentUserRole] = useState<string | undefined>(initialCurrentUserRole)
+  // Fetch clients and current user data using hooks
+  const { data: clientsResponse } = useClients()
+  const { role: currentUserRole } = useCurrentUser()
+  
+  // Use clients from API or fallback to initial props
+  const clients = clientsResponse?.data || initialClients || []
   const isStaffUser = currentUserRole === 'Staff'
 
-  // Fetch users from the paginated API
-  const fetchUsers = async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        pageSize: ITEMS_PER_PAGE.toString(),
-      })
-      
-      if (searchTerm) params.append('search', searchTerm)
-      if (roleFilter) params.append('role', roleFilter)
-      if (clientFilter) params.append('clientId', clientFilter)
-  
-      // Fetch data from our paginated API
-      const response = await fetch(`/api/admin/users?${params.toString()}`)
-      
-      if (!response.ok) {
-        throw new Error(`Error fetching users: ${response.status}`)
-      }
-      
-      const result = await response.json()
-      
-      // Update state with the paginated data
-      setUsers(result.data)
-      setTotalCount(result.metadata.totalCount)
-      setTotalPages(result.metadata.totalPages)
-      
-    } catch (err: any) {
-      console.error('Error fetching users:', err)
-      setError(err.message || 'Failed to fetch users')
-    } finally {
-      setLoading(false)
-  }
-  }
-  
-  // Initial fetch and when pagination/filter changes
-  useEffect(() => {
-    fetchUsers()
-  }, [currentPage]) // We'll handle filter changes via the search button
+  // Use the API hook for fetching users
+  const { 
+    data: usersResponse, 
+    isLoading: loading, 
+    error,
+    refetch
+  } = useUsers({
+    page: currentPage,
+    pageSize: ITEMS_PER_PAGE,
+    search: searchTerm || undefined,
+    role: roleFilter || undefined,
+    clientId: clientFilter || undefined,
+  })
+
+  const users = usersResponse?.data || []
+  const totalCount = usersResponse?.metadata.totalCount || 0
+  const totalPages = usersResponse?.metadata.totalPages || 0
   
   // Handle search & filter
   const handleSearch = () => {
     setCurrentPage(1) // Reset to first page when filtering/searching
-    fetchUsers()
+    refetch() // Trigger a refetch with new parameters
   }
   
   // Handle page change
@@ -152,7 +104,7 @@ export function UsersTable({ clients, initialCurrentUserRole }: UsersTableProps)
   
   // Handle user actions that might change data
   const handleUserUpdated = () => {
-    fetchUsers() // Refresh the data
+    refetch() // Refresh the data
   }
 
   return (
@@ -240,7 +192,9 @@ export function UsersTable({ clients, initialCurrentUserRole }: UsersTableProps)
         {/* Error message if any */}
         {error && (
           <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error instanceof Error ? error.message : 'An error occurred while loading users'}
+            </AlertDescription>
           </Alert>
         )}
         

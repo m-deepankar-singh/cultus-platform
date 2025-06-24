@@ -11,7 +11,7 @@ export const PROGRESS_MILESTONES = [10, 25, 50, 75, 90, 95, 100] as const;
 // Thresholds for additional save triggers
 export const PAUSE_THRESHOLD = 30; // Seconds of pause before saving progress
 export const SEEK_THRESHOLD = 10; // Seconds of seeking before saving progress
-export const COMPLETION_THRESHOLD = 95; // Percentage threshold for marking as completed
+export const COMPLETION_THRESHOLD = 100; // Percentage threshold for marking as completed
 
 // Progress save trigger types
 export const SAVE_TRIGGERS = {

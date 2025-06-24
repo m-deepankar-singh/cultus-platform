@@ -69,7 +69,7 @@ interface UseExpertSessionProgressReturn {
 
 // Constants
 const MILESTONES = [10, 25, 50, 75, 90, 95, 100]
-const COMPLETION_THRESHOLD = 95
+const COMPLETION_THRESHOLD = 100
 const PAUSE_SAVE_THRESHOLD = 30 // seconds
 const MIN_WATCH_TIME = 3 // seconds before milestone counts
 

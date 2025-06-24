@@ -202,23 +202,67 @@ export async function POST(
       newVideoCompletionCount += 1;
     }
 
-    // Calculate overall progress
-    const overallCompletionPercentage = totalLessons > 0 
-      ? Math.round((newVideoCompletionCount / totalLessons) * 100) 
-      : 0;
-
-    // Determine if course is completed (all videos watched)
-    const courseCompleted = newVideoCompletionCount >= totalLessons && totalLessons > 0;
-    const newStatus = courseCompleted ? 'Completed' : 
-                     newVideoCompletionCount > 0 ? 'InProgress' : 'NotStarted';
-
-    // Update progress details
+    // Update progress details (moved before completion check)
     const updatedProgressDetails = {
       ...existingDetails,
       video_playback_positions: videoPlaybackPositions,
       last_viewed_lesson_sequence: existingDetails.last_viewed_lesson_sequence || 0,
       lesson_quiz_results: existingDetails.lesson_quiz_results || {},
     };
+
+    // 🚀 ENHANCED: Check course completion properly considering quizzes
+    // First, get all lessons to check quiz requirements
+    const { data: allLessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id, has_quiz')
+      .eq('module_id', moduleId);
+
+    if (lessonsError) {
+      console.error(`Error fetching lessons for completion check:`, lessonsError);
+      return NextResponse.json({ error: 'Failed to check course completion' }, { status: 500 });
+    }
+
+    // Calculate completion based on both video watching AND quiz passing
+    let completedLessonsCount = 0;
+    let courseCompleted = false;
+
+    if (allLessons && allLessons.length > 0) {
+      for (const lesson of allLessons) {
+        const isVideoWatched = newCompletedVideos.includes(lesson.id);
+        let isQuizPassedOrNotRequired = true;
+
+        // If lesson has a quiz, check if it's been passed
+        if (lesson.has_quiz) {
+          // Check both possible quiz result formats for maximum compatibility
+          const quizResult = updatedProgressDetails.lesson_quiz_results?.[lesson.id];
+          const quizAttempts = updatedProgressDetails.lesson_quiz_attempts?.[lesson.id];
+          
+          // Support both data structures:
+          // 1. lesson_quiz_results[lessonId].passed (newer format)
+          // 2. lesson_quiz_attempts[lessonId][].pass_fail_status === 'passed' (older format)
+          const passedInQuizResults = quizResult?.passed === true;
+          const passedInQuizAttempts = Array.isArray(quizAttempts) && 
+            quizAttempts.some((att: any) => att.pass_fail_status === 'passed');
+          
+          isQuizPassedOrNotRequired = passedInQuizResults || passedInQuizAttempts;
+        }
+
+        // Lesson is complete if video watched AND (no quiz OR quiz passed)
+        if (isVideoWatched && isQuizPassedOrNotRequired) {
+          completedLessonsCount += 1;
+        }
+      }
+
+      courseCompleted = completedLessonsCount >= allLessons.length;
+    }
+
+    // Calculate overall progress based on completed lessons (not just videos)
+    const overallCompletionPercentage = totalLessons > 0 
+      ? Math.round((completedLessonsCount / totalLessons) * 100) 
+      : 0;
+
+    const newStatus = courseCompleted ? 'Completed' : 
+                     newVideoCompletionCount > 0 ? 'InProgress' : 'NotStarted';
 
     // 10. Upsert progress record
     const progressUpdateData = {

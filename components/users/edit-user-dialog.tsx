@@ -10,7 +10,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { UserForm } from './user-form'
-import { updateUser } from '@/app/actions/userActions'
+import { useUpdateUser } from '@/hooks/api/use-users'
+import type { UpdateUserData } from '@/hooks/api/use-users'
 
 // Types (should ideally be shared)
 interface Client { id: string; name: string; }
@@ -60,8 +61,10 @@ export function EditUserDialog({ user, clients, children, onUserUpdated }: EditU
                     <UserForm 
                         clients={clients}
                         mode="edit"
-                        initialData={user} 
-                        serverAction={updateUser} // Pass the update action
+                        initialData={{
+                            ...user,
+                            full_name: user.full_name || undefined
+                        }} 
                         onFormSubmit={handleFormSubmit} 
                     />
                 </div>

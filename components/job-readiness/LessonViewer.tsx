@@ -95,14 +95,14 @@ export function LessonViewer({
     }
   }, [lesson.id])
 
-  // Check if video reached 95% completion threshold
+  // Check if video reached 100% completion threshold
   useEffect(() => {
     if (duration > 0 && currentTime > 0) {
       const watchedPercent = (currentTime / duration) * 100
-      if (watchedPercent >= 95 && !canCompleteVideo && !isVideoCompleted) {
+      if (watchedPercent >= 100 && !canCompleteVideo && !isVideoCompleted) {
         setCanCompleteVideo(true)
         toast({
-          title: "Video Almost Complete!",
+          title: "Video Complete!",
           description: "You can now mark this video as completed.",
         })
       }
@@ -162,10 +162,10 @@ export function LessonViewer({
 
   // Handle manual completion
   const handleCompleteVideo = async () => {
-    if (!canCompleteVideo && watchedPercentage < 95) {
+    if (!canCompleteVideo && watchedPercentage < 100) {
       toast({
         title: "Not Ready",
-        description: "You need to watch at least 95% of the video to complete it.",
+        description: "You need to watch 100% of the video to complete it.",
         variant: "destructive"
       })
       return

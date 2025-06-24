@@ -1,0 +1,803 @@
+# Tanstack Query Migration & Performance Optimization Plan
+
+## Overview
+
+This document outlines the comprehensive migration plan from mixed data fetching patterns (useEffect + Server Actions) to a unified Tanstack Query approach with virtualization for optimal performance.
+
+## Current State Analysis
+
+### ✅ Infrastructure Ready
+- Tanstack Query v5.75.0 already installed and configured
+- `QueryProvider` properly set up in root layout
+- React Query DevTools available
+- Centralized `api-client.ts` exists
+- React-window v1.8.11 already installed
+
+### 🔄 Mixed Patterns Found
+- **Student Dashboard**: Manual useEffect + useState patterns
+- **Job Readiness**: Already using Tanstack Query (good reference)
+- **Admin Tables**: Server Components + Client useEffect with pagination
+- **Analytics**: Server Actions (keeping as-is per strategy)
+- **Assessment Pages**: Partially migrated
+
+### ⚡ Performance Bottlenecks
+- Large tables rendering all rows without virtualization
+- Manual loading/error state management
+- Inconsistent caching strategies
+
+## Migration Strategy
+
+### Hybrid Approach (Agreed Strategy)
+- **Keep**: Analytics pages using Server Actions (admin-only, low frequency)
+- **Migrate**: All (app) student-facing routes and (dashboard) interactive admin features
+- **Add**: Virtualization for data-heavy tables
+
+## Implementation Plan
+
+### Phase 0: Foundation & Organization (Days 1-2)
+
+#### 0.1 Create Centralized Query Keys
+**File**: `lib/query-keys.ts`
+```typescript
+export const queryKeys = {
+  // Student App Keys
+  studentDashboard: ['student', 'dashboard'] as const,
+  studentProgress: ['student', 'progress'] as const,
+  
+  // Job Readiness Keys (standardize existing)
+  jobReadinessProgress: ['job-readiness', 'progress'] as const,
+  jobReadinessProducts: (productId?: string) => 
+    ['job-readiness', 'products', productId].filter(Boolean) as const,
+  jobReadinessAssessments: (productId: string) => 
+    ['job-readiness', 'assessments', productId] as const,
+  jobReadinessCourses: (productId: string) => 
+    ['job-readiness', 'courses', productId] as const,
+  jobReadinessExpertSessions: (productId: string) => 
+    ['job-readiness', 'expert-sessions', productId] as const,
+  jobReadinessProjects: (productId: string) => 
+    ['job-readiness', 'projects', productId] as const,
+  
+  // Course & Assessment Keys
+  assessmentDetails: (moduleId: string) => ['assessments', 'details', moduleId] as const,
+  assessmentProgress: (moduleId: string) => ['assessments', 'progress', moduleId] as const,
+  courseContent: (courseId: string) => ['courses', 'content', courseId] as const,
+  courseProgress: (courseId: string) => ['courses', 'progress', courseId] as const,
+  
+  // Admin Keys - with proper filter serialization
+  adminLearners: (filters: Record<string, any>) => ['admin', 'learners', filters] as const,
+  adminUsers: (filters: Record<string, any>) => ['admin', 'users', filters] as const,
+  adminClients: (filters: Record<string, any>) => ['admin', 'clients', filters] as const,
+  adminModules: (filters: Record<string, any>) => ['admin', 'modules', filters] as const,
+  adminProducts: (filters: Record<string, any>) => ['admin', 'products', filters] as const,
+  adminQuestionBanks: (filters: Record<string, any>) => ['admin', 'question-banks', filters] as const,
+}
+```
+
+#### 0.2 Enhance API Client with Proper Error Handling
+**File**: `lib/api-client.ts` (enhance existing)
+```typescript
+// Add query parameter helper
+export function buildQueryParams(params: Record<string, any>): string {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, String(value));
+    }
+  });
+  return searchParams.toString();
+}
+
+// Improved error types aligned with TanStack Query
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Enhanced API client with better error handling
+export async function apiClient<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  let url = endpoint;
+
+  if (!/^https?:\/\//i.test(endpoint)) {
+    if (!baseUrl) {
+      throw new ApiError('Application URL not configured');
+    }
+    url = `${baseUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
+  }
+
+  const defaultHeaders: HeadersInit = {
+    'Accept': 'application/json',
+  };
+
+  if (options.body) {
+    defaultHeaders['Content-Type'] = 'application/json';
+  }
+
+  const mergedOptions: RequestInit = {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+  };
+
+  try {
+    const response = await fetch(url, mergedOptions);
+
+    if (!response.ok) {
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {
+        // Failed to parse error response as JSON
+      }
+      throw new ApiError(errorMessage, response.status);
+    }
+
+    // Handle empty responses
+    if (response.status === 204 || response.headers.get("Content-Length") === "0") {
+      return null as T;
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      throw new ApiError("Response was not JSON");
+    }
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(
+      error instanceof Error ? error.message : "A network error occurred"
+    );
+  }
+}
+```
+
+#### 0.3 Create Query Options Pattern (TanStack Query Best Practice)
+**File**: `lib/query-options.ts`
+```typescript
+import { queryOptions } from '@tanstack/react-query';
+import { apiClient } from './api-client';
+import { queryKeys } from './query-keys';
+
+// Student dashboard options
+export function studentDashboardOptions() {
+  return queryOptions({
+    queryKey: queryKeys.studentDashboard,
+    queryFn: () => apiClient<Product[]>('/api/app/progress'),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 30, // 30 minutes (renamed from cacheTime in v5)
+  });
+}
+
+// Job readiness products options
+export function jobReadinessProductsOptions(productId?: string) {
+  return queryOptions({
+    queryKey: queryKeys.jobReadinessProducts(productId),
+    queryFn: ({ queryKey }) => {
+      const [, , id] = queryKey;
+      const endpoint = id 
+        ? `/api/app/job-readiness/products/${id}`
+        : '/api/app/job-readiness/products';
+      return apiClient(endpoint);
+    },
+    staleTime: 1000 * 60 * 3, // 3 minutes
+  });
+}
+
+// Admin learners options with proper filtering
+export function adminLearnersOptions(filters: LearnersFilters) {
+  return queryOptions({
+    queryKey: queryKeys.adminLearners(filters),
+    queryFn: ({ queryKey }) => {
+      const [, , filterParams] = queryKey;
+      const params = buildQueryParams(filterParams);
+      return apiClient<PaginatedResponse<Learner>>(`/api/admin/learners?${params}`);
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutes for admin data
+  });
+}
+```
+
+#### 0.4 Hook Organization Structure
+**Directory**: `hooks/queries/`
+```
+hooks/
+├── queries/
+│   ├── student/
+│   │   ├── useDashboard.ts
+│   │   ├── useProgress.ts
+│   │   └── index.ts
+│   ├── admin/
+│   │   ├── useLearners.ts
+│   │   ├── useUsers.ts
+│   │   ├── useClients.ts
+│   │   └── index.ts
+│   ├── job-readiness/
+│   │   ├── useProducts.ts
+│   │   ├── useAssessments.ts
+│   │   ├── useCourses.ts
+│   │   └── index.ts
+│   └── index.ts
+├── mutations/
+│   ├── admin/
+│   │   ├── useLearnerMutations.ts
+│   │   ├── useUserMutations.ts
+│   │   └── index.ts
+│   ├── student/
+│   │   ├── useProgressMutations.ts
+│   │   └── index.ts
+│   └── index.ts
+└── index.ts
+```
+
+### Phase 1: Student-Facing Components Migration (Days 3-7)
+
+#### 1.1 Student Dashboard Migration
+**Target**: `app/(app)/app/dashboard/page.tsx`
+
+**Current State**: 358 lines with manual useEffect + useState
+**Action**: Replace with Query Options pattern
+
+**New Hook**: `hooks/queries/student/useDashboard.ts`
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { studentDashboardOptions } from '@/lib/query-options';
+
+export function useStudentDashboard() {
+  return useQuery(studentDashboardOptions());
+}
+```
+
+**Component Changes**:
+```typescript
+// Before (358 lines with manual state)
+const [products, setProducts] = useState<Product[]>([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | undefined>(undefined);
+
+useEffect(() => {
+  async function fetchData() {
+    // 50+ lines of manual fetching, error handling, transformation
+  }
+  fetchData();
+}, []);
+
+// After (clean and simple)
+export default function Dashboard() {
+  const { data: products, isPending, isError, error } = useStudentDashboard();
+
+  if (isPending) return <div>Loading...</div>;
+  if (isError) return <div>Error: {error.message}</div>;
+  
+  // Rest of component logic (60% reduction in lines)
+}
+```
+
+#### 1.2 Course Components Migration
+**Targets**:
+- `components/courses/CourseOverview.tsx`
+- `components/courses/LessonViewer.tsx`
+- `app/(app)/app/course/[id]/page.tsx`
+
+**New Hooks Following Query Options Pattern**:
+```typescript
+// hooks/queries/student/useCourseContent.ts
+export function useCourseContent(courseId: string) {
+  return useQuery(courseContentOptions(courseId));
+}
+
+// hooks/queries/student/useCourseProgress.ts
+export function useCourseProgress(courseId: string) {
+  return useQuery(courseProgressOptions(courseId));
+}
+```
+
+#### 1.3 Assessment Components Standardization
+**Targets**:
+- `app/(app)/app/assessment/[id]/page.tsx` (standardize existing)
+- `app/(app)/app/assessment/[id]/take/page.tsx` (standardize existing)
+
+**Actions**:
+- Migrate existing useQuery to query options pattern
+- Add optimistic updates for progress saving
+- Implement proper error boundaries
+
+### Phase 2: Admin Dashboard with Virtualization (Days 8-14)
+
+#### 2.1 Learners Table Complete Overhaul
+**Target**: `components/learners/learners-table-client.tsx` (509 lines - highest priority)
+
+**Step 2.1.1**: Create Infinite Query Hook
+**New File**: `hooks/queries/admin/useLearners.ts`
+```typescript
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
+import { apiClient, buildQueryParams } from '@/lib/api-client';
+
+interface LearnersFilters {
+  search?: string;
+  clientId?: string;
+  isActive?: boolean;
+  pageSize?: number;
+}
+
+export function useLearnersInfinite(filters: LearnersFilters) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.adminLearners(filters),
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = buildQueryParams({
+        ...filters,
+        page: pageParam,
+        pageSize: filters.pageSize || 50,
+      });
+      
+      return apiClient<PaginatedResponse<Learner>>(`/api/admin/learners?${params}`);
+    },
+    getNextPageParam: (lastPage) => {
+      return lastPage.metadata.currentPage < lastPage.metadata.totalPages
+        ? lastPage.metadata.currentPage + 1
+        : undefined;
+    },
+    initialPageParam: 1,
+    staleTime: 1000 * 60 * 2, // 2 minutes for admin data
+  });
+}
+```
+
+**Step 2.1.2**: Implement React-Window Integration
+**New File**: `components/learners/virtualized-learners-table.tsx`
+```typescript
+import { FixedSizeList as List } from 'react-window';
+import InfiniteLoader from 'react-window-infinite-loader';
+import { useLearnersInfinite } from '@/hooks/queries/admin/useLearners';
+
+const LearnerRow = ({ index, style, data }: any) => {
+  const { learners, loadMoreItems } = data;
+  const learner = learners[index];
+  
+  // Trigger loading more items when approaching the end
+  React.useEffect(() => {
+    if (index >= learners.length - 5) {
+      loadMoreItems();
+    }
+  }, [index, learners.length, loadMoreItems]);
+  
+  if (!learner) {
+    return (
+      <div style={style} className="flex items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+  
+  const initials = learner.full_name
+    .split(' ')
+    .map(name => name[0])
+    .join('');
+  
+  return (
+    <div style={style} className="border-b border-gray-200">
+      <div className="grid grid-cols-7 gap-4 p-4 items-center">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+          <span className="font-medium">{learner.full_name}</span>
+        </div>
+        <div>{learner.email}</div>
+        <div>{learner.phone_number}</div>
+        <div>{learner.client?.name}</div>
+        <div>
+          <Badge variant={learner.is_active ? "default" : "secondary"}>
+            {learner.is_active ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+        <div>⭐ {learner.star_rating || 0}</div>
+        <div>
+          {/* Action buttons */}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export function VirtualizedLearnersTable({ filters }: { filters: LearnersFilters }) {
+  const { 
+    data, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage,
+    isLoading 
+  } = useLearnersInfinite(filters);
+  
+  const learners = data?.pages.flatMap(page => page.data) ?? [];
+  const itemCount = hasNextPage ? learners.length + 1 : learners.length;
+  
+  const isItemLoaded = (index: number) => !!learners[index];
+  const loadMoreItems = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
+  
+  if (isLoading) {
+    return <div>Loading initial data...</div>;
+  }
+  
+  return (
+    <div className="rounded-md border">
+      {/* Table Header */}
+      <div className="grid grid-cols-7 gap-4 p-4 font-medium bg-gray-50 border-b">
+        <div>Name</div>
+        <div>Email</div>
+        <div>Phone</div>
+        <div>Client</div>
+        <div>Status</div>
+        <div>Rating</div>
+        <div>Actions</div>
+      </div>
+      
+      {/* Virtualized Table Body */}
+      <InfiniteLoader
+        isItemLoaded={isItemLoaded}
+        itemCount={itemCount}
+        loadMoreItems={loadMoreItems}
+      >
+        {({ onItemsRendered, ref }) => (
+          <List
+            ref={ref}
+            height={600} // Adjust based on design
+            itemCount={itemCount}
+            itemSize={65} // Height of each row
+            onItemsRendered={onItemsRendered}
+            itemData={{ learners, loadMoreItems }}
+          >
+            {LearnerRow}
+          </List>
+        )}
+      </InfiniteLoader>
+    </div>
+  );
+}
+```
+
+**Performance Target**: Handle 10,000+ learners smoothly with 60 FPS scrolling
+
+#### 2.2 Users Table Migration
+**Target**: `components/users/users-table.tsx`
+**Pattern**: Same as learners table with virtualization
+**New Hook**: `hooks/queries/admin/useUsers.ts`
+
+#### 2.3 Other Admin Tables
+**Sequential Migration Order**:
+1. Clients table (`components/clients/clients-table.tsx`)
+2. Modules table (`components/modules/modules-table.tsx`)
+3. Products table (`components/products/products-table.tsx`)
+4. Question banks table (`components/question-banks/question-banks-table.tsx`)
+
+### Phase 3: Advanced Features & Optimizations (Days 15-18)
+
+#### 3.1 Mutation Hooks with Optimistic Updates
+**Directory**: `hooks/mutations/`
+
+**Example**: `hooks/mutations/admin/useLearnerMutations.ts`
+```typescript
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
+import { apiClient } from '@/lib/api-client';
+import { toast } from '@/components/ui/use-toast';
+
+export function useCreateLearner() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (learnerData: CreateLearnerData) => {
+      return apiClient<Learner>('/api/admin/learners', {
+        method: 'POST',
+        body: JSON.stringify(learnerData),
+      });
+    },
+    onMutate: async (newLearner) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['admin', 'learners'] });
+      
+      // Snapshot the previous value
+      const previousLearners = queryClient.getQueryData(['admin', 'learners']);
+      
+      // Optimistically update cache
+      queryClient.setQueryData(['admin', 'learners'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any, index: number) => 
+            index === 0 
+              ? { ...page, data: [{ ...newLearner, id: 'temp-' + Date.now() }, ...page.data] }
+              : page
+          )
+        };
+      });
+      
+      return { previousLearners };
+    },
+    onError: (error, newLearner, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['admin', 'learners'], context?.previousLearners);
+      toast({
+        title: "Error",
+        description: `Failed to create learner: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: "Learner created successfully",
+      });
+    },
+    onSettled: () => {
+      // Always refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['admin', 'learners'] });
+    },
+  });
+}
+
+export function useUpdateLearner() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateLearnerData }) => {
+      return apiClient<Learner>(`/api/admin/learners/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['admin', 'learners'] });
+      
+      const previousLearners = queryClient.getQueryData(['admin', 'learners']);
+      
+      // Optimistically update the specific learner
+      queryClient.setQueryData(['admin', 'learners'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            data: page.data.map((learner: Learner) => 
+              learner.id === id ? { ...learner, ...data } : learner
+            )
+          }))
+        };
+      });
+      
+      return { previousLearners };
+    },
+    onError: (error, variables, context) => {
+      queryClient.setQueryData(['admin', 'learners'], context?.previousLearners);
+      toast({
+        title: "Error",
+        description: `Failed to update learner: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'learners'] });
+    },
+  });
+}
+```
+
+#### 3.2 Background Sync & Offline Support
+**New File**: `lib/query-config.ts`
+```typescript
+import { QueryClient } from '@tanstack/react-query';
+
+export function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        gcTime: 1000 * 60 * 30, // 30 minutes (v5 renamed from cacheTime)
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: true, // Good for offline support
+        refetchOnMount: true,
+        retry: (failureCount, error) => {
+          // Don't retry on 4xx errors
+          if (error instanceof ApiError && error.statusCode && error.statusCode < 500) {
+            return false;
+          }
+          return failureCount < 3;
+        },
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      },
+      mutations: {
+        retry: 1,
+        retryDelay: 1000,
+      },
+    },
+  });
+}
+```
+
+#### 3.3 Performance Monitoring
+**New File**: `lib/performance/query-metrics.ts`
+```typescript
+import { QueryClient } from '@tanstack/react-query';
+
+export function setupQueryMetrics(queryClient: QueryClient) {
+  // Subscribe to query cache events
+  queryClient.getQueryCache().subscribe((event) => {
+    if (event.type === 'observerResultsUpdated') {
+      const query = event.query;
+      console.log('Query metrics:', {
+        queryKey: query.queryKey,
+        state: query.state.status,
+        dataUpdatedAt: query.state.dataUpdatedAt,
+        errorUpdatedAt: query.state.errorUpdatedAt,
+        fetchStatus: query.state.fetchStatus,
+        isStale: query.isStale(),
+      });
+    }
+  });
+  
+  // Subscribe to mutation cache events
+  queryClient.getMutationCache().subscribe((event) => {
+    if (event.type === 'observerResultsUpdated') {
+      const mutation = event.mutation;
+      console.log('Mutation metrics:', {
+        mutationKey: mutation.options.mutationKey,
+        state: mutation.state.status,
+        submittedAt: mutation.state.submittedAt,
+        variables: mutation.state.variables,
+      });
+    }
+  });
+}
+```
+
+### Phase 4: Testing & Validation (Days 19-21)
+
+#### 4.1 Performance Testing
+**Metrics to Track**:
+- Time to first meaningful paint
+- Largest contentful paint  
+- Table scroll performance (target: 60 FPS)
+- Memory usage with large datasets (target: < 100MB for 10K rows)
+- Cache hit ratio (target: > 85%)
+
+#### 4.2 User Experience Testing
+**Test Scenarios**:
+- Navigation between pages (should be instant with caching)
+- Table interactions with 1000+ rows
+- Form submissions with optimistic updates
+- Error handling and retry logic
+- Network interruption recovery
+
+#### 4.3 Migration Validation
+**Checklist**:
+- [ ] All useEffect patterns replaced with useQuery/useInfiniteQuery
+- [ ] No memory leaks in virtualized tables
+- [ ] Consistent error handling across all queries
+- [ ] Optimistic updates working for all mutations
+- [ ] Background refetch functioning properly
+- [ ] Dev tools showing proper cache usage and hit rates
+- [ ] Query key structure is consistent and efficient
+- [ ] Mutation rollback working correctly
+- [ ] No console errors or warnings
+
+## Implementation Details
+
+### File-by-File Migration Checklist
+
+#### High Priority (Student Facing)
+- [ ] `app/(app)/app/dashboard/page.tsx` - Replace 358 lines with query options pattern
+- [ ] `components/courses/CourseOverview.tsx` - Add query integration with background updates
+- [ ] `components/courses/LessonViewer.tsx` - Progress tracking with optimistic updates
+- [ ] `app/(app)/app/course/[id]/page.tsx` - Standardize data fetching
+
+#### Medium Priority (Admin Tables)  
+- [ ] `components/learners/learners-table-client.tsx` - 509 lines, add virtualization + infinite query
+- [ ] `components/users/users-table.tsx` - Add virtualization with proper error boundaries
+- [ ] `components/modules/modules-table.tsx` - Query migration with optimistic updates
+- [ ] `components/products/products-table.tsx` - Query migration with cache invalidation
+
+#### Low Priority (Enhancement)
+- [ ] `components/analytics/*` - Keep Server Actions (per hybrid strategy)
+- [ ] Form components - Add mutations with optimistic updates where beneficial
+- [ ] Background data sync for critical user data
+
+### Performance Expectations
+
+#### Before Migration
+- **Dashboard Load**: 2-3 seconds for data fetch + processing
+- **Large Tables**: Laggy scrolling with 500+ rows, DOM bloat  
+- **Memory Usage**: Grows linearly with data size (500MB+ for large tables)
+- **Cache Efficiency**: 0% (refetch on every navigation)
+- **Error Recovery**: Manual page refresh required
+
+#### After Migration
+- **Dashboard Load**: Instant (cached) or 500ms (fresh data)
+- **Large Tables**: Smooth 60 FPS scrolling with 10,000+ rows
+- **Memory Usage**: Constant ~50-100MB (virtualization + proper cache management)
+- **Cache Efficiency**: 90%+ cache hit rate for repeat navigation
+- **Error Recovery**: Automatic retry with exponential backoff
+
+### Risk Mitigation
+
+#### Technical Risks & Mitigations
+1. **Bundle Size Increase**: 
+   - Monitor with `@next/bundle-analyzer`
+   - Implement code splitting for admin sections
+   - Tree-shake unused query features
+
+2. **Memory Leaks in Virtualization**:
+   - Extensive testing with large datasets
+   - Proper cleanup in useEffect hooks
+   - Monitor with React DevTools Profiler
+
+3. **Cache Invalidation Complexity**:
+   - Careful query key design with proper dependencies
+   - Automated testing for cache behavior
+   - Documentation of invalidation patterns
+
+4. **Type Safety Regression**:
+   - Maintain strict TypeScript throughout
+   - Add runtime validation for critical data
+   - Comprehensive type tests
+
+#### Migration Strategy Risks
+- **Feature Flags**: Gradual rollout with ability to fallback
+- **Comprehensive Error Boundaries**: Prevent white screens during migration
+- **Performance Monitoring**: Real-time alerts for performance regressions
+- **Rollback Plan**: Clear steps for each phase reversal
+
+## Success Metrics
+
+### Performance KPIs
+- **Time to Interactive**: < 1 second for cached data, < 2 seconds for fresh
+- **Table Performance**: 60 FPS scrolling with 10,000+ rows
+- **Memory Usage**: < 100MB for large datasets
+- **Cache Hit Rate**: > 85% for repeat navigation
+- **Error Rate**: < 1% for query failures
+
+### Developer Experience KPIs
+- **Code Reduction**: 40% fewer lines in data fetching components
+- **Bug Reduction**: 60% fewer state-related bugs
+- **Development Speed**: 30% faster feature development
+- **Type Safety**: 100% TypeScript coverage for query/mutation hooks
+
+### User Experience KPIs
+- **Perceived Performance**: Instant navigation between cached pages
+- **Reliability**: Zero data inconsistency issues
+- **Responsiveness**: No UI blocking during data operations
+- **Error Recovery**: Automatic retry without user intervention
+
+## Timeline Summary
+
+- **Days 1-2**: Foundation setup (query keys, options, enhanced API client)
+- **Days 3-7**: Student app migration (dashboard, courses, assessments)
+- **Days 8-14**: Admin tables with virtualization (learners, users, modules)
+- **Days 15-18**: Advanced features (optimistic updates, background sync, monitoring)
+- **Days 19-21**: Testing, validation, and performance optimization
+
+**Total Duration**: 3 weeks
+**Expected Impact**: 70% performance improvement, 40% code reduction, 85%+ cache efficiency
+**Risk Level**: Low (gradual migration, proven patterns, existing infrastructure)
+
+---
+
+*This plan follows official TanStack Query v5 best practices including query options pattern, proper error handling, optimistic updates with rollback, and performance optimizations through virtualization and intelligent caching.* 

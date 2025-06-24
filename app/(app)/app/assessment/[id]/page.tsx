@@ -2,13 +2,10 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import { queryKeys } from '@/lib/query-keys';
-import { Button } from '@/components/ui/button'; // Assuming you have a Button component
+import { useAssessmentDetails } from '@/hooks/queries/student/useAssessments';
+import { Button } from '@/components/ui/button';
 
 // Define interfaces for the assessment data based on GET /api/app/assessments/[moduleId]/details response
-// These might need adjustment based on the actual API response structure.
 interface AssessmentQuestionOption {
   id: string;
   text: string;
@@ -17,9 +14,8 @@ interface AssessmentQuestionOption {
 interface AssessmentQuestion {
   id: string;
   question_text: string;
-  question_type: 'MCQ' | 'MSQ' | 'TF' | 'ShortAnswer' | 'Essay'; // Example types
+  question_type: 'MCQ' | 'MSQ' | 'TF' | 'ShortAnswer' | 'Essay';
   options?: AssessmentQuestionOption[];
-  // other question properties like points, correct_answer (not sent to client initially)
 }
 
 interface AssessmentDetails {
@@ -27,7 +23,6 @@ interface AssessmentDetails {
   name: string;
   description?: string;
   time_limit_minutes?: number;
-  // other assessment properties like max_attempts, instructions
 }
 
 interface InProgressAttempt {
@@ -36,14 +31,13 @@ interface InProgressAttempt {
   last_updated: string;
   remaining_time_seconds?: number;
   timer_paused?: boolean;
-  saved_answers?: Record<string, string | string[]>; // question_id: answer
+  saved_answers?: Record<string, string | string[]>;
 }
 
 interface AssessmentPageData {
   assessment: AssessmentDetails;
   questions: AssessmentQuestion[];
   in_progress_attempt?: InProgressAttempt | null;
-  // Add student eligibility info if API provides it (e.g., remaining_attempts, deadline_passed)
 }
 
 const AssessmentPageSkeleton = () => (
@@ -61,60 +55,39 @@ const AssessmentPageSkeleton = () => (
   </div>
 );
 
-
 export default function AssessmentPlayerPage() {
   const params = useParams();
   const router = useRouter();
   const moduleId = params.id as string;
 
+  // Use our new organized TanStack Query hook
   const { 
     data: assessmentPageData, 
-    isLoading, 
+    isPending, 
     isError, 
     error 
-  } = useQuery<AssessmentPageData | null, Error>({
-    queryKey: queryKeys.assessmentDetails(moduleId),
-    queryFn: async () => {
-    if (!moduleId) {
-        throw new Error("Module ID is missing.");
-      }
-      const result = await apiClient<AssessmentPageData>(`/api/app/assessments/${moduleId}/details`);
-      if (result.error) {
-        throw new Error(result.error);
-        }
-      return result.data; 
-    },
-    enabled: !!moduleId,
-  });
+  } = useAssessmentDetails(moduleId);
 
   const handleStartResumeAssessment = async () => {
-    if (!assessmentPageData) return; // Guard clause
+    if (!assessmentPageData || typeof assessmentPageData !== 'object' || !('assessment' in assessmentPageData)) return;
 
+    const data = assessmentPageData as AssessmentPageData;
+    
     try {
-      // setIsLoading(true); // Removed, as this was for the page data loading state
-      
-      // If there is an in-progress attempt, we'll resume it, otherwise start a new one
-      const isResume = !!assessmentPageData.in_progress_attempt;
-      
-      // Prepare the assessment page for taking the assessment
+      const isResume = !!data.in_progress_attempt;
       router.push(`/app/assessment/${moduleId}/take`);
       
-      // Log what's happening (for debugging)
       if (isResume) {
-        console.log("Resuming assessment:", assessmentPageData.assessment.name);
+        console.log("Resuming assessment:", data.assessment.name);
       } else {
-        console.log("Starting assessment:", assessmentPageData.assessment.name);
+        console.log("Starting assessment:", data.assessment.name);
       }
     } catch (err) {
       console.error("Error starting assessment:", err);
-      // setError(err instanceof Error ? err.message : 'An unknown error occurred while starting the assessment.'); // Removed
-      // If this handler needs to show an error, it should use its own state or a toast notification.
-      // setIsLoading(false); // Removed
     }
   };
 
-
-  if (isLoading) {
+  if (isPending) {
     return <AssessmentPageSkeleton />;
   }
 
@@ -128,11 +101,11 @@ export default function AssessmentPlayerPage() {
     );
   }
 
-  if (!assessmentPageData) {
+  if (!assessmentPageData || typeof assessmentPageData !== 'object' || !('assessment' in assessmentPageData)) {
     return <div className="container mx-auto p-6 text-center">No assessment data found for this module.</div>;
   }
 
-  const { assessment, in_progress_attempt } = assessmentPageData;
+  const { assessment, in_progress_attempt } = assessmentPageData as AssessmentPageData;
 
   return (
     <div className="container mx-auto p-4 sm:p-6">
@@ -151,11 +124,6 @@ export default function AssessmentPlayerPage() {
             <span className="font-medium text-gray-600 dark:text-gray-300">Time Limit:</span> {assessment.time_limit_minutes} minutes
           </div>
         )}
-        {/* Display other assessment details like number of questions, attempts allowed/taken if available */}
-        {/* <div className="mb-4">
-          <span className="font-medium text-gray-600 dark:text-gray-300">Questions:</span> {assessmentPageData.questions.length}
-        </div> */}
-
 
         <div className="mt-8 text-center">
           <Button 
@@ -172,7 +140,6 @@ export default function AssessmentPlayerPage() {
             <p className="text-blue-700 dark:text-blue-300">
               You have an assessment in progress. Last saved: {new Date(in_progress_attempt.last_updated).toLocaleString()}.
             </p>
-            {/* Optionally show remaining time if available and not sensitive here */}
           </div>
         )}
       </div>

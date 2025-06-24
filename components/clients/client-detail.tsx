@@ -6,7 +6,7 @@ import { Building2, CalendarIcon, MailIcon, MapPinIcon, PenIcon } from "lucide-r
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ClientForm } from "@/components/clients/client-form"
-import { Client } from "@/app/actions/clientActions"
+import { type Client } from "@/hooks/api/use-clients"
 import Image from "next/image"
 
 interface ClientDetailProps {

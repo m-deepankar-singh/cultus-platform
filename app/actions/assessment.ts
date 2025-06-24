@@ -37,161 +37,11 @@ interface SaveAssessmentActionResult {
 export async function saveAssessmentProgressAction(
   data: AssessmentProgressSaveData
 ): Promise<SaveAssessmentActionResult> {
-  try {
-    const validationResult = AssessmentProgressSaveDataSchema.safeParse(data);
-    if (!validationResult.success) {
-      return {
-        success: false,
-        error: 'Invalid input data',
-        errorDetails: validationResult.error.flatten(),
-      };
-    }
-
-    const {
-      moduleId,
-      saved_answers,
-      remaining_time_seconds,
-      timer_paused
-    } = validationResult.data;
-
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
-    // Student and module verification logic (similar to the original PATCH route)
-    const { data: studentRecord, error: studentFetchError } = await supabase
-      .from('students')
-      .select('client_id, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (studentFetchError) {
-      return { success: false, error: studentFetchError.code === 'PGRST116' ? 'Student record not found' : 'Failed to fetch student record' };
-    }
-    if (!studentRecord.is_active) {
-      return { success: false, error: 'Student account is inactive' };
-    }
-    if (!studentRecord.client_id) {
-      return { success: false, error: 'Student not linked to a client' };
-    }
-
-    const { data: moduleData, error: moduleFetchError } = await supabase
-      .from('modules')
-      .select(`
-        id, 
-        type, 
-        configuration,
-        module_product_assignments!inner(product_id)
-      `)
-      .eq('id', moduleId)
-      .single();
-      
-    if (moduleFetchError) return { success: false, error: moduleFetchError.code === 'PGRST116' ? 'Module not found' : `DB error (module): ${moduleFetchError.message}` };
-    if (!moduleData) return { success: false, error: 'Module data not found after fetch.' }; 
-    if (moduleData.type !== 'Assessment') return { success: false, error: 'Module is not an assessment' };
-    if (!moduleData.module_product_assignments?.length) return { success: false, error: 'Module not assigned to any product' };
-
-    const productId = moduleData.module_product_assignments[0].product_id;
-
-    const { count, error: enrollmentError } = await supabase
-      .from('client_product_assignments')
-      .select('*', { count: 'exact', head: true })
-      .eq('client_id', studentRecord.client_id)
-      .eq('product_id', productId);
-
-    if (enrollmentError) {
-      return { success: false, error: 'Failed to verify enrollment', errorDetails: enrollmentError.message };
-    }
-    if (count === 0) {
-      return { success: false, error: 'Student not enrolled in this assessment' };
-    }
-
-    const { data: submissionData, error: submissionError } = await supabase
-      .from('assessment_progress')
-      .select('submitted_at')
-      .eq('student_id', user.id)
-      .eq('module_id', moduleId)
-      .not('submitted_at', 'is', null)
-      .maybeSingle();
-
-    if (submissionError && submissionError.code !== 'PGRST116') {
-      // Log error but proceed cautiously
-      console.error(`Error checking assessment submission for module ${moduleId}:`, submissionError);
-    }
-    if (submissionData?.submitted_at) {
-      return { success: false, error: 'Cannot save progress for an already submitted assessment' };
-    }
-
-    const { data: existingProgress, error: progressFetchError } = await supabase
-      .from('assessment_progress')
-      .select(`
-        student_id,
-        module_id,
-        saved_answers,
-        started_at,
-        last_updated,
-        submitted_at,
-        remaining_time_seconds,
-        timer_paused
-      `)
-      .eq('student_id', user.id)
-      .eq('module_id', moduleId)
-      .is('submitted_at', null)
-      .maybeSingle();
-
-    if (progressFetchError && progressFetchError.code !== 'PGRST116') {
-      return { success: false, error: 'Failed to check existing progress', errorDetails: progressFetchError.message };
-    }
-
-    const now = new Date().toISOString();
-    const upsertData: any = {
-      student_id: user.id,
-      module_id: moduleId,
-      last_updated: now,
-      submitted_at: null, // Explicitly NULL for save operations
-    };
-
-    if (saved_answers !== undefined) upsertData.saved_answers = saved_answers;
-    if (remaining_time_seconds !== undefined) upsertData.remaining_time_seconds = remaining_time_seconds;
-    if (timer_paused !== undefined) upsertData.timer_paused = timer_paused;
-
-    if (!existingProgress) {
-      upsertData.started_at = now; // Set started_at only for new attempts
-    } else {
-      // If existing progress, retain its started_at unless it's null (shouldn't happen for a started attempt)
-      upsertData.started_at = existingProgress.started_at || now;
-    }
-
-    const { data: updatedProgress, error: upsertError } = await supabase
-      .from('assessment_progress')
-      .upsert(upsertData, { onConflict: 'student_id, module_id, submitted_at' }) // Ensure submitted_at IS NULL for onConflict to work for save
-                                                                            // This onConflict might need adjustment if you allow multiple non-submitted save slots.
-                                                                            // For now, it assumes one non-submitted save slot per student/module.
-      .select()
-      .single();
-
-    if (upsertError) {
-      console.error(`Error saving progress for module ${moduleId}:`, upsertError);
-      return { success: false, error: 'Failed to save progress', errorDetails: upsertError.message };
-    }
-
-    // Revalidate path if needed, e.g., if a different part of the UI shows save status
-    // revalidatePath(`/app/assessment/${moduleId}`); 
-
-    return {
-      success: true,
-      message: 'Progress saved successfully',
-      data: updatedProgress as SaveAssessmentActionResult['data'],
-    };
-
-  } catch (e) {
-    const error = e as Error;
-    console.error('Unexpected error in saveAssessmentProgressAction:', error);
-    return { success: false, error: 'An unexpected error occurred.', errorDetails: error.message };
-  }
+  // Progress saving is disabled - assessments must be completed in one session
+  return {
+    success: false,
+    error: 'Progress saving is disabled. Please complete the assessment in one session.'
+  };
 }
 
 // --- Submit Assessment Action ---
@@ -289,44 +139,29 @@ export async function submitAssessmentAction(
     if (enrollmentError) return { success: false, error: `Error checking enrollment: ${enrollmentError.message}` };
     if (count === 0) return { success: false, error: 'Student not enrolled in this assessment' };
 
-    // Check for an existing in-progress attempt (submitted_at IS NULL)
-    // or a previously fully submitted attempt (submitted_at IS NOT NULL).
-    const { data: existingProgress, error: progressCheckError } = await supabase
-      .from('assessment_progress')
-      .select('student_id, module_id, submitted_at, started_at') // Select relevant fields
+    // Check if assessment has already been submitted (no retakes allowed)
+    const { data: existingSubmission, error: submissionCheckError } = await supabase
+      .from('assessment_submissions')
+      .select('student_id, assessment_id')
       .eq('student_id', studentId)
-      .eq('module_id', moduleId)
-      .order('last_updated', { ascending: false })
-      .limit(1)
+      .eq('assessment_id', moduleId)
       .maybeSingle();
 
-    if (progressCheckError && progressCheckError.code !== 'PGRST116') {
-      console.error('Error checking existing progress (Supabase):', progressCheckError);
+    if (submissionCheckError && submissionCheckError.code !== 'PGRST116') {
+      console.error('Error checking existing submission:', submissionCheckError);
       return { 
         success: false, 
-        error: 'Error checking existing progress', 
+        error: 'Error checking existing submission', 
         errorDetails: { 
-          message: progressCheckError.message, 
-          code: progressCheckError.code, 
-          details: progressCheckError.details 
+          message: submissionCheckError.message, 
+          code: submissionCheckError.code, 
+          details: submissionCheckError.details 
         } 
       };
     }
 
-    let isRetake = false;
-    let canUpdateInProgress = false;
-
-    if (existingProgress?.submitted_at) {
-      // This is a previously submitted attempt
-      const config = moduleData.configuration || {}; 
-      const retakesAllowed = config.retakesAllowed || config.retakes_allowed || false;
-      if (!retakesAllowed) {
-        return { success: false, error: 'Assessment already submitted and retakes are not allowed.' };
-      }
-      isRetake = true; // This submission will be a new record for a retake.
-    } else if (existingProgress && !existingProgress.submitted_at) {
-      // This is an existing in-progress attempt (saved but not submitted)
-      canUpdateInProgress = true;
+    if (existingSubmission) {
+      return { success: false, error: 'Assessment already submitted. Retakes are not allowed.' };
     }
     
     const { data: questionData, error: questionError } = await supabase
@@ -395,57 +230,27 @@ export async function submitAssessmentAction(
     const passed = score >= passingThreshold;
     const submissionTime = new Date().toISOString();
 
-    // Prepare the core submission data
-    const submissionDataCore = {
-      student_id: studentId,
-      module_id: moduleId,
-      submitted_at: submissionTime,
-      score,
-      passed,
-      answers: submittedAnswers,
-      last_updated: submissionTime,
-    };
+    // Record the assessment submission (no progress saving, direct submission only)
+    const { error: progressInsertError } = await supabase
+      .from('assessment_progress')
+      .insert({
+        student_id: studentId,
+        module_id: moduleId,
+        submitted_at: submissionTime,
+        score,
+        passed,
+        answers: submittedAnswers,
+        started_at: submissionTime,
+        last_updated: submissionTime,
+      });
 
-    if (canUpdateInProgress && existingProgress) {
-      // Update the existing in-progress record
-      const { error: updateError } = await supabase
-        .from('assessment_progress')
-        .update({
-          ...submissionDataCore,
-          started_at: existingProgress.started_at || submissionTime, // Preserve original start_at
-        })
-        .eq('student_id', studentId)
-        .eq('module_id', moduleId)
-        .is('submitted_at', null); // Target the in-progress record
-
-      if (updateError) {
-        console.error('Error updating in-progress assessment submission:', updateError);
-        return { success: false, error: 'Failed to finalize assessment submission (update).' };
-      }
-    } else {
-      // Insert a new record (first attempt or a retake)
-      const { error: insertError } = await supabase
-        .from('assessment_progress')
-        .insert({
-          ...submissionDataCore,
-          started_at: submissionTime, // New attempt, so started_at is now
-        });
-
-      if (insertError) {
-        console.error('Error inserting new assessment submission:', insertError);
-        // Attempt to provide more specific error if it's a unique constraint violation (e.g., already submitted and not a retake case)
-        if (insertError.code === '23505') { // Unique violation
-             return { success: false, error: 'Failed to record submission. This assessment might have already been submitted without retake eligibility.' };
-        }
-        return { success: false, error: 'Failed to record assessment submission (insert).' };
-      }
+    if (progressInsertError) {
+      console.error('Error recording assessment submission:', progressInsertError);
+      return { success: false, error: 'Failed to record assessment submission.' };
     }
     
-    // START --- MODIFICATION TO ADD RECORD TO assessment_submissions ---
-    // Make submissionTime unique for assessment_submissions by appending random ms
-    const uniqueSubmissionTime = new Date(new Date(submissionTime).getTime() + Math.floor(Math.random() * 1000)).toISOString();
-    
-    const { error: newSubmissionError } = await supabase
+    // Record in assessment_submissions table (no retakes allowed - insert only)
+    const { error: submissionError } = await supabase
       .from('assessment_submissions')
       .insert({
         student_id: studentId,
@@ -454,21 +259,17 @@ export async function submitAssessmentAction(
         passed: passed,
         total_questions: totalQuestions,
         correct_answers: correctAnswers,
-        submitted_at: uniqueSubmissionTime, // Use unique timestamp
+        submitted_at: submissionTime,
       });
 
-    if (newSubmissionError) {
-      // Log the error but don't fail the entire action,
-      // as the primary submission to assessment_progress might have succeeded.
-      console.error('Error inserting into assessment_submissions:', newSubmissionError);
+    if (submissionError) {
+      console.error('Error inserting into assessment_submissions:', submissionError);
       
-      // Try again using the admin client which bypasses RLS
+      // Try using admin client if regular client fails
       try {
-        // Import our admin client (has service_role privileges)
         const { createAdminClient } = await import('@/lib/supabase/admin');
         const adminSupabase = createAdminClient();
         
-        // Insert using admin client
         await adminSupabase
           .from('assessment_submissions')
           .insert({
@@ -478,17 +279,16 @@ export async function submitAssessmentAction(
             passed: passed,
             total_questions: totalQuestions,
             correct_answers: correctAnswers,
-            submitted_at: uniqueSubmissionTime, // Use unique timestamp
+            submitted_at: submissionTime,
           });
           
         console.log('Successfully inserted assessment submission using admin client');
       } catch (adminError) {
         console.error('Failed to insert using admin client:', adminError);
-        // Still not a fatal error as we have the database trigger as fallback
-        console.warn('Relying on database trigger to sync assessment_submissions');
+        // Not a fatal error - assessment_progress was recorded successfully
+        console.warn('Assessment recorded in progress table but failed to sync to submissions table');
       }
     }
-    // END --- MODIFICATION TO ADD RECORD TO assessment_submissions ---
     
     await supabase
       .from('student_module_progress')

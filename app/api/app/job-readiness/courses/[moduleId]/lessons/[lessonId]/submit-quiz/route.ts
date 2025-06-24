@@ -29,6 +29,8 @@ interface QuizSubmissionResponse {
   }>;
   attempts: number;
   can_retake: boolean;
+  course_completed?: boolean; // Optional field for course completion status
+  completion_percentage?: number; // Optional field for overall progress
 }
 
 // Cache for server-side quiz questions - same as used in content route
@@ -298,14 +300,70 @@ export async function POST(
       updated_at: new Date().toISOString(),
     };
 
-    // 12. Save progress
+    // 12. 🚀 ENHANCED: Check for course completion after quiz submission
+    const { data: allLessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id, has_quiz')
+      .eq('module_id', validModuleId);
+
+    let courseCompleted = false;
+    let completedLessonsCount = 0;
+    
+    if (!lessonsError && allLessons && allLessons.length > 0) {
+      // Get existing completed videos and quiz results
+      const { data: existingProgress } = await supabase
+        .from('student_module_progress')
+        .select('completed_videos, progress_details')
+        .eq('student_id', user.id)
+        .eq('module_id', validModuleId)
+        .maybeSingle();
+      
+      const completedVideos = existingProgress?.completed_videos || [];
+      const currentProgressDetails = existingProgress?.progress_details || {};
+      
+      for (const lesson of allLessons) {
+        const isVideoWatched = completedVideos.includes(lesson.id);
+        let isQuizPassedOrNotRequired = true;
+
+        // If lesson has a quiz, check if it's been passed
+        if (lesson.has_quiz) {
+          // Check updated quiz results (including current submission)
+          const quizResult = lesson.id === validLessonId 
+            ? updatedDetails.lesson_quiz_results?.[lesson.id]  // Use updated results for current lesson
+            : currentProgressDetails.lesson_quiz_results?.[lesson.id]; // Use existing results for other lessons
+          
+          isQuizPassedOrNotRequired = quizResult?.passed === true;
+        }
+
+        // Lesson is complete if video watched AND (no quiz OR quiz passed)
+        if (isVideoWatched && isQuizPassedOrNotRequired) {
+          completedLessonsCount += 1;
+        }
+      }
+
+      courseCompleted = completedLessonsCount >= allLessons.length;
+    }
+
+    // Calculate overall progress based on completed lessons
+    const overallCompletionPercentage = allLessons && allLessons.length > 0 
+      ? Math.round((completedLessonsCount / allLessons.length) * 100) 
+      : 0;
+
+    const newStatus = courseCompleted ? 'Completed' : 'InProgress';
+
+    // 13. Save progress with course completion status
     const { error: saveError } = await supabase
       .from('student_module_progress')
       .upsert({
         student_id: user.id,
         module_id: validModuleId,
         progress_details: updatedDetails,
+        progress_percentage: overallCompletionPercentage,
+        status: newStatus,
         last_updated: new Date().toISOString(),
+        ...(courseCompleted && {
+          course_completed_at: new Date().toISOString()
+        })
       });
 
     if (saveError) {
@@ -316,7 +374,7 @@ export async function POST(
       );
     }
 
-    // 13. Return results
+    // 14. Return results with course completion info
     const response: QuizSubmissionResponse = {
       success: true,
       score,
@@ -325,7 +383,9 @@ export async function POST(
       passing_threshold: passingThreshold,
       detailed_results: detailedResults,
       attempts: newAttempts,
-      can_retake: !passed && newAttempts < 3 // Allow up to 3 attempts
+      can_retake: !passed && newAttempts < 3, // Allow up to 3 attempts
+      course_completed: courseCompleted, // Add course completion flag
+      completion_percentage: overallCompletionPercentage // Add overall progress
     };
 
     return NextResponse.json(response);

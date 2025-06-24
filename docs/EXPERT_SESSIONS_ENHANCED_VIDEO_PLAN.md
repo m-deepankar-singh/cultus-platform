@@ -415,7 +415,7 @@ const allowedControls = {
 ### Milestone Positions
 ```typescript
 const MILESTONES = [10, 25, 50, 75, 90, 95, 100]; // percentages
-const COMPLETION_THRESHOLD = 95; // 95% for completion
+const COMPLETION_THRESHOLD = 100; // 100% for completion
 const MIN_WATCH_TIME = 30; // seconds before milestone counts
 ```
 

@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
-import { createClient, updateClient } from "@/app/actions/clientActions"
+import { useCreateClient, useUpdateClient } from "@/hooks/api/use-clients"
 import { S3FileUpload } from "@/components/ui/s3-file-upload"
 import NextImage from "next/image"
 
@@ -55,8 +55,13 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const isEditing = !!client
+  
+  // API hooks
+  const createClient = useCreateClient()
+  const updateClient = useUpdateClient()
+  
+  const isSubmitting = isEditing ? updateClient.isPending : createClient.isPending
 
   // Initialize form with existing client data or defaults
   const form = useForm<FormData>({
@@ -90,36 +95,37 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
   }, [client, open, form])
 
   const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true)
     try {
       console.log('Submitting form with data:', data)
+      
       if (isEditing && client) {
         // Update existing client
-        await updateClient(client.id, data)
-        toast({
-          title: "Client updated",
-          description: `${data.name} has been updated successfully.`,
+        await updateClient.mutateAsync({
+          id: client.id,
+          data: {
+            name: data.name,
+            contact_email: data.contact_email || null,
+            address: data.address || null,
+            logo_url: data.logo_url || null,
+          },
         })
       } else {
         // Create new client
-        await createClient(data)
-        toast({
-          title: "Client created",
-          description: `${data.name} has been created successfully.`,
+        await createClient.mutateAsync({
+          name: data.name,
+          contact_email: data.contact_email || null,
+          address: data.address || null,
+          logo_url: data.logo_url || null,
         })
       }
+      
       form.reset() // Reset after successful submission
       setOpen(false)
       if (onSuccess) onSuccess()
+      
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} client. Please try again.`,
-        variant: "destructive",
-      })
-      console.error(error)
-    } finally {
-      setIsSubmitting(false)
+      // Error handling is done in the hooks with toast notifications
+      console.error('Form submission error:', error)
     }
   }
 
@@ -201,47 +207,46 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
                     <Textarea 
                       placeholder="Client address" 
                       {...field} 
-                      value={field.value || ""}
+                      value={field.value || ""} 
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
             <FormField
               control={form.control}
               name="logo_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Client Logo</FormLabel>
+                  <FormLabel>Logo</FormLabel>
                   <FormControl>
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       {field.value && (
-                        <div className="relative">
-                          <NextImage 
-                            src={field.value} 
-                            alt="Client logo preview" 
-                            width={96}
-                            height={96}
-                            className="w-24 h-24 object-cover rounded-md border"
+                        <div className="relative w-24 h-24 border rounded-lg overflow-hidden">
+                          <NextImage
+                            src={field.value}
+                            alt="Client logo"
+                            fill
+                            className="object-cover"
                           />
                           <Button
                             type="button"
                             variant="destructive"
                             size="sm"
-                            className="absolute -top-2 -right-2"
+                            className="absolute top-1 right-1 h-6 w-6 p-0"
                             onClick={handleLogoRemove}
                           >
                             ×
                           </Button>
                         </div>
                       )}
-                      <S3FileUpload
+                      <S3FileUpload 
                         onUpload={handleLogoUpload}
-                        accept="image/*"
                         uploadEndpoint="/api/admin/clients/upload-logo"
-                        maxSize={2}
+                        accept="image/*"
+                        maxSize={5} // 5MB
+                        className="w-full"
                       />
                     </div>
                   </FormControl>
@@ -249,27 +254,27 @@ export function ClientForm({ open, setOpen, client, onSuccess }: ClientFormProps
                 </FormItem>
               )}
             />
-            
             <DialogFooter>
               <Button 
                 type="button" 
                 variant="outline" 
-                onClick={() => {
-                  setOpen(false)
-                  // Reset form when cancel button is clicked
-                  form.reset({
-                    name: "",
-                    contact_email: "",
-                    address: "",
-                    logo_url: null,
-                  })
-                }}
+                onClick={() => setOpen(false)}
                 disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : isEditing ? "Update Client" : "Create Client"}
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                    {isEditing ? "Updating..." : "Creating..."}
+                  </>
+                ) : (
+                  isEditing ? "Update Client" : "Create Client"
+                )}
               </Button>
             </DialogFooter>
           </form>

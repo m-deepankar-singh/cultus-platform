@@ -26,7 +26,7 @@ interface SessionProgressProps {
 
 export function SessionProgress({ session }: SessionProgressProps) {
   const { student_progress } = session
-  const completionThreshold = 95 // 95% threshold for completion
+  const completionThreshold = 100 // 100% threshold for completion
   
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600)

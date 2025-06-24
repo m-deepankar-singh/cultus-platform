@@ -18,8 +18,8 @@ importers:
         specifier: ^3.830.0
         version: 3.830.0
       '@google/genai':
-        specifier: ^1.2.0
-        version: 1.5.0(@modelcontextprotocol/sdk@1.12.1)
+        specifier: ^1.6.0
+        version: 1.6.0(@modelcontextprotocol/sdk@1.12.1)
       '@hello-pangea/dnd':
         specifier: ^18.0.1
         version: 18.0.1(@types/react@19.1.8)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -874,8 +874,8 @@ packages:
   '@floating-ui/utils@0.2.9':
     resolution: {integrity: sha512-MDWhGtE+eHw5JW7lq4qhc5yRLS11ERl1c7Z6Xd0a58DozHES6EnNNwUWbMiG4J9Cgj053Bhk8zvlhFYKVhULwg==}
 
-  '@google/genai@1.5.0':
-    resolution: {integrity: sha512-N/UhGPcKwYw4tD/fERrNQMeHh3yiUDXhJ5f94HSMV7LhkU19IMFSqtXjek6nSpgM/YDJGBYw/MoHVLjfWhmdmQ==}
+  '@google/genai@1.6.0':
+    resolution: {integrity: sha512-0vn8wMGesjiEsHeFsl10T8+SFqLj7q+RSE6mml66sE+jwI7U9wW2LQ3qYtwUEaI+P8ZYeEYE5IpYmNLcRQUBPQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.11.0
@@ -6755,7 +6755,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.9': {}
 
-  '@google/genai@1.5.0(@modelcontextprotocol/sdk@1.12.1)':
+  '@google/genai@1.6.0(@modelcontextprotocol/sdk@1.12.1)':
     dependencies:
       google-auth-library: 9.15.1
       ws: 8.18.2

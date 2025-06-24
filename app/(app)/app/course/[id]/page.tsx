@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react'
 import { CourseOverview } from '@/components/courses/CourseOverview'
-import { useEnhancedCourseContent } from '@/hooks/useEnhancedCourseContent'
+import { useEnhancedCourseContent } from '@/hooks/queries/student/useCourses'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react'
@@ -40,35 +40,37 @@ function transformCourseData(apiResponse: CourseApiResponse) {
   return { moduleData, progressData }
 }
 
-// Enhanced course page using Job Readiness-style UI patterns
+// Enhanced course page using TanStack Query
 function EnhancedCoursePageContent() {
   const params = useParams()
   const moduleId = params.id as string
 
+  // Use TanStack Query with improved error handling
   const {
     data: courseData,
-    isLoading,
+    isPending,
+    isError,
     error
   } = useEnhancedCourseContent(moduleId)
 
-  if (isLoading) {
+  if (isPending) {
     return <CoursePageSkeleton />
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="container mx-auto p-4">
         <Card className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
           <div className="p-6 flex items-center justify-center">
             <AlertCircle className="h-5 w-5 mr-2" />
-            <p>{error.message || 'An error occurred while loading the course'}</p>
+            <p>{error?.message || 'An error occurred while loading the course'}</p>
           </div>
         </Card>
       </div>
     )
   }
 
-  if (!courseData) {
+  if (!courseData || typeof courseData !== 'object' || !('course' in courseData) || !('progress' in courseData)) {
     return (
       <div className="container mx-auto p-4">
         <Card className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">
@@ -85,7 +87,7 @@ function EnhancedCoursePageContent() {
     )
   }
 
-  const { moduleData, progressData } = transformCourseData(courseData)
+  const { moduleData, progressData } = transformCourseData(courseData as CourseApiResponse)
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -119,7 +121,7 @@ function EnhancedCoursePageContent() {
   )
 }
 
-// Skeleton loader component
+// Optimized skeleton loader component
 function CoursePageSkeleton() {
   return (
     <div className="container mx-auto p-4 animate-pulse">
@@ -199,7 +201,7 @@ function CoursePageSkeleton() {
                 <CardContent className="pt-0">
                   <div className="flex items-center justify-between">
                     <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-32"></div>
-                    <div className="h-9 bg-gray-300 dark:bg-gray-700 rounded w-28"></div>
+                    <div className="h-9 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
                   </div>
                 </CardContent>
               </Card>
@@ -211,19 +213,17 @@ function CoursePageSkeleton() {
   )
 }
 
-// Loading wrapper
+// Simple loading wrapper (optimized for TanStack Query)
 function LoadingWrapper() {
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-        <p className="text-gray-600 dark:text-gray-400">Loading course content...</p>
-      </div>
+    <div className="flex items-center justify-center p-8">
+      <Loader2 className="h-8 w-8 animate-spin mr-2" />
+      <span>Loading course...</span>
     </div>
   )
 }
 
-// Main page component with Suspense boundary
+// Main component export with Suspense boundary
 export default function EnhancedCoursePage() {
   return (
     <Suspense fallback={<LoadingWrapper />}>

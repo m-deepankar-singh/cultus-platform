@@ -155,7 +155,63 @@ export async function POST(
       : [...currentCompletedVideos, lesson_id];
 
     const videosCompleted = updatedCompletedVideos.length;
-    const courseCompleted = videosCompleted >= totalLessons;
+    
+    // 🚀 ENHANCED: Check course completion properly considering quizzes
+    // Get all lessons to check quiz requirements
+    const { data: allLessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id, has_quiz')
+      .eq('module_id', validModuleId);
+
+    let completedLessonsCount = 0;
+    let courseCompleted = false;
+
+    if (!lessonsError && allLessons && allLessons.length > 0) {
+      // Get current progress details for quiz results
+      const { data: currentProgressDetails, error: progressDetailsError } = await supabase
+        .from('student_module_progress')
+        .select('progress_details')
+        .eq('student_id', studentId)
+        .eq('module_id', validModuleId)
+        .maybeSingle();
+
+      const progressDetails = currentProgressDetails?.progress_details || {};
+
+      for (const lesson of allLessons) {
+        const isVideoWatched = updatedCompletedVideos.includes(lesson.id);
+        let isQuizPassedOrNotRequired = true;
+
+        // If lesson has a quiz, check if it's been passed
+        if (lesson.has_quiz) {
+          // Check both possible quiz result formats for maximum compatibility
+          const quizResult = progressDetails.lesson_quiz_results?.[lesson.id];
+          const quizAttempts = progressDetails.lesson_quiz_attempts?.[lesson.id];
+          
+          // Support both data structures:
+          // 1. lesson_quiz_results[lessonId].passed (newer format)
+          // 2. lesson_quiz_attempts[lessonId][].pass_fail_status === 'passed' (older format)
+          const passedInQuizResults = quizResult?.passed === true;
+          const passedInQuizAttempts = Array.isArray(quizAttempts) && 
+            quizAttempts.some((att: any) => att.pass_fail_status === 'passed');
+          
+          isQuizPassedOrNotRequired = passedInQuizResults || passedInQuizAttempts;
+        }
+
+        // Lesson is complete if video watched AND (no quiz OR quiz passed)
+        if (isVideoWatched && isQuizPassedOrNotRequired) {
+          completedLessonsCount += 1;
+        }
+      }
+
+      courseCompleted = completedLessonsCount >= allLessons.length;
+    } else if (lessonsError) {
+      console.error('Error fetching lessons for completion check:', lessonsError);
+      // Fallback to video-only completion for backward compatibility
+      courseCompleted = videosCompleted >= totalLessons;
+    } else {
+      // No lessons found, fallback to video-only completion
+      courseCompleted = videosCompleted >= totalLessons;
+    }
     const now = new Date().toISOString();
 
     // Build update data
@@ -165,7 +221,7 @@ export async function POST(
       completed_videos: updatedCompletedVideos,
       video_completion_count: videosCompleted,
       status: courseCompleted ? 'Completed' : 'InProgress',
-      progress_percentage: Math.round((videosCompleted / totalLessons) * 100),
+      progress_percentage: totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0,
       last_updated: now,
       ...(courseCompleted && !existingProgress?.course_completed_at && {
         completed_at: now,
@@ -273,7 +329,9 @@ export async function POST(
 
     const response: ProgressSaveResponse = {
       success: true,
-      message: courseCompleted ? 'Course completed successfully!' : 'Video completion saved',
+      message: courseCompleted 
+        ? '🎉 Course completed successfully! All lessons and quizzes finished!' 
+        : `Video completed! ${completedLessonsCount}/${totalLessons} lessons finished.`,
       videos_completed: videosCompleted,
       total_videos: totalLessons,
       course_completed: courseCompleted,
