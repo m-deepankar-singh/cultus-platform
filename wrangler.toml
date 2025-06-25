@@ -7,6 +7,10 @@ main = "./.output/server/index.mjs"
 [build]
 command = "npx @opennextjs/cloudflare"
 
+# Static assets configuration for Next.js files
+[assets]
+directory = "./.output/static"
+
 # Custom domains (update with your actual domain)
 [[routes]]
 pattern = "app.cultuslearn.com/*"

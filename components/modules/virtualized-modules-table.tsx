@@ -81,9 +81,9 @@ const ModuleRow = React.memo(({
   data: RowData 
 }) => {
   const { modules, isAdmin, onEditModule, onDeleteModule } = data;
-  const module = modules[index];
+  const moduleItem = modules[index];
   
-  if (!module) {
+  if (!moduleItem) {
     return (
       <div style={style} className="flex items-center px-6 border-b border-border bg-card dark:bg-card/80">
         <Skeleton className="h-8 w-full" />
@@ -95,18 +95,18 @@ const ModuleRow = React.memo(({
     <div style={style} className="border-b border-border bg-card dark:bg-card/80 hover:bg-muted/25 transition-colors group">
       <div className="grid grid-cols-5 gap-6 px-6 py-4 items-center h-full">
         <div>
-          <Badge variant={module.type === "Course" ? "default" : "secondary"}>
-            {module.type === "Course" ? <BookOpen className="mr-1 h-3 w-3" /> : <FileText className="mr-1 h-3 w-3" />}
-            {module.type}
+          <Badge variant={moduleItem.type === "Course" ? "default" : "secondary"}>
+            {moduleItem.type === "Course" ? <BookOpen className="mr-1 h-3 w-3" /> : <FileText className="mr-1 h-3 w-3" />}
+            {moduleItem.type}
           </Badge>
         </div>
-        <div className="font-medium text-foreground truncate">{module.name}</div>
+        <div className="font-medium text-foreground truncate">{moduleItem.name}</div>
         <div>
-          {module.products && module.products.length > 0 ? (
+          {moduleItem.products && moduleItem.products.length > 0 ? (
             <div className="flex flex-wrap gap-1">
-              {module.products.length <= 2 ? (
+              {moduleItem.products.length <= 2 ? (
                 // Show all products if there are 2 or fewer
-                module.products.map((product) => (
+                moduleItem.products.map((product) => (
                   <Link 
                     key={product.id}
                     href={`/products/${product.id}`}
@@ -126,13 +126,13 @@ const ModuleRow = React.memo(({
                     <TooltipTrigger asChild>
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Package className="h-3 w-3" />
-                        {module.products.length} Products
+                        {moduleItem.products.length} Products
                       </Badge>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <div className="text-xs font-medium">Assigned to:</div>
                       <ul className="text-xs mt-1 list-disc pl-3 space-y-1">
-                        {module.products.map((product) => (
+                        {moduleItem.products.map((product) => (
                           <li key={product.id}>
                             <Link
                               href={`/products/${product.id}`}
@@ -154,7 +154,7 @@ const ModuleRow = React.memo(({
           )}
         </div>
         <div className="text-sm text-muted-foreground">
-          {module.created_at ? format(new Date(module.created_at), "MMM d, yyyy") : "—"}
+          {moduleItem.created_at ? format(new Date(moduleItem.created_at), "MMM d, yyyy") : "—"}
         </div>
         <div className="flex items-center justify-end">
           <DropdownMenu>
@@ -167,20 +167,20 @@ const ModuleRow = React.memo(({
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem asChild>
-                <Link href={`/modules/${module.id}`}>
+                <Link href={`/modules/${moduleItem.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
                   View Details
                 </Link>
               </DropdownMenuItem>
               {isAdmin && (
                 <>
-                  <DropdownMenuItem onClick={() => onEditModule(module)}>
+                  <DropdownMenuItem onClick={() => onEditModule(moduleItem)}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    onClick={() => onDeleteModule(module)}
+                    onClick={() => onDeleteModule(moduleItem)}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash className="mr-2 h-4 w-4" />
