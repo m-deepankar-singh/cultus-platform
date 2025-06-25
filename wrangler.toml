@@ -28,11 +28,11 @@ binding = "R2_BUCKET"
 bucket_name = "cultus-public-assets"
 preview_bucket_name = "cultus-public-assets-preview"
 
-# KV binding for caching (if needed)
-[[kv_namespaces]]
-binding = "KV_CACHE"
-id = ""
-preview_id = ""
+# KV binding for caching (if needed) - commented out until configured
+# [[kv_namespaces]]
+# binding = "KV_CACHE"
+# id = ""
+# preview_id = ""
 
 # Durable Objects (if using real-time features)
 # [[durable_objects.bindings]]
