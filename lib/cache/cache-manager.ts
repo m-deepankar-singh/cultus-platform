@@ -559,6 +559,18 @@ export const CacheUtils = {
     `expert_sessions_content:${productId || 'all'}`,
 
   /**
+   * Generate cache key for expert sessions
+   */
+  expertSessionsKey: (productId?: string) => 
+    `expert_sessions:${productId || 'all'}`,
+
+  /**
+   * Generate cache key for student progress
+   */
+  studentProgressKey: (studentId: string, moduleId?: string) => 
+    `student_progress:${studentId}${moduleId ? `:${moduleId}` : ''}`,
+
+  /**
    * Generate cache key for module content
    */
   moduleContentKey: (moduleId: string) => 
@@ -598,6 +610,9 @@ export const CacheUtils = {
     MODULE_CONTENT: ['module_content', 'modules', 'lessons', 'quizzes'],
     CLIENT_CONFIGS: ['client_configs', 'clients', 'settings'],
     ANALYTICS: ['analytics', 'dashboard', 'stats', 'performance'],
-    USERS: ['users', 'auth', 'admin']
+    USERS: ['users', 'auth', 'admin'],
+    STUDENT_PROGRESS: ['student_progress', 'progress'],
+    PRODUCT_PERFORMANCE: ['products', 'performance', 'analytics'],
+    MODULE_DATA: ['modules', 'module_completion']
   }
 }; 
