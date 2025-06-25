@@ -34,6 +34,16 @@ export {
   type ModulesFilters
 } from './useModules';
 
+export {
+  useProductsInfinite,
+  flattenProductsPages,
+  getTotalProductsCount,
+  type Product,
+  type ProductsFilters
+} from './useProducts';
+
+export * from './useQuestionBanks';
+
 // Shared types
 export type { PaginatedResponse } from './useLearners';
 

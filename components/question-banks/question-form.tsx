@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useCreateQuestionBank, useUpdateQuestionBank } from '@/hooks/mutations/admin/useQuestionBankMutations';
 
 // Define the Question types
 interface Option {
@@ -74,12 +75,17 @@ interface QuestionFormProps {
   onOpenChange: (open: boolean) => void;
   bankType: 'assessment' | 'course';
   questionToEdit?: Question;
+  onSuccess?: () => void;
 }
 
-export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: QuestionFormProps) {
+export function QuestionForm({ open, onOpenChange, bankType, questionToEdit, onSuccess }: QuestionFormProps) {
   const router = useRouter();
   const [questionType, setQuestionType] = useState<'MCQ' | 'MSQ'>(questionToEdit?.question_type || 'MCQ');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // TanStack Query mutations
+  const createQuestionMutation = useCreateQuestionBank();
+  const updateQuestionMutation = useUpdateQuestionBank();
 
   // Memoized function to get default values
   const getDefaultValues = useCallback((): Partial<FormValues> => {
@@ -201,39 +207,30 @@ export function QuestionForm({ open, onOpenChange, bankType, questionToEdit }: Q
       // Transform the data for the API
       const apiData = {
         question_text: data.question_text,
-        question_type: data.question_type,
-        options: data.options,
+        question_type: data.question_type, // Keep as 'MCQ' or 'MSQ'
+        options: data.options, // Keep as array of {id, text} objects
         bank_type: data.bank_type,
         // Convert empty strings or 'none' to null
         topic: (!data.topic || data.topic === '') ? null : data.topic,
         difficulty: (!data.difficulty || data.difficulty === '' || data.difficulty === 'none') ? null : data.difficulty,
-        // Transform correct_answers to the expected format for MSQ
-        ...(data.question_type === 'MCQ' 
-          ? { correct_answer: data.correct_answer } 
-          : { correct_answer: { answers: data.correct_answers } }
-        ),
+        // Transform correct_answers to the expected format
+        correct_answer: data.question_type === 'MCQ' 
+          ? data.correct_answer 
+          : { answers: data.correct_answers }, // MSQ format
       };
       
-      // Determine if we're creating a new question or updating an existing one
-      const url = questionToEdit 
-        ? `/api/admin/question-banks/${questionToEdit.id}` 
-        : '/api/admin/question-banks';
-      
-      const response = await fetch(url, {
-        method: questionToEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to ${questionToEdit ? 'update' : 'create'} question`);
+      if (questionToEdit) {
+        await updateQuestionMutation.mutateAsync({
+          id: questionToEdit.id,
+          data: apiData,
+        });
+      } else {
+        await createQuestionMutation.mutateAsync(apiData);
       }
       
-      // Close the dialog and refresh the data
+      // Close the dialog and call success callback
       onOpenChange(false);
-      router.refresh();
+      onSuccess?.();
     } catch (error) {
       console.error('Error submitting question:', error);
     } finally {

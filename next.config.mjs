@@ -12,7 +12,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // Conditional output for Cloudflare Workers
+  output: process.env.CLOUDFLARE_WORKERS === "true" ? "standalone" : undefined,
   images: {
+    // Disable image optimization for Cloudflare Workers
+    unoptimized: process.env.CLOUDFLARE_WORKERS === "true",
     remotePatterns: [
       {
         protocol: 'https',

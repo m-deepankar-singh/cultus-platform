@@ -49,14 +49,34 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
       image_url: product?.image_url || null,
     },
   })
+  
+  // Watch the image_url field for debugging
+  const watchedImageUrl = form.watch("image_url")
+  
+  // Debug logging for image URL changes
+  useEffect(() => {
+    console.log('ProductForm: image_url field changed:', {
+      watchedImageUrl: watchedImageUrl ? watchedImageUrl.substring(0, 30) + "..." : "null",
+      productImageUrl: product?.image_url ? product.image_url.substring(0, 30) + "..." : "null",
+      isEditing,
+      open
+    });
+  }, [watchedImageUrl, product?.image_url, isEditing, open])
 
   useEffect(() => {
     if (open) {
-      form.reset({
+      const resetData = {
         name: product?.name || "",
         description: product?.description || "",
         image_url: product?.image_url || null,
+      };
+      
+      console.log('ProductForm: Resetting form with data:', {
+        ...resetData,
+        image_url: resetData.image_url ? resetData.image_url.substring(0, 30) + "..." : "null"
       });
+      
+      form.reset(resetData);
     } else {
       form.reset({ name: "", description: "", image_url: null });
     }
@@ -80,19 +100,22 @@ export function ProductForm({ open, onOpenChange, product }: ProductFormProps) {
       
       const method = isEditing ? "PATCH" : "POST"
       
-      // Important: Get the image_url directly from the form state
-      const imageUrl = form.getValues("image_url");
-      
+      // Use the data from the form submission directly, which includes the current image_url
       const payload: ProductFormData = {
         name: data.name,
         description: data.description,
-        image_url: imageUrl // Use the value from form state directly
+        image_url: data.image_url // This should include existing image_url or new uploaded image_url
       };
       
       console.log('Submitting product form with payload:', {
         name: payload.name,
         description: payload.description,
-        image_url: payload.image_url ? payload.image_url.substring(0, 30) + "..." : "null"
+        image_url: payload.image_url ? payload.image_url.substring(0, 30) + "..." : "null",
+        isEditing,
+        originalProduct: isEditing ? {
+          id: product.id,
+          image_url: product.image_url ? product.image_url.substring(0, 30) + "..." : "null"
+        } : null
       });
       
       const response = await fetch(url, {
