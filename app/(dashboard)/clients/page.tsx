@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
-import { ClientsTable } from "@/components/clients/clients-table"
-import { ClientsHeader } from "@/components/clients/clients-header"
+import { VirtualizedClientsTableWrapper } from "@/components/clients/virtualized-clients-table-wrapper"
 
 export const metadata: Metadata = {
   title: "Clients - Upskilling Platform",
@@ -10,8 +9,7 @@ export const metadata: Metadata = {
 export default function ClientsPage() {
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <ClientsHeader />
-      <ClientsTable />
+      <VirtualizedClientsTableWrapper />
     </div>
   )
 }

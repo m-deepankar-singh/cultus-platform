@@ -1,13 +1,66 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { adminClientsOptions, ClientsFilters } from '@/lib/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { apiClient, buildQueryParams } from '@/lib/api-client';
+
+export interface Client {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  contact_email: string | null;
+  address: string | null;
+  logo_url: string | null;
+  is_active: boolean;
+  // Extended fields from API response
+  products?: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+  }>;
+  total_students?: number;
+  active_students?: number;
+  recent_activity?: any[];
+}
+
+export interface ClientsFilters {
+  search?: string;
+  status?: 'active' | 'inactive' | 'all';
+  pageSize?: number;
+  page?: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  metadata: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+  // Also support the old pagination format for backward compatibility
+  pagination?: {
+    totalCount: number;
+    totalPages: number;
+    page: number;
+    pageSize: number;
+  };
+}
 
 /**
  * Hook for fetching clients with pagination
  */
 export function useClients(filters: ClientsFilters) {
-  return useQuery(adminClientsOptions(filters));
+  return useQuery({
+    queryKey: queryKeys.adminClients(filters),
+    queryFn: ({ queryKey }) => {
+      const [, , filterParams] = queryKey;
+      const params = buildQueryParams(filterParams);
+      return apiClient<PaginatedResponse<Client>>(`/api/admin/clients?${params}`);
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutes for admin data
+  });
 }
 
 /**
@@ -23,14 +76,33 @@ export function useClientsInfinite(filters: ClientsFilters) {
         pageSize: filters.pageSize || 50,
       });
       
-      return apiClient(`/api/admin/clients?${params}`);
+      return apiClient<PaginatedResponse<Client>>(`/api/admin/clients?${params}`);
     },
-    getNextPageParam: (lastPage: any) => {
-      return lastPage.metadata?.currentPage < lastPage.metadata?.totalPages
-        ? lastPage.metadata.currentPage + 1
-        : undefined;
+    getNextPageParam: (lastPage) => {
+      // Support both metadata and pagination formats
+      if (lastPage.metadata) {
+        return lastPage.metadata.currentPage < lastPage.metadata.totalPages
+          ? lastPage.metadata.currentPage + 1
+          : undefined;
+      } else if (lastPage.pagination) {
+        return lastPage.pagination.page < lastPage.pagination.totalPages
+          ? lastPage.pagination.page + 1
+          : undefined;
+      }
+      return undefined;
     },
     initialPageParam: 1,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 60 * 2, // 2 minutes for admin data
   });
+}
+
+export function flattenClientsPages(data: any): Client[] {
+  if (!data?.pages) return [];
+  return data.pages.flatMap((page: PaginatedResponse<Client>) => page.data);
+}
+
+export function getTotalClientsCount(data: any): number {
+  if (!data?.pages?.[0]) return 0;
+  const firstPage = data.pages[0];
+  return firstPage.metadata?.totalCount || firstPage.pagination?.totalCount || 0;
 } 

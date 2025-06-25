@@ -129,9 +129,7 @@ export default function TakeAssessmentPage() {
     queryKey: queryKeys.assessmentDetails(moduleId),
     queryFn: async () => {
       if (!moduleId) throw new Error("Module ID is missing.");
-      const result = await apiClient<AssessmentData>(`/api/app/assessments/${moduleId}/details`);
-      if (result.error) throw new Error(result.error);
-      return result.data;
+      return await apiClient<AssessmentData>(`/api/app/assessments/${moduleId}/details`);
     },
     enabled: !!moduleId,
   });

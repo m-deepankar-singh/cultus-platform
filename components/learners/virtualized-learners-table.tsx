@@ -68,84 +68,67 @@ const LearnerRow = React.memo(({
   
   if (!learner) {
     return (
-      <div style={style} className="flex items-center px-4 border-b">
+      <div style={style} className="flex items-center px-6 border-b border-border bg-card dark:bg-card/80">
         <Skeleton className="h-8 w-full" />
       </div>
     );
   }
   
-      return (
-      <div style={style} className="border-b hover:bg-muted/25 transition-colors group">
-        <div className="grid grid-cols-7 gap-6 px-6 py-4 items-center h-full">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
-              {learner.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-            </div>
-            <div className="min-w-0">
-              <div className="font-medium text-foreground truncate">{learner.full_name}</div>
-              {learner.temporary_password && (
-                <div className="text-xs text-muted-foreground font-mono">
-                  Temp: {learner.temporary_password}
-                </div>
-              )}
-            </div>
+  return (
+    <div style={style} className="border-b border-border bg-card dark:bg-card/80 hover:bg-muted/25 transition-colors group">
+      <div className="grid grid-cols-8 gap-6 px-6 py-4 items-center h-full">
+        <div className="font-medium text-foreground truncate">{learner.full_name}</div>
+        <div className="text-sm text-foreground truncate">{learner.email || '—'}</div>
+        <div className="font-mono text-xs text-muted-foreground truncate">{learner.temporary_password || '—'}</div>
+        <div className="text-sm text-foreground truncate">{learner.phone_number || '—'}</div>
+        <div className="text-sm text-foreground truncate">{learner.client?.name || '—'}</div>
+        <div>
+          {learner.job_readiness_background_type ? (
+            <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-medium">
+              {learner.job_readiness_background_type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-sm">—</span>
+          )}
+        </div>
+        <div>
+          <Badge variant={learner.is_active ? "default" : "secondary"} className={learner.is_active ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900" : ""}>
+            {learner.is_active ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {learner.created_at ? format(new Date(learner.created_at), "MMM d, yyyy") : "—"}
           </div>
-          
-          <div className="text-sm text-foreground truncate">{learner.email || '—'}</div>
-          
-          <div className="text-sm text-foreground truncate">{learner.phone_number || '—'}</div>
-          
-          <div className="text-sm text-foreground truncate">{learner.client?.name || '—'}</div>
-          
-          <div>
-            {learner.job_readiness_background_type ? (
-              <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium">
-                {learner.job_readiness_background_type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-              </span>
-            ) : (
-              <span className="text-muted-foreground text-sm">—</span>
-            )}
-          </div>
-          
-          <div>
-            <Badge variant={learner.is_active ? "default" : "secondary"} className={learner.is_active ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}>
-              {learner.is_active ? "Active" : "Inactive"}
-            </Badge>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              {learner.created_at ? format(new Date(learner.created_at), "MMM d, yyyy") : "—"}
-            </div>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="sr-only">Actions</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/learners/${learner.id}`}>View details</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEditLearner(learner)}>
-                    Edit learner
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => onDeleteLearner(learner)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    Delete learner
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                  <Link href={`/learners/${learner.id}`}>View details</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onEditLearner(learner)}>
+                  Edit learner
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onDeleteLearner(learner)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Delete learner
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
+    </div>
   );
 });
 
@@ -354,11 +337,12 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
       </div>
 
       {/* Table Container */}
-      <div className="rounded-lg border bg-white">
+      <div className="rounded-lg border border-border bg-card dark:bg-card/80">
         {/* Table Header */}
-        <div className="grid grid-cols-7 gap-6 px-6 py-4 font-medium bg-transparent border-b text-sm text-muted-foreground">
+        <div className="grid grid-cols-8 gap-6 px-6 py-4 font-medium bg-transparent border-b border-border text-sm text-muted-foreground">
           <div>Name</div>
           <div>Contact Email</div>
+          <div>Temp Password</div>
           <div>Phone</div>
           <div>Client</div>
           <div>Background</div>
