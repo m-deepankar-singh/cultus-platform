@@ -26,6 +26,14 @@ export {
   type ClientsFilters
 } from './useClients';
 
+export {
+  useModulesInfinite,
+  flattenModulesPages,
+  getTotalModulesCount,
+  type Module,
+  type ModulesFilters
+} from './useModules';
+
 // Shared types
 export type { PaginatedResponse } from './useLearners';
 
