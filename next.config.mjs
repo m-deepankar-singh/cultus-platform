@@ -6,18 +6,13 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Output configuration for different platforms
-  output: "standalone", // For Vercel and Cloudflare compatibility
-  
   eslint: {
     ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
-    // Disable next/image optimization for Cloudflare Pages
-    unoptimized: process.env.CLOUDFLARE_PAGES === "true",
     remotePatterns: [
       {
         protocol: 'https',
@@ -47,24 +42,6 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '1mb', // ✅ Reduced from 100mb - only for metadata now
     },
-  },
-  
-  // Conditionally set runtime for API routes based on deployment platform
-  async headers() {
-    if (process.env.CLOUDFLARE_PAGES === "true") {
-      return [
-        {
-          source: "/api/:path*",
-          headers: [
-            {
-              key: "x-middleware-runtime",
-              value: "edge", // Force Edge runtime for Cloudflare Pages
-            },
-          ],
-        },
-      ];
-    }
-    return [];
   },
   webpack: (config) => {
     // Suppress the Supabase realtime-js critical dependency warning

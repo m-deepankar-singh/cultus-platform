@@ -145,7 +145,7 @@ export function ChartCard({
                 labelLine={false}
                 outerRadius={80}
                 dataKey={dataKey}
-                label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />

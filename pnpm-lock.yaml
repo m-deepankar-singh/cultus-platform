@@ -183,7 +183,7 @@ importers:
         specifier: 15.2.4
         version: 15.2.4(@babel/core@7.27.4)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       next-themes:
-        specifier: 0.4.6
+        specifier: latest
         version: 0.4.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       nodemailer:
         specifier: ^7.0.2
@@ -216,7 +216,7 @@ importers:
         specifier: ^1.0.10
         version: 1.0.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       recharts:
-        specifier: 3.0.0
+        specifier: latest
         version: 3.0.0(@types/react@19.1.8)(react-dom@19.1.0(react@19.1.0))(react-is@18.3.1)(react@19.1.0)(redux@5.0.1)
       repomix:
         specifier: ^0.3.7
