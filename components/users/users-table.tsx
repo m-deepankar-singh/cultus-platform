@@ -48,8 +48,8 @@ function isUserActive(user: UserProfile): boolean {
     return false;
   }
   
-  // Check metadata status
-  if (user.user_metadata?.status === 'inactive' || user.app_metadata?.status === 'inactive') {
+  // Check is_active field
+  if (user.is_active === false) {
     return false;
   }
   
