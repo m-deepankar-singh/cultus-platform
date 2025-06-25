@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:workers": "CLOUDFLARE_WORKERS=true next build && npx @opennextjs/cloudflare",
+    "build:workers": "CLOUDFLARE_WORKERS=true next build && npx @opennextjs/cloudflare build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
