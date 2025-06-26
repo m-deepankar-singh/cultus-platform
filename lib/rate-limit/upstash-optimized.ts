@@ -31,9 +31,10 @@ export class UpstashOptimizedRateLimiter {
     
     if (!url || !token) {
       if (!this.isDevelopment) {
-        throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in production');
+        console.warn('Rate limiting disabled: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN not found in production');
+      } else {
+        console.warn('Rate limiting disabled: Upstash Redis credentials not found');
       }
-      console.warn('Rate limiting disabled: Upstash Redis credentials not found');
       return;
     }
     
