@@ -236,12 +236,10 @@ export async function POST(request: Request) {
     // 1. Create auth user first - note: this requires admin privileges
     // For now, we'll create the student record without auth user creation
     
-    let authUser;
-    
     // Note: Creating auth users requires admin privileges
     // For now, we'll generate a UUID and create student record without auth user
     const authUserId = crypto.randomUUID();
-    authUser = { user: { id: authUserId } };
+    const authUser = { user: { id: authUserId } };
     
     // 2. Create the student record using the new auth user's ID
     const { data: newLearner, error: createError } = await supabase
