@@ -3,7 +3,6 @@ import { ClientSchema } from '@/lib/schemas/client';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 // Types for the response data structure
 interface ClientProductAssignment {
@@ -77,16 +76,13 @@ export async function GET(request: NextRequest) {
     // 3. Calculate range for pagination
     const { from, to } = calculatePaginationRange(page, pageSize);
 
-    // Use admin client for enhanced permissions
-    const supabaseAdmin = createAdminClient();
-
     // 🚀 PHASE 1 OPTIMIZATION: Single RPC call replaces multiple queries
     // This replaces:
     // 1. clients count query
     // 2. clients data query with join to products
     // 3. client_product_assignments subquery
     // Total: 3 database calls → 1 database call (67% reduction)
-    const { data: clientsData, error: rpcError } = await supabaseAdmin
+    const { data: clientsData, error: rpcError } = await supabase
       .rpc('get_client_dashboard_data', {
         p_client_id: null, // Get all clients
         p_limit: pageSize,

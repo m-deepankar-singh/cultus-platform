@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import { utils, write } from 'xlsx';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
-import { createClient } from '@/lib/supabase/server';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Define types for the data we're working with

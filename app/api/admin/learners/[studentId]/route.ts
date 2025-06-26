@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { getUserSessionAndRole } from '@/lib/supabase/utils';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
 import { z } from 'zod';
@@ -197,8 +195,7 @@ export async function PATCH(
     
     const updateData = validation.data;
     
-    // 4. Get service client (supabase client from authResult)
-    const serviceClient = await createServiceClient();
+    // 4. Use supabase client from authResult
     
     // 5. Check if the student exists - query the students table directly
     const { data: existingStudent, error: checkError } = await supabase
@@ -233,49 +230,38 @@ export async function PATCH(
     };
     console.log(`[PATCH /api/admin/learners/${studentId}] Update Payload:`, JSON.stringify(updatePayload, null, 2));
 
-    // Start transaction for atomic updates
-    const tx = await serviceClient.rpc('begin_transaction'); // Assuming a custom RPC or use supabase transaction method if available
-
-    try {
-      // Update the student record
-      const { data: updateResult, error: updateError, count } = await serviceClient
-        .from('students')
-        .update(updatePayload)
-        .eq('id', studentId);
-      
-      if (updateError) {
-        throw updateError; // Throw to rollback transaction
-      }
-      
-      if (count === 0) {
-        console.log(`[PATCH /api/admin/learners/${studentId}] No rows updated - possible no change or concurrency issue`);
-        throw new Error('No rows updated');
-      }
-      
-      // Commit transaction
-      await serviceClient.rpc('commit_transaction');
-      
-      // Fetch and return updated student
-      const { data: updatedStudent, error: fetchError } = await serviceClient
-        .from('students')
-        .select(SELECTORS.STUDENT.DETAIL)
-        .eq('id', studentId)
-        .single();
-      
-      if (fetchError) {
-        console.error('Error fetching updated student:', fetchError);
-        return NextResponse.json({ error: "Failed to retrieve updated student data" }, { status: 500 });
-      }
-      
-      return NextResponse.json(updatedStudent);
-    } catch (txError) {
-      console.error('Transaction Error:', txError);
-      await serviceClient.rpc('rollback_transaction');
+    // Update the student record directly (remove transaction logic for simplicity)
+    const { data: updateResult, error: updateError, count } = await supabase
+      .from('students')
+      .update(updatePayload)
+      .eq('id', studentId);
+    
+    if (updateError) {
+      console.error('Error updating student:', updateError);
       return NextResponse.json({
         error: "Failed to update student",
-        details: txError instanceof Error ? txError.message : 'Unknown error during transaction'
+        details: updateError.message
       }, { status: 500 });
     }
+    
+    if (count === 0) {
+      console.log(`[PATCH /api/admin/learners/${studentId}] No rows updated - possible no change or concurrency issue`);
+      return NextResponse.json({ error: "No rows updated" }, { status: 404 });
+    }
+    
+    // Fetch and return updated student
+    const { data: updatedStudent, error: fetchError } = await supabase
+      .from('students')
+      .select(SELECTORS.STUDENT.DETAIL)
+      .eq('id', studentId)
+      .single();
+    
+    if (fetchError) {
+      console.error('Error fetching updated student:', fetchError);
+      return NextResponse.json({ error: "Failed to retrieve updated student data" }, { status: 500 });
+    }
+    
+    return NextResponse.json(updatedStudent);
   } catch (error) {
     console.error('Unexpected error in PATCH /api/admin/learners/[studentId]:', error);
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
@@ -312,10 +298,7 @@ export async function DELETE(
       }, { status: 400 });
     }
 
-    // 3. Get service client (supabase client from authResult)
-    const serviceClient = await createServiceClient();
-    
-    // 4. Check if the student exists
+    // 3. Check if the student exists
     const { data: existingStudent, error: checkError } = await supabase
       .from('students')
       .select('id')
@@ -327,21 +310,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
     
-    // 5. Start a transaction - depends on Supabase's transaction support
+    // 4. Delete student data (Note: auth user deletion requires admin privileges)
     try {
       // First delete the student record
-      const { error: deleteStudentError } = await serviceClient
+      const { error: deleteStudentError } = await supabase
         .from('students')
         .delete()
         .eq('id', studentId);
       
       if (deleteStudentError) {
-        throw deleteStudentError;
+        console.error('Error deleting student record:', deleteStudentError);
+        return NextResponse.json({
+          error: "Failed to delete student record",
+          details: deleteStudentError.message
+        }, { status: 500 });
       }
       
       // Delete all progress data associated with the student
       // For student_module_progress
-      const { error: deleteProgressError } = await serviceClient
+      const { error: deleteProgressError } = await supabase
         .from('student_module_progress')
         .delete()
         .eq('student_id', studentId);
@@ -351,12 +338,9 @@ export async function DELETE(
         // Consider whether this should be a hard failure
       }
       
-      // Delete the auth user
-      const { error: deleteAuthError } = await serviceClient.auth.admin.deleteUser(studentId);
-      
-      if (deleteAuthError) {
-        throw deleteAuthError;
-      }
+      // Note: Auth user deletion would require service role or admin client
+      // For now, we'll just delete the student record
+      // To delete auth user, you would need admin privileges
       
       return NextResponse.json({ message: "Student successfully deleted" });
     } catch (txError) {
