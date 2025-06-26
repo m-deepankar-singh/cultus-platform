@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin'; // Adjust path
+import { createAdminClient } from '@/lib/supabase/admin'; // Only needed for POST (user creation)
 import { CreateUserSchema } from '@/lib/schemas/user'; // Adjust path
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -23,8 +23,7 @@ export async function GET(request: NextRequest) {
     const roleFilter = searchParams.get('role');
     const clientIdFilter = searchParams.get('clientId');
 
-    // Use admin client to bypass RLS completely for admin operations
-    const supabaseAdmin = createAdminClient();
+    // Use authenticated client - api-auth already verified Admin role
     
     // Calculate range for pagination
     const { from, to } = calculatePaginationRange(page, pageSize);
@@ -35,7 +34,7 @@ export async function GET(request: NextRequest) {
     // 2. profiles data query with join
     // 3. auth.users query
     // Total: 3 database calls → 1 database call (67% reduction)
-    const { data: usersData, error: rpcError } = await supabaseAdmin
+    const { data: usersData, error: rpcError } = await authResult.supabase
       .rpc('get_users_with_auth_details', {
         p_search_query: searchQuery,
         p_role_filter: roleFilter,

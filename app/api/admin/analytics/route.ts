@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/auth/api-auth";
-import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,8 +17,8 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get('dateTo');
     const clientId = searchParams.get('clientId');
 
-    // Use admin client for analytics access
-    const supabaseAdmin = createAdminClient();
+    // Use the authenticated supabase client (no need for admin client)
+    // The api-auth already ensures the user has Admin/Staff role
     
     // 🚀 PHASE 1 OPTIMIZATION: Single RPC call replaces multiple analytics queries
     // This replaces multiple separate queries for:
@@ -31,7 +30,7 @@ export async function GET(request: NextRequest) {
     // 6. Score distributions
     // 7. Recent activity queries
     // Total: 7+ database calls → 1 database call (85%+ reduction)
-    const { data: analyticsData, error: rpcError } = await supabaseAdmin
+    const { data: analyticsData, error: rpcError } = await supabase
       .rpc('get_analytics_dashboard_data', {
         p_date_from: dateFrom || undefined,
         p_date_to: dateTo || undefined,
