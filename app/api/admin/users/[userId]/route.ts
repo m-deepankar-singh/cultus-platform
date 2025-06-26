@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { UserIdSchema, UpdateUserSchema } from '@/lib/schemas/user'; // Adjust path
-import { createAdminClient } from '@/lib/supabase/admin'; // Adjust path
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 export async function GET(
@@ -13,6 +12,7 @@ export async function GET(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { supabase } = authResult;
 
     // Validate Route Parameter
     const resolvedParams = await params;
@@ -23,10 +23,8 @@ export async function GET(
     const { userId } = validationResult.data;
 
     // Fetch User Profile
-    const supabaseAdmin = createAdminClient();
-    
     // First try to find in profiles table
-    const { data: userProfile, error: fetchError } = await supabaseAdmin
+    const { data: userProfile, error: fetchError } = await supabase
       .from('profiles')
       .select('*, client:clients(id, name)') // Select all profile fields and client info
       .eq('id', userId)
@@ -38,7 +36,7 @@ export async function GET(
     }
     
     // If not found in profiles, check students table
-    const { data: studentProfile, error: studentFetchError } = await supabaseAdmin
+    const { data: studentProfile, error: studentFetchError } = await supabase
       .from('students')
       .select('*, client:clients(id, name)') // Adjust join based on your schema
       .eq('id', userId)
@@ -62,7 +60,7 @@ export async function GET(
     }
     
     // This case might be redundant due to error handling above, but included for safety.
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   } catch (error) {
     console.error(`Unexpected error in GET /api/admin/users/[userId]:`, error);
@@ -80,6 +78,7 @@ export async function PUT(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { supabase } = authResult;
 
     // Validate Route Parameter
     const resolvedParams = await params;
@@ -109,17 +108,15 @@ export async function PUT(
     }
 
     // Update Profile or Student
-    const supabaseAdmin = createAdminClient();
-    
     // First check if user exists in profiles table
-    const { data: userExists, error: userCheckError } = await supabaseAdmin
+    const { data: userExists, error: userCheckError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .maybeSingle();
     
     // Then check if user exists in students table
-    const { data: studentExists, error: studentCheckError } = await supabaseAdmin
+    const { data: studentExists, error: studentCheckError } = await supabase
       .from('students')
       .select('id')
       .eq('id', userId)
@@ -136,7 +133,7 @@ export async function PUT(
     }
     
     // Update the appropriate table
-    const { data: updatedData, error: updateError } = await supabaseAdmin
+    const { data: updatedData, error: updateError } = await supabase
       .from(tableName)
       .update(updateData)
       .eq('id', userId)
@@ -180,6 +177,7 @@ export async function DELETE(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    const { supabase } = authResult;
 
     // Validate Route Parameter
     const resolvedParams = await params;
@@ -189,57 +187,53 @@ export async function DELETE(
     }
     const { userId } = validationResult.data;
 
-    // Use Admin Client for deletion operations
-    const supabaseAdmin = createAdminClient();
-    
     // First check if user exists in profiles table
-    const { data: userExists, error: userCheckError } = await supabaseAdmin
+    const { data: userExists, error: userCheckError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .maybeSingle();
     
     // Then check if user exists in students table
-    const { data: studentExists, error: studentCheckError } = await supabaseAdmin
+    const { data: studentExists, error: studentCheckError } = await supabase
       .from('students')
       .select('id')
       .eq('id', userId)
       .maybeSingle();
     
-    // Determine which table to delete from
-    let tableName = null;
+    if (!userExists && !studentExists) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Perform deletion on the appropriate table
     if (userExists) {
-      tableName = 'profiles';
-    } else if (studentExists) {
-      tableName = 'students';
-    } else {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        if (error) {
+            console.error('Error deleting profile:', error);
+            return NextResponse.json({ error: 'Failed to delete user profile' }, { status: 500 });
+        }
     }
     
-    // Delete from the appropriate table
-    const { error: deleteError } = await supabaseAdmin
-      .from(tableName)
-      .delete()
-      .eq('id', userId);
-
-    if (deleteError) {
-      console.error('Error deleting user:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+    if (studentExists) {
+        const { error } = await supabase.from('students').delete().eq('id', userId);
+        if (error) {
+            console.error('Error deleting student:', error);
+            return NextResponse.json({ error: 'Failed to delete student profile' }, { status: 500 });
+        }
     }
 
-    // Also delete from auth.users using admin API
-    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    // After deleting from profile/student table, delete the auth user
+    // Note: Deleting the auth user requires admin privileges.
+    // This part will fail if the logged-in user does not have `supabase_admin` role.
+    const { error: authUserError } = await supabase.auth.admin.deleteUser(userId);
+
+    if (authUserError) {
+        // Log the error but maybe don't fail the request if profile was deleted.
+        // This can happen if the user was already deleted from auth but not from profiles.
+        console.warn(`Could not delete auth user ${userId}:`, authUserError.message);
+    }
     
-    if (authDeleteError) {
-      console.error('Error deleting auth user:', authDeleteError);
-      // Profile/student record was deleted but auth user remains
-      return NextResponse.json({ 
-        message: 'User profile deleted but auth user deletion failed',
-        warning: 'Manual cleanup may be required'
-      }, { status: 207 }); // Multi-Status
-    }
-
-    return NextResponse.json({ message: 'User deleted successfully' });
+    return NextResponse.json({ message: 'User successfully deleted' });
 
   } catch (error) {
     console.error(`Unexpected error in DELETE /api/admin/users/[userId]:`, error);

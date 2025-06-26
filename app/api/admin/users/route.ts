@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin'; // Only needed for POST (user creation)
+import { createAdminClient } from '@/lib/supabase/admin';
 import { CreateUserSchema } from '@/lib/schemas/user'; // Adjust path
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
