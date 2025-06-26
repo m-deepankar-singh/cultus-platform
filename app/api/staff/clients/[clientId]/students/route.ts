@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { EnrollStudentSchema } from '@/lib/schemas/enrollment';
 import { USER_ROLES } from '@/lib/schemas/user';
@@ -65,12 +64,12 @@ export async function POST(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-        // JWT-based authentication (0 database queries)
+    // JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequest(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims } = authResult;
+    const { user, claims, supabase } = authResult;
 
     // Get role and client_id from JWT claims
     const userRole = claims.user_role;
@@ -110,10 +109,10 @@ export async function POST(
     const { email, full_name, send_invite } = bodyValidation.data;
 
     // 5. Core Enrollment Logic
-    const supabaseAdmin = createAdminClient();
+    // Use supabase from authResult
 
     // First, check if a profile with this email already exists
-    const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
+    const { data: existingProfile, error: profileCheckError } = await supabase
       .from('profiles')
       .select('id, client_id, is_active, role')
       .eq('email', email)
@@ -143,7 +142,7 @@ export async function POST(
         } else {
           // Inactive profile for this client - reactivate
           console.log(`POST /students: Reactivating inactive user ${userId} for client ${validatedClientId}`);
-          const { data: updatedProfile, error: updateError } = await supabaseAdmin
+          const { data: updatedProfile, error: updateError } = await supabase
             .from('profiles')
             .update({ is_active: true, updated_at: new Date().toISOString() })
             .eq('id', userId)
@@ -177,7 +176,7 @@ export async function POST(
         if (send_invite) {
           const redirectTo = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/confirm`;
           console.log(`POST /students: Inviting user ${email} with redirect to ${redirectTo}`);
-          const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+          const { data, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
             data: { full_name: full_name },
             redirectTo: redirectTo,
           });
@@ -190,7 +189,7 @@ export async function POST(
         } else {
           // Direct creation
           console.warn(`POST /students: Creating user ${email} directly without invite.`);
-          const { data, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          const { data, error: createError } = await supabase.auth.admin.createUser({
             email: email,
             email_confirm: true, // Auto-confirm for simplicity, adjust if needed
             user_metadata: { full_name: full_name },
@@ -228,7 +227,7 @@ export async function POST(
       }
 
       // --- If auth user creation/invite succeeded, proceed to create profile --- 
-      const { data: newProfile, error: insertError } = await supabaseAdmin
+      const { data: newProfile, error: insertError } = await supabase
         .from('profiles')
         .insert({
           id: userId, // Use the userId obtained from successful invite/create
@@ -247,7 +246,7 @@ export async function POST(
         // Consider deleting the created auth user if profile insertion fails
         console.log(`POST /students: Attempting to delete auth user ${userId} due to profile creation failure.`);
         try {
-           await supabaseAdmin.auth.admin.deleteUser(userId);
+           await supabase.auth.admin.deleteUser(userId);
            console.log(`POST /students: Successfully deleted auth user ${userId}.`);
         } catch (deleteError: any) {
            console.error(`POST /students: CRITICAL - Failed to delete auth user ${userId} after profile creation error:`, deleteError);
@@ -330,8 +329,7 @@ if (!studentIdValidation.success) {
     }
 
     // 4. Perform Unenrollment (Update Student Table)
-    const supabaseAdmin = createAdminClient();
-    const { data: updatedStudent, error: updateError, count } = await supabaseAdmin
+    const { data: updatedStudent, error: updateError, count } = await supabase
       .from('students') // Changed from profiles to students
       .update({
         is_active: false, // Mark as inactive in the students table
@@ -342,7 +340,7 @@ if (!studentIdValidation.success) {
       .eq('client_id', validatedClientId) // Ensure they belong to this client
       // .eq('role', USER_ROLES.find(r => r === 'Student')) // Role check not needed for students table
       .select('id') // Select minimal data to confirm update
-      .maybeSingle(); // Handle case where student/client combo not found
+      .maybeSingle();
 
     if (updateError) {
       console.error(`DELETE /students: Database error unenrolling student ${validatedStudentId}:`, updateError);
@@ -426,7 +424,7 @@ export async function PATCH(
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
-    const { user, claims } = authResult;
+    const { user, claims, supabase } = authResult;
 
     // Get role and client_id from JWT claims
     const userRole = claims.user_role;
@@ -442,8 +440,7 @@ export async function PATCH(
     }
 
     // 4. Check if student exists and belongs to this client
-    const supabaseAdmin = createAdminClient();
-    const { data: existingStudent, error: fetchError } = await supabaseAdmin
+    const { data: existingStudent, error: fetchError } = await supabase
       .from('students') // Changed from profiles to students
       .select('id, is_active')
       .eq('id', validatedStudentId)
@@ -462,7 +459,7 @@ export async function PATCH(
     }
 
     // 5. Update student status
-    const { data: updatedStudent, error: updateError } = await supabaseAdmin
+    const { data: updatedStudent, error: updateError } = await supabase
       .from('students') // Changed from profiles to students
       .update({
         is_active: is_active,

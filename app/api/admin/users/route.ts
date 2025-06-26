@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { CreateUserSchema } from '@/lib/schemas/user'; // Adjust path
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
@@ -89,8 +88,10 @@ export async function POST(request: Request) {
     }
     const { email, password, role, client_id, full_name } = validationResult.data;
 
-    // Create Auth User (using Admin Client)
+    // Dynamically import and create the admin client only when needed
+    const { createAdminClient } = await import('@/lib/supabase/admin');
     const supabaseAdmin = createAdminClient();
+
     const { data: authData, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
