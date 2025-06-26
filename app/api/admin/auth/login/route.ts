@@ -1,10 +1,23 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { AdminLoginSchema } from '@/lib/schemas/auth';
+import { RATE_LIMIT_CONFIGS, rateLimitGuard } from '@/lib/rate-limit';
 // Using the proper @supabase/ssr package per project requirements
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Check rate limit before processing login attempt
+    const rateLimitResponse = await rateLimitGuard(
+      request,
+      undefined, // No user ID yet since this is login
+      undefined, // No user role yet
+      RATE_LIMIT_CONFIGS.AUTH_LOGIN
+    );
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     // Parse request body first
     const body = await request.json();
 

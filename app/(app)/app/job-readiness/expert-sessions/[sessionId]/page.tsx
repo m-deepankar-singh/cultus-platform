@@ -129,10 +129,8 @@ export default function ExpertSessionViewerPage() {
   }) => {
     try {
       const result = await updateProgressMutation.mutateAsync(event)
-      console.log('Progress updated successfully:', result)
       return result
     } catch (error) {
-      console.error('Failed to update expert session progress:', error)
       throw error
     }
   }
@@ -350,9 +348,7 @@ export default function ExpertSessionViewerPage() {
             session={session}
             onProgressUpdate={(event) => {
               updateProgressMutation.mutate(event, {
-                onSuccess: (data) => {
-                  console.log('Progress updated successfully:', data)
-                },
+                onSuccess: (data) => {},
                 onError: (error) => {
                   console.error('Failed to update expert session progress:', error)
                 }

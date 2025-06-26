@@ -74,14 +74,7 @@ export default function AssessmentPlayerPage() {
     const data = assessmentPageData as AssessmentPageData;
     
     try {
-      const isResume = !!data.in_progress_attempt;
       router.push(`/app/assessment/${moduleId}/take`);
-      
-      if (isResume) {
-        console.log("Resuming assessment:", data.assessment.name);
-      } else {
-        console.log("Starting assessment:", data.assessment.name);
-      }
     } catch (err) {
       console.error("Error starting assessment:", err);
     }

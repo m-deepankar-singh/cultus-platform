@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeInterview } from './analyze-function';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
-    // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    // JWT-based authentication with rate limiting (AI cost protection)
+    const authResult = await authenticateApiRequestWithRateLimit(
+      request,
+      ['student'],
+      RATE_LIMIT_CONFIGS.AI_INTERVIEW_ANALYSIS
+    );
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

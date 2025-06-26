@@ -108,20 +108,6 @@ export async function PATCH(
     }
 
     // Log the override action for audit purposes
-    console.log('Admin progress override completed:', {
-      admin_user_id: user.id,
-      student_id: studentId,
-      previous_values: {
-        star_level: updatedStudent.job_readiness_star_level,
-        tier: updatedStudent.job_readiness_tier
-      },
-      new_values: {
-        job_readiness_star_level: processedStarLevel || updatedStudent.job_readiness_star_level,
-        job_readiness_tier: job_readiness_tier || updatedStudent.job_readiness_tier
-      },
-      override_reason: override_reason,
-      timestamp: new Date().toISOString()
-    });
 
     // Return clear information about the action taken
     return NextResponse.json({

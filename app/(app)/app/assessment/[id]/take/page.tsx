@@ -212,7 +212,6 @@ export default function TakeAssessmentPage() {
         saved_answers: answers,
         remaining_time_seconds: timeRemaining || undefined
       });
-      console.log('Assessment progress auto-saved');
     } catch (err) {
       console.error('Error auto-saving progress:', err);
     }

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 /**
  * GET /api/auth/me
@@ -7,10 +8,14 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
  * Returns information about the currently authenticated user
  * including their profile data and role from JWT claims.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // JWT-based authentication (0 database queries for basic user info)
-    const authResult = await authenticateApiRequest();
+    // JWT-based authentication with rate limiting (0 database queries for basic user info)
+    const authResult = await authenticateApiRequestWithRateLimit(
+      request,
+      undefined, // No role restrictions
+      RATE_LIMIT_CONFIGS.AUTH_VALIDATION
+    );
     if ('error' in authResult) {
       return NextResponse.json({
         user: null,

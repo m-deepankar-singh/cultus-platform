@@ -56,7 +56,6 @@ export async function GET(
         // Differentiate between DB error and not found/not a student
         const status = profileError && profileError.code !== 'PGRST116' ? 500 : 404; // PGRST116: Row not found
         const error = status === 404 ? 'Learner not found or is not a student' : 'Database error fetching profile';
-        if(status === 500) console.error('Profile Fetch Error:', profileError);
         return new NextResponse(JSON.stringify({ error }), {
             status,
             headers: { 'Content-Type': 'application/json' },
@@ -71,7 +70,6 @@ export async function GET(
       .single();
 
     if (studentError) {
-      console.error('Student Data Fetch Error:', studentError);
       // Continue with profile data even if student data fetch fails
     }
 
@@ -84,7 +82,6 @@ export async function GET(
         .eq('student_id', studentId);
 
     if (progressError) {
-        console.error('Progress Fetch Error:', progressError);
         // Decide if this should be a hard error or just return profile without progress
         return new NextResponse(JSON.stringify({ error: 'Database error fetching course progress' }), {
             status: 500,
@@ -110,7 +107,6 @@ export async function GET(
     return NextResponse.json(learnerDetails);
 
   } catch (error) {
-    console.error('API Error:', error);
     let errorMessage = 'Internal Server Error';
     if (error instanceof Error) {
         errorMessage = error.message;
@@ -205,7 +201,6 @@ export async function PATCH(
       .single();
     
     if (checkError || !existingStudent) {
-      console.error('Error checking if student exists:', checkError);
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
     
@@ -223,12 +218,10 @@ export async function PATCH(
     }
     
     // 7. Update the student
-    console.log(`[PATCH /api/admin/learners/${studentId}] Preparing update. User ID: ${user.id}`);
     const updatePayload = {
       ...updateData,
       updated_at: new Date().toISOString()
     };
-    console.log(`[PATCH /api/admin/learners/${studentId}] Update Payload:`, JSON.stringify(updatePayload, null, 2));
 
     // Update the student record directly (remove transaction logic for simplicity)
     const { data: updateResult, error: updateError, count } = await supabase
@@ -237,7 +230,6 @@ export async function PATCH(
       .eq('id', studentId);
     
     if (updateError) {
-      console.error('Error updating student:', updateError);
       return NextResponse.json({
         error: "Failed to update student",
         details: updateError.message
@@ -245,7 +237,6 @@ export async function PATCH(
     }
     
     if (count === 0) {
-      console.log(`[PATCH /api/admin/learners/${studentId}] No rows updated - possible no change or concurrency issue`);
       return NextResponse.json({ error: "No rows updated" }, { status: 404 });
     }
     
@@ -257,7 +248,6 @@ export async function PATCH(
       .single();
     
     if (fetchError) {
-      console.error('Error fetching updated student:', fetchError);
       return NextResponse.json({ error: "Failed to retrieve updated student data" }, { status: 500 });
     }
     
@@ -306,7 +296,6 @@ export async function DELETE(
       .single();
     
     if (checkError || !existingStudent) {
-      console.error('Error checking if student exists:', checkError);
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
     
@@ -319,7 +308,6 @@ export async function DELETE(
         .eq('id', studentId);
       
       if (deleteStudentError) {
-        console.error('Error deleting student record:', deleteStudentError);
         return NextResponse.json({
           error: "Failed to delete student record",
           details: deleteStudentError.message
@@ -334,7 +322,6 @@ export async function DELETE(
         .eq('student_id', studentId);
       
       if (deleteProgressError) {
-        console.warn('Error deleting student module progress:', deleteProgressError);
         // Consider whether this should be a hard failure
       }
       
@@ -344,7 +331,6 @@ export async function DELETE(
       
       return NextResponse.json({ message: "Student successfully deleted" });
     } catch (txError) {
-      console.error('Error during student deletion:', txError);
       return NextResponse.json({
         error: "Failed to delete student",
         details: txError instanceof Error ? txError.message : 'Unknown error during deletion'

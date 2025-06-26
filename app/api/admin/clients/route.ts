@@ -90,7 +90,6 @@ export async function GET(request: NextRequest) {
       });
 
     if (rpcError) {
-      console.error('Error fetching clients via RPC:', rpcError);
       return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });
     }
 
@@ -127,7 +126,6 @@ export async function GET(request: NextRequest) {
 
     // 7. Performance monitoring
     const responseTime = Date.now() - startTime;
-    console.log(`[PHASE 1 OPTIMIZED] GET /api/admin/clients completed in ${responseTime}ms (Single RPC call)`);
 
     // 8. Return paginated client list with dashboard data
     const paginatedResponse = createPaginatedResponse(
@@ -140,7 +138,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(paginatedResponse);
     
   } catch (error) {
-    console.error('Unexpected error in GET /api/admin/clients:', error);
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
 }
@@ -173,14 +170,12 @@ export async function POST(request: Request) {
     try {
         body = await request.json();
     } catch (parseError) {
-        console.error('JSON Parsing Error:', parseError);
         return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
     
     const validationResult = ClientSchema.safeParse(body);
 
     if (!validationResult.success) {
-      console.error('Validation Error:', validationResult.error.errors);
       return NextResponse.json({ error: 'Invalid input', details: validationResult.error.flatten() }, { status: 400 });
     }
 
@@ -194,19 +189,16 @@ export async function POST(request: Request) {
       .single();
 
     if (dbError) {
-      console.error('Supabase DB Error (Insert):', dbError);
       return NextResponse.json({ error: 'Failed to create client', details: dbError.message }, { status: 500 });
     }
 
     // 4. Performance monitoring
     const responseTime = Date.now() - startTime;
-    console.log(`[OPTIMIZED] POST /api/admin/clients completed in ${responseTime}ms (JWT auth)`);
 
     // 5. Return the newly created client
     return NextResponse.json(newClient, { status: 201 });
 
   } catch (error) {
-    console.error('POST /api/admin/clients Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 } 

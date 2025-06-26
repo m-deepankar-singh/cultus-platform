@@ -1,10 +1,15 @@
-import { NextResponse } from "next/server";
-import { authenticateApiRequest } from "@/lib/auth/api-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { authenticateApiRequestWithRateLimit } from "@/lib/auth/api-auth";
+import { RATE_LIMIT_CONFIGS } from "@/lib/rate-limit";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    // JWT-based authentication with rate limiting (operational protection)
+    const authResult = await authenticateApiRequestWithRateLimit(
+      request,
+      ['Admin', 'Staff'],
+      RATE_LIMIT_CONFIGS.ADMIN_EXPORT
+    );
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

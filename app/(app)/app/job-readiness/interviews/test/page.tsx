@@ -37,7 +37,6 @@ function TestInterviewFlow() {
   };
 
   const handleInterviewComplete = () => {
-    console.log('Interview completed! Redirecting to results...');
     // In real implementation, this would redirect to results page
   };
 

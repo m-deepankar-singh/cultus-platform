@@ -129,9 +129,6 @@ export async function getOptimizedAnalytics(
       return { error: 'Failed to retrieve analytics data.' };
     }
 
-    // Log performance metrics
-    console.log(`Analytics loaded in ${loadTime}ms`);
-    
     // Determine if this was a cache hit (heuristic: very fast response)
     const cached = loadTime < 100;
 

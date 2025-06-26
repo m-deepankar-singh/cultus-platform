@@ -20,7 +20,6 @@ export async function deleteFileFromR2(fileUrl: string, uploadType?: string) {
 
     // Note: File deletion from R2 temporarily disabled during S3 migration
     // TODO: Implement S3 file deletion in future phase
-    console.log('File deletion temporarily disabled for:', fileUrl);
     const success = true; // Assume success for now
     
     if (success) {

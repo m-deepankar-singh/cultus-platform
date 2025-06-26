@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadService } from '@/lib/r2/simple-upload-service';
 import { UploadError } from '@/lib/r2/upload-errors';
+import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // JWT-based authentication with rate limiting (bandwidth protection)
+    const authResult = await authenticateApiRequestWithRateLimit(
+      request,
+      ['Admin', 'Staff'],
+      RATE_LIMIT_CONFIGS.UPLOAD_IMAGE
+    );
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     

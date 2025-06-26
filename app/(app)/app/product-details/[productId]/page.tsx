@@ -241,7 +241,6 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
                      
                      // 🚀 ENHANCEMENT: Update database if status is not already 'Completed'
                      if (progress.status !== 'Completed') {
-                       console.log(`Course ${module.id} should be completed but is marked as ${progress.status}. Updating database...`);
                        // Trigger a silent update to fix the database status
                        supabase
                          .from('student_module_progress')
@@ -255,8 +254,6 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
                          .then(({ error }) => {
                            if (error) {
                              console.error('Failed to update course completion status:', error);
-                           } else {
-                             console.log(`Successfully updated course ${module.id} to completed status`);
                            }
                          });
                      }

@@ -197,7 +197,6 @@ export default function JobReadinessPromotionExamsPage() {
   // Handle view attempt details
   const handleViewAttemptDetails = (attempt: JrPromotionExamAttempt) => {
     // TODO: Implement attempt details modal/page
-    console.log('View attempt details:', attempt)
     toast({
       title: "Feature Coming Soon",
       description: "Detailed attempt view will be available soon.",

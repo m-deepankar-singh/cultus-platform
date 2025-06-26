@@ -48,13 +48,9 @@ export default function InterviewsPage() {
   };
 
   const handleInterviewComplete = async (submissionId?: string) => {
-    console.log('🎯 Interview completed callback received with submission ID:', submissionId);
-    
     // Force refresh interview status to get the latest submission data
     try {
-      console.log('🔄 Force refreshing interview status...');
       await forceRefreshInterviewStatus();
-      console.log('✅ Cache invalidated and refreshed successfully');
       
       // Small delay to ensure data is fresh
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -63,7 +59,6 @@ export default function InterviewsPage() {
     }
     
     // Redirect back to interviews page instead of feedback
-    console.log('🔗 Navigating back to interviews page');
     window.location.href = `/app/job-readiness/interviews`;
   };
 

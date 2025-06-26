@@ -78,7 +78,6 @@ export async function PATCH(
       .eq('id', submissionId);
 
     if (updateError) {
-      console.error('Error updating submission:', updateError);
       return NextResponse.json(
         { error: 'Failed to update submission' },
         { status: 500 }
@@ -87,7 +86,7 @@ export async function PATCH(
 
     // Note: Admin action logging would go here if admin_action_logs table existed
     // For now, the action is logged in the analysis_result field
-    console.log(`Admin ${user.id} manually reviewed submission ${submissionId} with status ${status}`);
+    
 
     // If the status is 'Approved', trigger tier promotion if applicable
     if (status === 'Approved') {
@@ -100,7 +99,6 @@ export async function PATCH(
     });
 
   } catch (error) {
-    console.error('Error in manual review:', error);
     return NextResponse.json(
       { error: 'Failed to process manual review' },
       { status: 500 }
@@ -121,7 +119,6 @@ async function handleApprovedInterview(studentId: string, supabase: any): Promis
       .single();
     
     if (error || !student) {
-      console.error('Error fetching student tier:', error);
       return;
     }
     
@@ -132,10 +129,7 @@ async function handleApprovedInterview(studentId: string, supabase: any): Promis
         .from('students')
         .update({ job_readiness_tier: 'FOUR' })
         .eq('id', studentId);
-      
-      console.log(`Student ${studentId} promoted from tier THREE to FOUR`);
     }
   } catch (error) {
-    console.error('Error handling approved interview:', error);
   }
 } 

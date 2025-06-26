@@ -265,8 +265,6 @@ export async function PUT(
         sequence: q.sequence
       }));
       
-      console.log('Inserting associations:', associations);
-      
       const { error: insertError } = await supabase
         .from('assessment_module_questions')
         .insert(associations);

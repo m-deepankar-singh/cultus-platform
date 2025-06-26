@@ -1,12 +1,25 @@
 // This login route is intentionally left as-is since it's the endpoint that creates the JWT authentication session
 // No JWT authentication optimization needed here as this endpoint handles the login process itself
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { AppLoginSchema } from '@/lib/schemas/auth';
+import { RATE_LIMIT_CONFIGS, rateLimitGuard } from '@/lib/rate-limit';
 // Using the proper @supabase/ssr package per project requirements
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Check rate limit before processing login attempt
+    const rateLimitResponse = await rateLimitGuard(
+      request,
+      undefined, // No user ID yet since this is login
+      undefined, // No user role yet
+      RATE_LIMIT_CONFIGS.AUTH_LOGIN
+    );
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     // Create Supabase client
     const supabase = await createClient();
 

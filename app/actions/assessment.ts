@@ -281,8 +281,6 @@ export async function submitAssessmentAction(
             correct_answers: correctAnswers,
             submitted_at: submissionTime,
           });
-          
-        console.log('Successfully inserted assessment submission using admin client');
       } catch (adminError) {
         console.error('Failed to insert using admin client:', adminError);
         // Not a fatal error - assessment_progress was recorded successfully

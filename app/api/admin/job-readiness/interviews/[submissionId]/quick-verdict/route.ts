@@ -91,7 +91,6 @@ export async function PATCH(
 
     // Note: Admin action logging would go here if admin_action_logs table existed
     // For now, the action is logged in the analysis_result field
-    console.log(`Admin ${user.id} changed verdict for submission ${submissionId} to ${admin_verdict_override}`);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateProject } from '@/lib/ai/project-generator';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 /**
  * Generates a real-world project for a student
@@ -19,8 +20,12 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    // JWT-based authentication with rate limiting (AI cost protection)
+    const authResult = await authenticateApiRequestWithRateLimit(
+      request,
+      ['student'],
+      RATE_LIMIT_CONFIGS.AI_PROJECT_GENERATION
+    );
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

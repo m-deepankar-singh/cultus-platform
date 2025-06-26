@@ -33,7 +33,6 @@ export async function GET(request: Request, context: { params: Promise<{ clientI
     // 3. Validate route parameter
     const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
     if (!validationResult.success) {
-        console.error('Validation Error (clientId):', validationResult.error.errors);
         return NextResponse.json({ error: 'Invalid Client ID format', details: validationResult.error.flatten() }, { status: 400 });
     }
     const { clientId } = validationResult.data;
@@ -50,7 +49,6 @@ export async function GET(request: Request, context: { params: Promise<{ clientI
         if (dbError.code === 'PGRST116') {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });
         }
-        console.error('Supabase DB Error (Fetch Client):', dbError);
         return NextResponse.json({ error: 'Failed to fetch client', details: dbError.message }, { status: 500 });
     }
 
@@ -60,15 +58,13 @@ export async function GET(request: Request, context: { params: Promise<{ clientI
 
     // 5. Performance monitoring
     const responseTime = Date.now() - startTime;
-    console.log(`[OPTIMIZED] GET /api/admin/clients/${clientId} completed in ${responseTime}ms (JWT auth + selective fields)`);
 
     // 6. Return client data
     return NextResponse.json(client, { status: 200 });
 
   } catch (error) {
-    console.error('GET /api/admin/clients/[clientId] Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
 }
 
 /**
@@ -101,7 +97,6 @@ export async function PUT(request: Request, context: { params: Promise<{ clientI
         // 3. Validate route parameter
         const paramValidation = ClientIdSchema.safeParse({ clientId: params.clientId });
         if (!paramValidation.success) {
-            console.error('Validation Error (clientId):', paramValidation.error.errors);
             return NextResponse.json({ error: 'Invalid Client ID format', details: paramValidation.error.flatten() }, { status: 400 });
         }
         const { clientId } = paramValidation.data;
@@ -111,13 +106,11 @@ export async function PUT(request: Request, context: { params: Promise<{ clientI
         try {
             body = await request.json();
         } catch (parseError) {
-            console.error('JSON Parsing Error:', parseError);
             return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
         }
 
         const bodyValidation = UpdateClientSchema.safeParse(body);
         if (!bodyValidation.success) {
-            console.error('Validation Error (body):', bodyValidation.error.errors);
             return NextResponse.json({ error: 'Invalid input', details: bodyValidation.error.flatten() }, { status: 400 });
         }
         const updateData = bodyValidation.data;
@@ -139,7 +132,6 @@ export async function PUT(request: Request, context: { params: Promise<{ clientI
             if (dbError.code === 'PGRST116') {
                 return NextResponse.json({ error: 'Client not found' }, { status: 404 });
             }
-            console.error('Supabase DB Error (Update Client):', dbError);
             return NextResponse.json({ error: 'Failed to update client', details: dbError.message }, { status: 500 });
         }
 
@@ -149,13 +141,11 @@ export async function PUT(request: Request, context: { params: Promise<{ clientI
 
         // 6. Performance monitoring
         const responseTime = Date.now() - startTime;
-        console.log(`[OPTIMIZED] PUT /api/admin/clients/${clientId} completed in ${responseTime}ms (JWT auth + selective fields)`);
 
         // 7. Return the updated client
         return NextResponse.json(updatedClient, { status: 200 });
 
     } catch (error) {
-        console.error('PUT /api/admin/clients/[clientId] Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -189,7 +179,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ clie
         // 3. Validate route parameter
         const validationResult = ClientIdSchema.safeParse({ clientId: params.clientId });
         if (!validationResult.success) {
-            console.error('Validation Error (clientId):', validationResult.error.errors);
             return NextResponse.json({ error: 'Invalid Client ID format', details: validationResult.error.flatten() }, { status: 400 });
         }
         const { clientId } = validationResult.data;
@@ -201,19 +190,16 @@ export async function DELETE(request: Request, context: { params: Promise<{ clie
             .eq('id', clientId);
 
         if (dbError) {
-            console.error('Supabase DB Error (Delete Client):', dbError);
             return NextResponse.json({ error: 'Failed to delete client', details: dbError.message }, { status: 500 });
         }
 
         // 5. Performance monitoring
         const responseTime = Date.now() - startTime;
-        console.log(`[OPTIMIZED] DELETE /api/admin/clients/${clientId} completed in ${responseTime}ms (JWT auth)`);
 
         // 6. Return success (204 No Content)
         return new Response(null, { status: 204 });
 
     } catch (error) {
-        console.error('DELETE /api/admin/clients/[clientId] Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 } 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { hasAnyRole, getClaimsFromToken, isTokenExpired, CustomJWTClaims } from './jwt-utils';
 import { User } from '@supabase/supabase-js';
+import { rateLimitGuard, type RateLimitRule } from '@/lib/rate-limit';
 
 export interface ApiAuthResult {
   user: User;
@@ -116,6 +117,54 @@ export async function authenticateApiRequest(
 }
 
 /**
+ * Enhanced authentication for API routes with optional rate limiting
+ * Includes all features of authenticateApiRequest plus rate limiting support
+ * 
+ * @param request - NextRequest object (required for rate limiting)
+ * @param requiredRoles - Array of roles that are allowed to access the endpoint
+ * @param rateLimitConfig - Optional rate limiting configuration
+ * @returns ApiAuthResult with user, claims, and supabase client OR ApiAuthError
+ */
+export async function authenticateApiRequestWithRateLimit(
+  request: NextRequest,
+  requiredRoles?: string[],
+  rateLimitConfig?: RateLimitRule
+): Promise<ApiAuthResult | ApiAuthError> {
+  try {
+    // First, perform standard authentication
+    const authResult = await authenticateApiRequest(requiredRoles);
+    
+    if ('error' in authResult) {
+      return authResult;
+    }
+
+    // If rate limiting is enabled, check rate limits
+    if (rateLimitConfig) {
+      const rateLimitResponse = await rateLimitGuard(
+        request,
+        authResult.user.id,
+        authResult.claims.user_role,
+        rateLimitConfig
+      );
+
+      if (rateLimitResponse) {
+        // Rate limit exceeded, extract error details
+        const responseData = await rateLimitResponse.json();
+        return {
+          error: responseData.error || 'Rate limit exceeded',
+          status: rateLimitResponse.status
+        };
+      }
+    }
+
+    return authResult;
+  } catch (error) {
+    console.error('Enhanced authentication error:', error);
+    return { error: "Authentication failed", status: 500 };
+  }
+}
+
+/**
  * Higher-order function that wraps API route handlers with authentication
  * 
  * Usage:
@@ -132,6 +181,38 @@ export function withAuth(requiredRoles?: string[]) {
   ) {
     return async function(req: NextRequest) {
       const authResult = await authenticateApiRequest(requiredRoles);
+      
+      if ('error' in authResult) {
+        return NextResponse.json(
+          { error: authResult.error }, 
+          { status: authResult.status }
+        );
+      }
+
+      // Pass the authenticated context to the handler
+      return handler(req, authResult);
+    };
+  };
+}
+
+/**
+ * Enhanced higher-order function that wraps API route handlers with authentication and rate limiting
+ * 
+ * Usage:
+ * export const POST = withAuthAndRateLimit(['Admin'], { limit: 10, windowMs: 60000 })(async (req, auth) => {
+ *   // auth.user, auth.claims, auth.supabase are available
+ *   // Rate limiting is automatically handled
+ * });
+ * 
+ * @param requiredRoles - Array of roles that can access this endpoint
+ * @param rateLimitConfig - Optional rate limiting configuration
+ */
+export function withAuthAndRateLimit(requiredRoles?: string[], rateLimitConfig?: RateLimitRule) {
+  return function(
+    handler: (req: NextRequest, auth: ApiAuthResult) => Promise<NextResponse>
+  ) {
+    return async function(req: NextRequest) {
+      const authResult = await authenticateApiRequestWithRateLimit(req, requiredRoles, rateLimitConfig);
       
       if ('error' in authResult) {
         return NextResponse.json(

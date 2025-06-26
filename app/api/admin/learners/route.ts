@@ -265,19 +265,11 @@ export async function POST(request: Request) {
     
     // 3. Send welcome email with login credentials
     try {
-      console.log(`[EMAIL DEBUG] Attempting to send welcome email to ${learnerData.email}`);
-      console.log(`[EMAIL DEBUG] SMTP_HOST: ${process.env.SMTP_HOST || 'not set'}`);
-      console.log(`[EMAIL DEBUG] SMTP_PORT: ${process.env.SMTP_PORT || 'not set'}`);
-      console.log(`[EMAIL DEBUG] SMTP_USER: ${process.env.SMTP_USER || 'not set'}`);
-      console.log(`[EMAIL DEBUG] SMTP_SECURE: ${process.env.SMTP_SECURE || 'not set'}`);
-      console.log(`[EMAIL DEBUG] EMAIL_FROM: ${process.env.EMAIL_FROM || 'not set'}`);
-      
       await sendLearnerWelcomeEmail(
         learnerData.email, 
         randomPassword,
         `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}/app/login`
       );
-      console.log(`[EMAIL DEBUG] Welcome email sent successfully to ${learnerData.email}`);
     } catch (emailError) {
       // We don't want to fail the API if only the email fails
       console.error('[EMAIL DEBUG] Error sending welcome email:', emailError);
