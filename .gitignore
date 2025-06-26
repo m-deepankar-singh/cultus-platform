@@ -2,12 +2,12 @@
 
 # dependencies
 /node_modules
-/.open-next
 /.wrangler
 
 # next.js
 /.next/
 /out/
+/.open-next/
 
 # production
 /build
