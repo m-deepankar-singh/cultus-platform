@@ -12,10 +12,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Conditional output for Cloudflare Workers
-  output: process.env.CLOUDFLARE_WORKERS === "true" ? "standalone" : undefined,
+  // Conditional output for dual deployment
+  // Vercel: default (no output specified)
+  // Cloudflare Workers: handled by OpenNext.js automatically
   images: {
-    // Disable image optimization for Cloudflare Workers
+    // Conditional image optimization for dual deployment
     unoptimized: process.env.CLOUDFLARE_WORKERS === "true",
     remotePatterns: [
       {

@@ -1,15 +1,13 @@
 name = "cultus-platform"
-compatibility_date = "2024-12-26"
+compatibility_date = "2025-01-02"
 compatibility_flags = ["nodejs_compat"]
 
 main = "./.open-next/worker.js"
 
-[build]
-command = "npx @opennextjs/cloudflare build"
-
 # Static assets configuration for Next.js files
 [assets]
 directory = "./.open-next/assets"
+binding = "ASSETS"
 
 # Custom domains (update with your actual domain)
 [[routes]]

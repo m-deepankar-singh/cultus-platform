@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:workers": "CLOUDFLARE_WORKERS=true next build && npx @opennextjs/cloudflare build",
+    "build:vercel": "next build",
+    "build:workers": "CLOUDFLARE_WORKERS=true next build && npx @opennextjs/cloudflare@latest build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
@@ -17,8 +18,11 @@
     "analyze": "ANALYZE=true pnpm build",
     "performance:baseline": "lighthouse http://localhost:3000 --output json --output html --output-path ./lighthouse-baseline",
     "performance:check": "lighthouse http://localhost:3000 --output json --output html --output-path ./lighthouse-results",
+    "preview:workers": "pnpm run build:workers && npx wrangler dev",
     "deploy:workers": "pnpm run build:workers && npx wrangler deploy",
     "deploy:workers:staging": "pnpm run build:workers && npx wrangler deploy --env staging",
+    "deploy:vercel": "vercel",
+    "deploy:vercel:prod": "vercel --prod",
     "dev:workers": "npx wrangler dev --local",
     "workers:login": "npx wrangler login"
   },
