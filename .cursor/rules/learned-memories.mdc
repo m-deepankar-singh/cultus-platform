@@ -21,6 +21,27 @@ This file stores project-specific knowledge, conventions, and user preferences l
 - **Table Performance:** Using react-window for virtualization in admin tables
 - **Query Pattern:** Using query options pattern with centralized query keys
 - **Mutations:** Implementing optimistic updates with rollback for admin operations
+- **Cloudflare Workers Deployment**: Successfully implemented dual deployment strategy with both Vercel and Cloudflare Workers from the same `main` branch using OpenNext adapter. Configuration includes Node.js runtime support, R2 bindings, and proper asset handling.
+
+## Implementation Details
+
+### Cloudflare Workers Setup
+- Uses `@opennextjs/cloudflare` adapter for Next.js compatibility
+- Wrangler configuration with `nodejs_compat` flag for full Node.js API support
+- Static assets served from `.open-next/assets` directory
+- Main worker script at `.open-next/worker.js`
+- Environment-specific builds using `CLOUDFLARE_WORKERS=true` flag
+
+### Build Process
+- Fixed ESLint error where variable `module` conflicted with Node.js global - renamed to `moduleItem`
+- OpenNext CLI requires explicit `build` command: `npx @opennextjs/cloudflare build`
+- Generated configuration includes R2 incremental cache for performance
+
+### Key Scripts Added
+- `build:workers`: CLOUDFLARE_WORKERS=true next build && npx @opennextjs/cloudflare build
+- `deploy:workers`: pnpm run build:workers && npx wrangler deploy
+- `dev:workers`: npx wrangler dev --local
+- `workers:login`: npx wrangler login
 
 ## Project Conventions
 
@@ -31,6 +52,9 @@ This file stores project-specific knowledge, conventions, and user preferences l
 - All query keys are centralized in `lib/query-keys.ts`
 - Query options are defined in `lib/query-options.ts` when reused
 - Product forms use `onOpenChange` callback pattern, not `onSaved`
+- Maintain single `main` branch for both Vercel and Cloudflare Workers deployments
+- Use environment variables to differentiate build targets
+- No need to add `export const runtime = "edge"` to routes - Workers handles Node.js runtime natively
 
 ## Migration Progress - TanStack Query
 

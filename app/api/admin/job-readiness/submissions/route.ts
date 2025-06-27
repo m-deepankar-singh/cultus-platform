@@ -78,7 +78,8 @@ export async function GET(req: NextRequest) {
         interviewQuery.eq('students.client_id', clientId);
       }
       if (search) {
-        interviewQuery.or(`students.full_name.ilike.%${search}%,students.email.ilike.%${search}%`);
+        const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+        interviewQuery.or(`students.full_name.ilike.%${escapedSearch}%,students.email.ilike.%${escapedSearch}%`);
       }
       if (reviewStatus) {
         // Map review status to actual submission status
@@ -142,7 +143,8 @@ export async function GET(req: NextRequest) {
         projectQuery.eq('students.client_id', clientId);
       }
       if (search) {
-        projectQuery.or(`students.full_name.ilike.%${search}%,students.email.ilike.%${search}%`);
+        const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+        projectQuery.or(`students.full_name.ilike.%${escapedSearch}%,students.email.ilike.%${escapedSearch}%`);
       }
       // Projects don't have manual review status, they're auto-graded
 

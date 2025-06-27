@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
       
     // Apply search filter (case-insensitive on full_name and email)
     if (search) {
-      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      countQuery = countQuery.or(`full_name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%`);
     }
 
     // Apply client filter
@@ -93,7 +94,8 @@ export async function GET(request: NextRequest) {
       
     // Apply search filter (case-insensitive on full_name and email)
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      query = query.or(`full_name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%`);
     }
 
     // Apply client filter

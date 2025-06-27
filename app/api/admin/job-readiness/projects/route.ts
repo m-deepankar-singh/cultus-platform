@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
         status,
         created_at,
         updated_at,
-        students!inner(
+        students(
           id,
           full_name,
           email,
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
           job_readiness_tier,
           job_readiness_background_type
         ),
-        products!inner(
+        products(
           id,
           name,
           description,
@@ -97,7 +97,8 @@ export async function GET(req: NextRequest) {
       projectQuery.eq('submission_type', submissionType);
     }
     if (search) {
-      projectQuery.or(`students.full_name.ilike.%${search}%,students.email.ilike.%${search}%,project_title.ilike.%${search}%`);
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      projectQuery.or(`students.full_name.ilike.%${escapedSearch}%,students.email.ilike.%${escapedSearch}%,project_title.ilike.%${escapedSearch}%`);
     }
     if (dateFrom) {
       projectQuery.gte('created_at', dateFrom);

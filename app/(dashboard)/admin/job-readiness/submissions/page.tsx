@@ -48,13 +48,11 @@ export default function SubmissionsPage() {
   const [interviewFilters, setInterviewFilters] = React.useState<JrSubmissionsFilters>({
     page: 1,
     pageSize: 50,
-    submissionType: "interview",
   })
   
   const [projectFilters, setProjectFilters] = React.useState<JrSubmissionsFilters>({
     page: 1,
     pageSize: 50,
-    submissionType: "project",
   })
   
   // React Query hooks for data fetching
@@ -75,6 +73,19 @@ export default function SubmissionsPage() {
   // Extract submissions from React Query responses
   const interviews = interviewsData?.submissions || []
   const projects = projectsData?.submissions || []
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Debug: interviewsData:', interviewsData)
+    console.log('Debug: interviews array:', interviews)
+    console.log('Debug: interviews length:', interviews.length)
+  }, [interviewsData, interviews])
+  
+  React.useEffect(() => {
+    console.log('Debug: projectsData:', projectsData)
+    console.log('Debug: projects array:', projects)
+    console.log('Debug: projects length:', projects.length)
+  }, [projectsData, projects])
   
   // Refresh hooks
   const refreshInterviews = useRefreshInterviews()

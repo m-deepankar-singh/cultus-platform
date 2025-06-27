@@ -1,0 +1,17 @@
+{
+  "user_id": "35b17613-ee2e-41ed-be5a-51f847b41d00",
+  "first_run": "2025-06-26T22:14:53.952241",
+  "runs": [
+    {
+      "timestamp": "2025-06-26T22:14:55.127721",
+      "plan": "pro",
+      "timezone": "Europe_Warsaw",
+      "filename": "XXXNEW_pro_Europe_Warsaw_35b17613-ee2e-41ed-be5a-51f847b41d00_20250626_221453.json"
+    }
+  ],
+  "last_upload_config": {
+    "plan": "pro",
+    "timezone": "Europe_Warsaw",
+    "timestamp": "2025-06-26T22:14:55.128104"
+  }
+}

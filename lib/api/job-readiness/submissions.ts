@@ -143,16 +143,16 @@ export async function getInterviewSubmissions(filters: JrSubmissionsFilters = {}
     if (filters.clientId) searchParams.append("client_id", filters.clientId)
     if (filters.search) searchParams.append("search", filters.search)
     if (filters.page) searchParams.append("page", filters.page.toString())
-    if (filters.pageSize) searchParams.append("pageSize", filters.pageSize.toString())
+    if (filters.pageSize) searchParams.append("limit", filters.pageSize.toString())
     
     // Interview-specific filters
     if (filters.status && filters.status !== "all") searchParams.append("status", filters.status)
-    if (filters.aiVerdict && filters.aiVerdict !== "all") searchParams.append("aiVerdict", filters.aiVerdict)
+    if (filters.aiVerdict && filters.aiVerdict !== "all") searchParams.append("ai_verdict", filters.aiVerdict)
     if (filters.confidenceScore) searchParams.append("confidenceScore", filters.confidenceScore)
-    if (filters.backgroundType) searchParams.append("backgroundType", filters.backgroundType)
+    if (filters.backgroundType) searchParams.append("background_type", filters.backgroundType)
     if (filters.tierWhenSubmitted) searchParams.append("tierWhenSubmitted", filters.tierWhenSubmitted)
-    if (filters.dateFrom) searchParams.append("dateFrom", filters.dateFrom)
-    if (filters.dateTo) searchParams.append("dateTo", filters.dateTo)
+    if (filters.dateFrom) searchParams.append("date_from", filters.dateFrom)
+    if (filters.dateTo) searchParams.append("date_to", filters.dateTo)
 
     // Add cache-busting parameter to ensure fresh data
     searchParams.append("_t", Date.now().toString())

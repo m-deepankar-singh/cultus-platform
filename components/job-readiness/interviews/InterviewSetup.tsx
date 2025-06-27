@@ -6,15 +6,17 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Camera, 
+  Monitor, 
   Mic, 
   CheckCircle, 
   XCircle, 
   AlertTriangle, 
   Volume2,
   Loader2,
+  Camera,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ScreenRecorder } from '@/lib/ai/screen-recorder';
 
 interface InterviewSetupProps {
   onSetupComplete?: () => void;
@@ -28,7 +30,7 @@ interface DeviceInfo {
 }
 
 interface SystemCheck {
-  camera: 'checking' | 'success' | 'error';
+  screen: 'checking' | 'success' | 'error';
   microphone: 'checking' | 'success' | 'error';
   speakers: 'checking' | 'success' | 'error';
   browser: 'checking' | 'success' | 'error';
@@ -37,17 +39,17 @@ interface SystemCheck {
 export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps) {
   // Device states
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [selectedMicrophone, setSelectedMicrophone] = useState<string>('');
   const [selectedSpeakers, setSelectedSpeakers] = useState<string>('');
   
   // Media stream and preview
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [displayStream, setDisplayStream] = useState<MediaStream | null>(null);
+  const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(null);
   const [audioLevel, setAudioLevel] = useState<number>(0);
   
   // System checks
   const [systemChecks, setSystemChecks] = useState<SystemCheck>({
-    camera: 'checking',
+    screen: 'checking',
     microphone: 'checking',
     speakers: 'checking',
     browser: 'checking'
@@ -66,16 +68,30 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
 
   // Check browser compatibility
   useEffect(() => {
-    const checkBrowser = () => {
-      const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    const checkBrowser = async () => {
+      const browserInfo = ScreenRecorder.getBrowserInfo();
       const hasWebRTC = !!window.RTCPeerConnection;
       const hasWebSocket = !!window.WebSocket;
       
-      if (hasGetUserMedia && hasWebRTC && hasWebSocket) {
+      if (browserInfo.supported && hasWebRTC && hasWebSocket) {
         setSystemChecks(prev => ({ ...prev, browser: 'success' }));
       } else {
         setSystemChecks(prev => ({ ...prev, browser: 'error' }));
-        setError('Your browser does not support the required features for video interviews.');
+        
+        // Provide specific error message based on missing features
+        const missingFeatures = [];
+        if (!browserInfo.features.getDisplayMedia) missingFeatures.push('screen sharing');
+        if (!browserInfo.features.getUserMedia) missingFeatures.push('microphone access');
+        if (!browserInfo.features.mediaRecorder) missingFeatures.push('video recording');
+        if (!browserInfo.features.webm) missingFeatures.push('WebM video format');
+        if (!hasWebRTC) missingFeatures.push('WebRTC');
+        if (!hasWebSocket) missingFeatures.push('WebSocket');
+        
+        const errorMsg = missingFeatures.length > 0 
+          ? `Your browser does not support: ${missingFeatures.join(', ')}. Please use Chrome, Firefox, Safari, or Edge.`
+          : 'Your browser does not support screen recording features required for interviews.';
+          
+        setError(errorMsg);
       }
     };
 
@@ -87,13 +103,35 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
     try {
       setError(null);
       
-      // Request camera and microphone permissions
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+      // Check screen recording support without requesting permission yet
+      // We'll request permission only once when the interview starts
+      if (ScreenRecorder.isSupported()) {
+        setSystemChecks(prev => ({ ...prev, screen: 'success' }));
+      } else {
+        setSystemChecks(prev => ({ ...prev, screen: 'error' }));
+        throw new Error('Screen recording is not supported in this browser.');
+      }
       
-      setStream(stream);
+      // Request microphone permissions
+      try {
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: false
+        });
+        
+        setMicrophoneStream(micStream);
+        setSystemChecks(prev => ({ ...prev, microphone: 'success' }));
+        
+      } catch (micErr) {
+        console.error('Microphone permission error:', micErr);
+        setSystemChecks(prev => ({ ...prev, microphone: 'error' }));
+        throw new Error('Microphone access is required for the interview.');
+      }
+      
       setPermissionGranted(true);
       
       // Get available devices
@@ -109,18 +147,11 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
       setDevices(formattedDevices);
       
       // Set default devices
-      const videoDevices = formattedDevices.filter(d => d.kind === 'videoinput');
       const audioInputDevices = formattedDevices.filter(d => d.kind === 'audioinput');
       const audioOutputDevices = formattedDevices.filter(d => d.kind === 'audiooutput');
       
-      if (videoDevices.length > 0) {
-        setSelectedCamera(videoDevices[0].deviceId);
-        setSystemChecks(prev => ({ ...prev, camera: 'success' }));
-      }
-      
       if (audioInputDevices.length > 0) {
         setSelectedMicrophone(audioInputDevices[0].deviceId);
-        setSystemChecks(prev => ({ ...prev, microphone: 'success' }));
       }
       
       if (audioOutputDevices.length > 0) {
@@ -132,34 +163,17 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
       
     } catch (err) {
       console.error('Permission error:', err);
-      setError('Camera and microphone access is required for the interview. Please allow access and try again.');
-      setSystemChecks(prev => ({
-        ...prev,
-        camera: 'error',
-        microphone: 'error'
-      }));
+      setError(err instanceof Error ? err.message : 'Screen recording and microphone access are required for the interview.');
     }
   };
 
-  // Update video preview when camera changes
+  // Update screen preview when display stream changes
   useEffect(() => {
-    if (selectedCamera && permissionGranted && videoRef.current) {
-      navigator.mediaDevices.getUserMedia({
-        video: { deviceId: selectedCamera },
-        audio: false
-      }).then(newStream => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
-        }
-        // Stop previous video tracks
-        if (stream) {
-          stream.getVideoTracks().forEach(track => track.stop());
-        }
-      }).catch(err => {
-        console.error('Error switching camera:', err);
-      });
+    if (displayStream && permissionGranted && videoRef.current) {
+      // For setup preview, we'll show a placeholder since we can't continuously share screen
+      // The actual screen recording will start during the interview
     }
-  }, [selectedCamera, permissionGranted]);
+  }, [displayStream, permissionGranted]);
 
   // Audio level monitoring
   useEffect(() => {
@@ -194,8 +208,8 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
         updateAudioLevel();
         
         // Stop previous audio tracks
-        if (stream) {
-          stream.getAudioTracks().forEach(track => track.stop());
+        if (microphoneStream) {
+          microphoneStream.getAudioTracks().forEach(track => track.stop());
         }
         
       }).catch(err => {
@@ -244,8 +258,11 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
   // Complete setup
   const completeSetup = () => {
     // Clean up streams
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+    if (displayStream) {
+      displayStream.getTracks().forEach(track => track.stop());
+    }
+    if (microphoneStream) {
+      microphoneStream.getTracks().forEach(track => track.stop());
     }
     if (audioContextRef.current) {
       audioContextRef.current.close();
@@ -315,10 +332,10 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
         {/* Step 1: Permissions */}
         {setupStep === 'permissions' && (
           <Card className="p-8 text-center">
-            <Camera className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-4">Camera & Microphone Access</h2>
+            <Monitor className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-4">Screen Recording & Microphone Access</h2>
             <p className="text-gray-600 mb-6">
-              We need access to your camera and microphone to conduct the interview.
+              We need access to your screen and microphone to conduct the interview.
               Your privacy is important - the recording stays on your device until you submit.
             </p>
             
@@ -327,7 +344,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
               <h3 className="font-semibold mb-3">System Requirements</h3>
               <div className="space-y-2">
                 {renderSystemCheck(systemChecks.browser, 'Browser Compatibility')}
-                {renderSystemCheck(systemChecks.camera, 'Camera Access')}
+                {renderSystemCheck(systemChecks.screen, 'Screen Recording Access')}
                 {renderSystemCheck(systemChecks.microphone, 'Microphone Access')}
                 {renderSystemCheck(systemChecks.speakers, 'Speaker Access')}
               </div>
@@ -364,34 +381,36 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
         {/* Step 2: Device Selection */}
         {setupStep === 'devices' && (
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Video preview */}
+            {/* Screen recording preview */}
             <Card className="p-6">
               <h3 className="font-semibold mb-4 flex items-center">
-                <Camera className="h-5 w-5 mr-2" />
-                Camera Preview
+                <Monitor className="h-5 w-5 mr-2" />
+                Screen Recording Setup
               </h3>
-              <div className="relative bg-black rounded-lg overflow-hidden mb-4" style={{ aspectRatio: '16/9' }}>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
+                <div className="text-center text-gray-600">
+                  <Monitor className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm">Screen recording permissions granted</p>
+                  <p className="text-xs text-gray-500">Recording will start during interview</p>
+                </div>
               </div>
               
-              <Select value={selectedCamera} onValueChange={setSelectedCamera}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select camera" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.filter(d => d.kind === 'videoinput').map(device => (
-                    <SelectItem key={device.deviceId} value={device.deviceId}>
-                      {device.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>What will be recorded:</strong>
+                </p>
+                <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                  <li>• Your screen activity</li>
+                  <li>• System audio (only available when sharing a browser tab)</li>
+                  <li>• Your microphone input</li>
+                </ul>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
+                <p className="text-xs text-amber-800">
+                  <strong>⚠️ Important:</strong> System audio is only captured when sharing a <strong>browser tab</strong>, not when sharing your entire screen or application windows.
+                </p>
+              </div>
             </Card>
 
             {/* Audio controls */}
@@ -487,14 +506,14 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
             <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-4">Setup Complete!</h2>
             <p className="text-gray-600 mb-6">
-              Your audio and video are working perfectly. You're ready to start your interview.
+              Your screen recording and audio are working perfectly. You're ready to start your interview.
             </p>
             
             <div className="bg-green-50 rounded-lg p-4 mb-6">
               <h3 className="font-semibold text-green-800 mb-2">Setup Summary</h3>
               <div className="text-sm text-green-700 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span>Camera:</span>
+                  <span>Screen Recording:</span>
                   <Badge variant="secondary" className="bg-green-100 text-green-800">
                     Ready
                   </Badge>
@@ -538,7 +557,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
             </Button>
             <Button 
               onClick={startTesting}
-              disabled={!selectedCamera || !selectedMicrophone}
+              disabled={!selectedMicrophone}
             >
               Continue
             </Button>

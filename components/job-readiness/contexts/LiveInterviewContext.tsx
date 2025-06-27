@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { InterviewLiveClient } from '@/lib/ai/gemini-live-client';
-import { WebMVideoRecorder } from '@/lib/ai/webm-video-recorder';
+import { ScreenRecorder } from '@/lib/ai/screen-recorder';
 import { AudioStreamer } from '@/lib/ai/audio-streamer';
 import { AudioRecorder } from '@/lib/ai/audio-recorder';
 import { audioContext } from '@/lib/ai/utils';
@@ -20,9 +20,11 @@ export interface LiveInterviewContextType {
   timeRemaining: number;
   interviewStarted: boolean;
   
-  // Video recording
-  videoRecorder: WebMVideoRecorder | null;
+  // Screen recording
+  screenRecorder: ScreenRecorder | null;
   videoBlob: Blob | null;
+  hasSystemAudio: boolean;
+  screenShareInterrupted: boolean;
   
   // Upload state
   uploading: boolean;
@@ -77,9 +79,11 @@ export function LiveInterviewProvider({
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes
   const [interviewStarted, setInterviewStarted] = useState(false);
   
-  // Video recording
-  const [videoRecorder, setVideoRecorder] = useState<WebMVideoRecorder | null>(null);
+  // Screen recording
+  const [screenRecorder, setScreenRecorder] = useState<ScreenRecorder | null>(null);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [hasSystemAudio, setHasSystemAudio] = useState<boolean>(false);
+  const [screenShareInterrupted, setScreenShareInterrupted] = useState<boolean>(false);
   
   // Upload state
   const [uploading, setUploading] = useState(false);
@@ -349,14 +353,14 @@ export function LiveInterviewProvider({
 
   // Submit interview with direct upload
   const submitInterview = useCallback(async (): Promise<string | null> => {
-    if (!recording || !videoRecorder) return null;
+    if (!recording || !screenRecorder) return null;
     
     try {
       setUploading(true);
       setUploadProgress(0);
       
       // Stop recording
-      const recordingResult = await videoRecorder.stopRecording();
+      const recordingResult = await screenRecorder.stopRecording();
       setVideoBlob(recordingResult.blob);
       setRecording(false);
       
@@ -393,7 +397,7 @@ export function LiveInterviewProvider({
       setUploadProgress(0);
       return null;
     }
-  }, [recording, videoRecorder, backgroundId, generatedQuestions, stopTimer, uploadFile]);
+  }, [recording, screenRecorder, backgroundId, generatedQuestions, stopTimer, uploadFile]);
 
   // Session management functions - moved up to fix dependency order
   const clearSessionTimers = useCallback(() => {
@@ -436,9 +440,9 @@ export function LiveInterviewProvider({
     setAudioInputEnabled(false);
     
     // Auto-submit handler
-    if (recording && videoRecorder) {
-      console.log('📹 Stopping video recorder');
-      videoRecorder.stopRecording().then((result) => {
+    if (recording && screenRecorder) {
+      console.log('📹 Stopping screen recorder');
+      screenRecorder.stopRecording().then((result) => {
         setVideoBlob(result.blob);
       });
       setRecording(false);
@@ -459,7 +463,7 @@ export function LiveInterviewProvider({
     setSessionActive(false);
     
     console.log('✅ All interview resources cleaned up');
-  }, [client, recording, videoRecorder, audioRecorder, stopTimer, clearSessionTimers]);
+  }, [client, recording, screenRecorder, audioRecorder, stopTimer, clearSessionTimers]);
 
   const handleInactivityDisconnect = useCallback(() => {
     console.log('🛑 Session terminated due to inactivity');
@@ -467,7 +471,7 @@ export function LiveInterviewProvider({
     setError('Session ended due to inactivity. Your interview progress has been saved.');
     
     // Auto-submit if recording
-    if (recording && videoRecorder) {
+    if (recording && screenRecorder) {
       // Don't await this since we're disconnecting anyway
       submitInterview().catch(error => {
         console.error('Failed to submit interview during inactivity disconnect:', error);
@@ -475,7 +479,7 @@ export function LiveInterviewProvider({
     } else {
       disconnect();
     }
-  }, [recording, videoRecorder, submitInterview, disconnect]);
+  }, [recording, screenRecorder, submitInterview, disconnect]);
 
   const resetInactivityTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -681,21 +685,54 @@ export function LiveInterviewProvider({
     try {
       setGeneratedQuestions(questions);
       
-      // Get user media for video recording
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+      // Initialize screen recorder with screen share end handler
+      const recorder = new ScreenRecorder({
+        onScreenShareEnded: () => {
+          console.log('🛑 Screen share ended - disconnecting and auto-submitting interview');
+          setScreenShareInterrupted(true);
+          setError('Screen sharing was stopped. Interview has been automatically submitted.');
+          
+          // Stop audio input immediately
+          setAudioInputEnabled(false);
+          
+          // Disconnect WebSocket connection
+          if (client && client.isConnected()) {
+            console.log('🔌 Closing WebSocket connection due to screen share end');
+            client.disconnect();
+            setConnected(false);
+          }
+          
+          // Stop all session timers
+          clearSessionTimers();
+          stopTimer();
+          setInterviewStarted(false);
+          setSessionActive(false);
+          
+          // Auto-submit the interview immediately
+          submitInterview().catch(error => {
+            console.error('Failed to submit interview after screen share ended:', error);
+          });
+        }
       });
+      setScreenRecorder(recorder);
       
-      mediaStreamRef.current = stream;
-      
-      // Initialize video recorder
-      const recorder = new WebMVideoRecorder();
-      setVideoRecorder(recorder);
-      
-      // Start recording
-      await recorder.startRecording(stream);
+      // Start screen recording (captures screen + system audio + microphone)
+      await recorder.startRecording();
       setRecording(true);
+      
+      // Check if system audio was captured after a short delay
+      setTimeout(() => {
+        const audioInfo = recorder.getAudioSourceInfo();
+        setHasSystemAudio(audioInfo.hasSystemAudio);
+        if (audioInfo.hasSystemAudio) {
+          console.log('✅ System audio successfully captured');
+        } else {
+          console.warn('⚠️ No system audio - user may not have enabled "Share audio"');
+        }
+      }, 1000);
+      
+      // Clear media stream ref since screen recorder manages its own streams
+      mediaStreamRef.current = null;
       
       // Enable audio input for AI conversation
       setAudioInputEnabled(true);
@@ -883,8 +920,10 @@ export function LiveInterviewProvider({
     recording,
     timeRemaining,
     interviewStarted,
-    videoRecorder,
+    screenRecorder,
     videoBlob,
+    hasSystemAudio,
+    screenShareInterrupted,
     uploading: uploading || videoUploading,
     uploadProgress,
     audioStreamer: audioStreamerRef.current,

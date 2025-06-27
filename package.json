@@ -108,7 +108,7 @@
     "three-globe": "^2.42.4",
     "uuid": "^11.1.0",
     "vaul": "^0.9.6",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
     "zod": "^3.24.2"
   },
   "devDependencies": {

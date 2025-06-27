@@ -52,62 +52,15 @@ export function InterviewVideoPlayer({
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
-  // Get video URL with secure R2 private URL generation
+  // Get video URL using proxy to avoid CORS issues
   const getVideoUrl = React.useCallback(async () => {
-    if (!submission) return null
+    if (!submission || !submission.id) return null
     
-    console.log('🔍 Getting R2 video URL for submission:', {
-      submissionId: submission.id,
-      video_url: submission.video_url,
-      video_storage_path: submission.video_storage_path,
-    })
+    console.log('🔗 Using proxied video URL for submission:', submission.id)
     
-    // Try the direct video_url first (if it's already an R2 URL)
-    if (submission.video_url && submission.video_url.includes('r2.dev')) {
-      console.log('✅ Using R2 video_url from database:', submission.video_url)
-      return submission.video_url
-    }
-    
-    // For private interview recordings, generate secure R2 presigned URL
-    if (submission.video_storage_path) {
-      try {
-        console.log('🔒 Generating secure R2 URL for video_storage_path:', submission.video_storage_path)
-        
-        const response = await fetch('/api/r2/private-url', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            object_key: submission.video_storage_path,
-            expires_in: 3600, // 1 hour access
-            purpose: 'interview_review'
-          }),
-        })
-        
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(`Failed to generate secure URL: ${errorData.error || response.statusText}`)
-        }
-        
-        const data = await response.json()
-        console.log('✅ Generated secure R2 download URL for interview video')
-        return data.data.download_url
-        
-      } catch (error) {
-        console.error('❌ Failed to generate secure R2 URL:', error)
-        return null
-      }
-    }
-    
-    // Fallback: check if video_url is a legacy Supabase URL and warn
-    if (submission.video_url && submission.video_url.includes('supabase')) {
-      console.warn('⚠️ Legacy Supabase URL detected - this should be migrated to R2:', submission.video_url)
-      return submission.video_url // Temporary fallback
-    }
-    
-    console.log('❌ No video URL or storage path available')
-    return null
+    // Use the proxy endpoint to avoid CORS issues with R2
+    const proxyUrl = `/api/admin/job-readiness/interviews/${submission.id}/video`
+    return proxyUrl
   }, [submission])
 
   // Load video URL when submission changes

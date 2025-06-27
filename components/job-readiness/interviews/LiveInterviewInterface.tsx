@@ -7,7 +7,7 @@ import { InactivityWarning } from './InactivityWarning';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Mic, MicOff, Video, VideoOff, StopCircle } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Monitor, MonitorOff, StopCircle, Camera, CameraOff, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LiveInterviewInterfaceProps {
@@ -21,6 +21,8 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     timeRemaining,
     interviewStarted,
     audioInputEnabled,
+    hasSystemAudio,
+    screenShareInterrupted,
     inactivityWarning,
     startInterview,
     submitInterview,
@@ -38,11 +40,11 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   } = useInterviewSession();
 
   // Local state for media controls
-  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [cameraViewEnabled, setCameraViewEnabled] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
-  // Video element ref
+  // Video element ref for screen preview
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -132,12 +134,16 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     };
   }, [interviewStarted]);
 
-  // Get user media stream and assign to video element
+  // Get user camera for video preview (while screen recording happens in background)
   useEffect(() => {
-    if (interviewStarted && videoRef.current) {
+    if (interviewStarted && videoRef.current && cameraViewEnabled) {
       navigator.mediaDevices.getUserMedia({
-        video: videoEnabled,
-        audio: false // 🔥 FIX: Don't request audio for display video - this prevents feedback loop
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: false // Audio is handled separately
       }).then(stream => {
         // Store stream reference for cleanup
         displayStreamRef.current = stream;
@@ -146,7 +152,8 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
           videoRef.current.srcObject = stream;
         }
       }).catch(err => {
-        console.error('Failed to get user media:', err);
+        console.error('Failed to get user camera:', err);
+        // Don't disable screen recording if camera fails, just show placeholder
       });
     }
     
@@ -166,7 +173,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         videoRef.current.srcObject = null;
       }
     };
-  }, [interviewStarted, videoEnabled]);
+  }, [interviewStarted, cameraViewEnabled]);
 
   // Additional cleanup when component unmounts or interview ends
   useEffect(() => {
@@ -203,6 +210,35 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
           <p className="text-gray-600">
             Generating personalized questions based on your background...
           </p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show screen share interrupted state
+  if (screenShareInterrupted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-pink-100">
+        <Card className="p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MonitorOff className="h-8 w-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2 text-red-800">Screen Sharing Stopped</h2>
+          <p className="text-red-600 mb-4">
+            Your screen sharing was interrupted during the interview. The interview has been automatically submitted for review.
+          </p>
+          <div className="space-y-2 text-sm text-red-500">
+            <p>• Interview recording saved</p>
+            <p>• Submission processed automatically</p>
+            <p>• You will receive feedback via email</p>
+          </div>
+          <Button 
+            onClick={() => window.location.href = '/app/job-readiness/interviews'} 
+            variant="outline"
+            className="mt-4 border-red-300 text-red-700 hover:bg-red-50"
+          >
+            Return to Interviews
+          </Button>
         </Card>
       </div>
     );
@@ -257,7 +293,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         <Card className="p-8 max-w-lg text-center">
           <div className="mb-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Video className="h-8 w-8 text-green-600" />
+              <Monitor className="h-8 w-8 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Ready to Start Your Interview</h2>
             <p className="text-gray-600 mb-4">
@@ -268,7 +304,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
               <ul className="text-sm text-blue-700 space-y-1">
                 <li>• Duration: 5 minutes</li>
                 <li>• Questions: {questions.length} personalized questions</li>
-                <li>• Recording: Video and audio will be recorded</li>
+                <li>• Recording: Screen and audio (camera view for monitoring)</li>
                 <li>• AI Interviewer: Real-time conversation</li>
               </ul>
             </div>
@@ -291,9 +327,17 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
               )}
             </Button>
             
-            <p className="text-xs text-gray-500">
-              Make sure your camera and microphone are working before starting.
-            </p>
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-4">
+              <p className="text-xs text-amber-800">
+                <strong>📋 Important:</strong> System audio is only available when sharing a <strong>browser tab</strong>. For full screen recording, your microphone will still be captured for assessment.
+              </p>
+            </div>
+            
+            <div className="bg-red-50 border border-red-200 p-3 rounded-lg mt-3">
+              <p className="text-xs text-red-800">
+                <strong>⚠️ Critical:</strong> Do not stop screen sharing during the interview. If screen sharing ends, the interview will be automatically submitted and cannot be resumed.
+              </p>
+            </div>
           </div>
         </Card>
       </div>
@@ -332,6 +376,17 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
           </div>
           
           <div className="text-right">
+            <div className="flex items-center justify-end space-x-2 mb-1">
+              <div className={cn(
+                "flex items-center space-x-1 px-2 py-1 rounded-full text-xs",
+                hasSystemAudio 
+                  ? "bg-green-500/20 text-green-300" 
+                  : "bg-amber-500/20 text-amber-300"
+              )}>
+                {hasSystemAudio ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                <span>{hasSystemAudio ? "System Audio" : "No System Audio"}</span>
+              </div>
+            </div>
             <p className="text-sm opacity-80">{background?.name}</p>
             <p className="text-xs opacity-60">AI Interview Session</p>
           </div>
@@ -367,19 +422,19 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
             {audioInputEnabled ? <Mic size={24} /> : <MicOff size={24} />}
           </Button>
           
-          {/* Video toggle */}
+          {/* Camera view toggle */}
           <Button
             variant="secondary"
             size="lg"
             className={cn(
               "rounded-full w-14 h-14 p-0",
-              videoEnabled 
+              cameraViewEnabled 
                 ? "bg-white/20 hover:bg-white/30 text-white" 
                 : "bg-red-600 hover:bg-red-700 text-white"
             )}
-            onClick={() => setVideoEnabled(!videoEnabled)}
+            onClick={() => setCameraViewEnabled(!cameraViewEnabled)}
           >
-            {videoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
+            {cameraViewEnabled ? <Camera size={24} /> : <CameraOff size={24} />}
           </Button>
           
           {/* End interview button */}

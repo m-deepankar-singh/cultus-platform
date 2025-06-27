@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
     }
     
     if (search) {
-      baseQuery = baseQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      baseQuery = baseQuery.or(`full_name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%`);
     }
 
     // Get all students first

@@ -91,7 +91,8 @@ export async function GET(request: Request) {
 
     // Apply search filter (case-insensitive)
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%`);
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      query = query.or(`full_name.ilike.%${escapedSearch}%`);
     }
 
     // Apply active filter
