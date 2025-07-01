@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LearnerListQuerySchema } from '@/lib/schemas/learner';
 import { z } from "zod"
-import { sendLearnerWelcomeEmail } from '@/lib/email/service'; // Import our email service
+import { sendLearnerWelcomeEmail } from '@/lib/email/resend-service'; // Import our email service
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * GET /api/admin/learners
@@ -235,13 +236,25 @@ export async function POST(request: Request) {
     
     const randomPassword = generateRandomPassword();
     
-    // 1. Create auth user first - note: this requires admin privileges
-    // For now, we'll create the student record without auth user creation
+    // 1. Create auth user first using Supabase Admin API
+    const supabaseAdmin = createAdminClient()
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: learnerData.email,
+      password: randomPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: learnerData.full_name,
+        role: 'Student'
+      }
+    })
     
-    // Note: Creating auth users requires admin privileges
-    // For now, we'll generate a UUID and create student record without auth user
-    const authUserId = crypto.randomUUID();
-    const authUser = { user: { id: authUserId } };
+    if (authError || !authUser.user) {
+      console.error('Error creating auth user:', authError)
+      return NextResponse.json({ 
+        error: "Failed to create user account", 
+        details: authError?.message 
+      }, { status: 500 })
+    }
     
     // 2. Create the student record using the new auth user's ID
     const { data: newLearner, error: createError } = await supabase
@@ -261,21 +274,33 @@ export async function POST(request: Request) {
     
     if (createError) {
       console.error('Error creating learner:', createError)
-      // Note: Since we're not creating auth users, no cleanup needed
+      
+      // Cleanup: Delete the auth user if student creation failed
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
+      } catch (cleanupError) {
+        console.error('Error during cleanup - could not delete auth user:', cleanupError)
+      }
+      
       return NextResponse.json({ error: "Failed to create learner", details: createError.message }, { status: 500 })
     }
     
-    // 3. Send welcome email with login credentials
+    // 3. Send welcome email with login credentials (using Resend)
     try {
-      await sendLearnerWelcomeEmail(
+      const emailResponse = await sendLearnerWelcomeEmail(
         learnerData.email, 
         randomPassword,
         `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}/app/login`
       );
+      
+      // Log successful email delivery with Resend message ID
+      if (emailResponse.data?.id) {
+        console.log(`[EMAIL SUCCESS] Welcome email sent to ${learnerData.email} - Resend ID: ${emailResponse.data.id}`);
+      }
     } catch (emailError) {
-      // We don't want to fail the API if only the email fails
-      console.error('[EMAIL DEBUG] Error sending welcome email:', emailError);
-      // We could log this to a monitoring service or alert system
+      // We don't want to fail the API if only the email fails (non-blocking behavior preserved)
+      console.error('[EMAIL ERROR] Failed to send welcome email via Resend:', emailError);
+      // Note: Consider adding monitoring/alerting for email failures in production
     }
     
     // Return success with generated password so it can be communicated to the student

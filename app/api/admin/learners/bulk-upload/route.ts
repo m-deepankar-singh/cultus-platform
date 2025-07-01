@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { sendLearnerWelcomeEmail } from '@/lib/email/service';
+import { sendLearnerWelcomeEmail } from '@/lib/email/resend-service';
 import { authenticateApiRequest } from '@/lib/auth/api-auth';
 
 // Schema for validating each learner
@@ -270,15 +270,21 @@ export async function PUT(request: Request) {
           existingEmailsInBatch.add(emailLower);
           successfulLearners.push(newDbLearner);
 
+          // Send welcome email via Resend (non-blocking)
           try {
-            await sendLearnerWelcomeEmail(
+            const emailResponse = await sendLearnerWelcomeEmail(
               finalLearnerData.email, 
               randomPassword,
               `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}/app/login`
             );
+            
+            // Log successful email delivery with Resend message ID
+            if (emailResponse.data?.id) {
+              console.log(`[BULK EMAIL SUCCESS] Welcome email sent to ${finalLearnerData.email} - Resend ID: ${emailResponse.data.id}`);
+            }
           } catch (emailError) {
-            console.warn(`Failed to send welcome email to ${finalLearnerData.email}:`, emailError);
-            // Log but don't fail the entire learner creation for this
+            console.warn(`[BULK EMAIL ERROR] Failed to send welcome email to ${finalLearnerData.email} via Resend:`, emailError);
+            // Non-blocking: Log but don't fail the entire learner creation
           }
 
         } catch (processingError) {
