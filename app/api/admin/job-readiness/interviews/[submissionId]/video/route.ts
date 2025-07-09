@@ -1,9 +1,10 @@
+
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateApiRequest } from '@/lib/auth/api-auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { submissionId: string } }
+  { params }: { params: Promise<{ submissionId: string }> }
 ) {
   try {
     // Authenticate admin access
@@ -14,11 +15,14 @@ export async function GET(
 
     const { supabase } = authResult
 
+    // Await the params Promise in Next.js 15
+    const { submissionId } = await params
+
     // Get the submission video URL
     const { data: submission, error } = await supabase
       .from('job_readiness_ai_interview_submissions')
       .select('video_url, video_storage_path')
-      .eq('id', params.submissionId)
+      .eq('id', submissionId)
       .single()
 
     if (error || !submission) {

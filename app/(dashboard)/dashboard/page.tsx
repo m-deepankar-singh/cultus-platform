@@ -1,6 +1,18 @@
 import { Metadata } from "next";
-import { ChartCard } from "@/components/analytics/chart-card";
+import dynamic from "next/dynamic";
 import { DataCard } from "@/components/analytics/data-card";
+
+// Dynamically import heavy chart components
+const DynamicChartCard = dynamic(
+  () => import("@/components/analytics/chart-card").then(mod => ({ default: mod.ChartCard })),
+  { 
+    loading: () => (
+      <div className="h-[300px] w-full rounded-lg bg-muted animate-pulse flex items-center justify-center">
+        <span className="text-sm text-muted-foreground">Loading chart...</span>
+      </div>
+    )
+  }
+);
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExportButton } from "@/components/common/export-button";
@@ -159,7 +171,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <ChartCard
+            <DynamicChartCard
               title="Progress Over Time"
               description="Module completions vs enrollments"
               type="line"
@@ -172,7 +184,7 @@ export default async function DashboardPage() {
               legend={chartLegend}
             />
 
-            <ChartCard
+            <DynamicChartCard
               title="Assessment Score Distribution"
               description="Learner score ranges"
               type="pie"
@@ -273,7 +285,7 @@ export default async function DashboardPage() {
 
         <TabsContent value="modules" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <ChartCard
+            <DynamicChartCard
               title="Top Modules by Completion"
               type="bar"
               data={moduleCompletions}

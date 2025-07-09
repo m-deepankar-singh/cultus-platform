@@ -47,8 +47,18 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '1mb', // ✅ Reduced from 100mb - only for metadata now
     },
+    optimizePackageImports: [
+      '@tanstack/react-query',
+      'framer-motion',
+      'lucide-react',
+      '@google/genai',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      'gsap',
+    ],
   },
-  webpack: (config) => {
+  webpack: (config, { dev, isServer }) => {
     // Suppress the Supabase realtime-js critical dependency warning
     config.ignoreWarnings = [
       ...(config.ignoreWarnings || []),
@@ -57,6 +67,56 @@ const nextConfig = {
         message: /Critical dependency: the request of a dependency is an expression/,
       },
     ];
+
+    // Optimize bundle splitting for production builds
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            priority: 10,
+            chunks: 'all',
+          },
+          ui: {
+            test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
+            name: 'ui-vendor',
+            priority: 20,
+            chunks: 'all',
+          },
+          animations: {
+            test: /[\\/]node_modules[\\/](framer-motion|gsap)[\\/]/,
+            name: 'animations-vendor',
+            priority: 15,
+            chunks: 'all',
+          },
+          query: {
+            test: /[\\/]node_modules[\\/]@tanstack[\\/]react-query/,
+            name: 'query-vendor',
+            priority: 15,
+            chunks: 'all',
+          },
+          ai: {
+            test: /[\\/]node_modules[\\/]@google[\\/]genai/,
+            name: 'ai-vendor',
+            priority: 15,
+            chunks: 'all',
+          },
+          common: {
+            name: 'common',
+            minChunks: 2,
+            priority: 5,
+            chunks: 'all',
+            enforce: true,
+          },
+        },
+      };
+
+      // Enable tree shaking optimization
+      config.optimization.usedExports = true;
+      config.optimization.sideEffects = false;
+    }
 
     return config;
   },

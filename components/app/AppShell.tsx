@@ -4,6 +4,7 @@ import type React from "react";
 import { AppHeader } from "@/components/app/app-header";
 import { LightBackground } from "@/components/ui/light-background";
 import { AdvancedPageTransition } from "@/components/ui/advanced-page-transition";
+import { Toaster } from "@/components/ui/toaster";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -25,18 +26,7 @@ export function AppShell({ children }: AppShellProps) {
 		setMounted(true);
 	}, []);
 	
-	if (!mounted) {
-		return (
-			<div className="flex h-screen flex-col overflow-hidden">
-				{!isLoginPage && <AppHeader />}
-				<main className={`flex-1 overflow-auto min-h-0 ${!isLoginPage ? 'bg-muted/40 p-4 md:p-8' : ''}`}>
-					{children}
-				</main>
-			</div>
-		);
-	}
-	
-	return (
+	const shellContent = (
 		<div className="flex h-screen flex-col overflow-hidden">
 			{!isLoginPage && <AppHeader />}
 			{/* Background element - subtle patterns in light mode */}
@@ -59,6 +49,14 @@ export function AppShell({ children }: AppShellProps) {
 					</AdvancedPageTransition>
 				</div>
 			</main>
+			{/* Toast notifications */}
+			<Toaster />
 		</div>
 	);
+
+	if (!mounted) {
+		return shellContent;
+	}
+	
+	return shellContent;
 } 
