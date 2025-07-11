@@ -4,10 +4,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { AppLoginSchema } from '@/lib/schemas/auth';
 import { RATE_LIMIT_CONFIGS, rateLimitGuard } from '@/lib/rate-limit';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 // Using the proper @supabase/ssr package per project requirements
 
 export async function POST(request: NextRequest) {
   try {
+    // Log student login attempt
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_API_ACCESS,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      endpoint: '/api/app/auth/login',
+      method: 'POST',
+      details: { operation: 'student_login_attempt' }
+    }, request);
+
     // Check rate limit before processing login attempt
     const rateLimitResponse = await rateLimitGuard(
       request,
@@ -51,6 +62,19 @@ export async function POST(request: NextRequest) {
 
     // Handle authentication failure
     if (authError) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.STUDENT_AUTH_FAILURE,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHENTICATION,
+        endpoint: '/api/app/auth/login',
+        method: 'POST',
+        details: { 
+          operation: 'student_login_failed',
+          error: authError.message,
+          email: email
+        }
+      }, request);
+      
       return NextResponse.json(
         { error: authError.message || 'Invalid login credentials' }, 
         { status: 401 }
@@ -115,6 +139,23 @@ export async function POST(request: NextRequest) {
       // Continue anyway as this is not critical
     }
     
+    // Log successful student login
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_AUTH_SUCCESS,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.AUTHENTICATION,
+      userId: userId,
+      userRole: 'student',
+      endpoint: '/api/app/auth/login',
+      method: 'POST',
+      details: { 
+        operation: 'student_login_success',
+        email: student.email,
+        clientId: student.client_id,
+        fullName: student.full_name
+      }
+    }, request);
+    
     // Return success response with remember me preference
     return NextResponse.json(
       { 
@@ -131,7 +172,18 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    // Top-level error handling - NO console.log for production safety
+    // Log system error for student login
+    securityLogger.logEvent({
+      eventType: SecurityEventType.SYSTEM_ERROR,
+      severity: SecuritySeverity.CRITICAL,
+      category: SecurityCategory.AUTHENTICATION,
+      endpoint: '/api/app/auth/login',
+      method: 'POST',
+      details: { 
+        operation: 'student_login_system_error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }, request);
     
     // Try to sign the user out in case they were authenticated
     try {

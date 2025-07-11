@@ -174,7 +174,7 @@ The R2 storage migration is **functionally complete** and ready for production u
   - Include batch deletion capabilities (TODO for future)
 
 - [x] **Create Private File Access Endpoint** ✅ COMPLETED
-  - Create `/app/api/r2/private-url/route.ts` for private file access
+  - Private file access handled via proxy endpoints (e.g., `/api/admin/job-readiness/interviews/[submissionId]/video`)
   - Generate time-limited download URLs for private files
   - Implement access logging for audit purposes
   - Add download tracking and analytics (TODO for future)
@@ -339,7 +339,7 @@ export const SUPABASE_TO_R2_BUCKET_MAPPING = {
 2. **Interview Video Player** ✅ COMPLETED
    - **`components/job-readiness/admin/interview-video-player.tsx`** - Successfully updated for R2 security
    - Removed hardcoded Supabase storage URL construction
-   - Implemented secure R2 private URL generation via `/api/r2/private-url`
+   - Implemented secure R2 private file access via proxy endpoints
    - Added time-limited access (1 hour) for interview recordings
    - Enhanced security with proper access controls
 

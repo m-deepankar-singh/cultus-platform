@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     
@@ -12,16 +13,33 @@ export async function POST() {
     const { error } = await supabase.auth.signOut();
     
     if (error) {
-      console.error('Logout error:', error);
+      securityLogger.logAuthEvent(
+        SecurityEventType.AUTH_FAILURE,
+        {
+          operation: 'logout',
+          error: error.message,
+          userId: user?.id,
+          email: user?.email
+        },
+        request
+      );
       return NextResponse.json(
         { error: 'Failed to logout' },
         { status: 500 }
       );
     }
 
-    // Log successful logout (optional)
+    // Log successful logout
     if (user) {
-      console.log(`User ${user.email} logged out successfully`);
+      securityLogger.logAuthEvent(
+        SecurityEventType.AUTH_SUCCESS,
+        {
+          operation: 'logout',
+          userId: user.id,
+          email: user.email
+        },
+        request
+      );
     }
 
     return NextResponse.json(
@@ -30,7 +48,15 @@ export async function POST() {
     );
 
   } catch (error) {
-    console.error('Unexpected logout error:', error);
+    securityLogger.logAuthEvent(
+      SecurityEventType.AUTH_FAILURE,
+      {
+        operation: 'logout',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stage: 'unexpected_error'
+      },
+      request
+    );
     return NextResponse.json(
       { error: 'An unexpected error occurred during logout' },
       { status: 500 }
@@ -39,19 +65,42 @@ export async function POST() {
 }
 
 // Also support GET for direct navigation to /api/auth/logout
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     
+    // Get current user for logging purposes
+    const { data: { user } } = await supabase.auth.getUser();
+    
     // Sign out from Supabase
     await supabase.auth.signOut();
+
+    // Log successful logout
+    if (user) {
+      securityLogger.logAuthEvent(
+        SecurityEventType.AUTH_SUCCESS,
+        {
+          operation: 'logout_redirect',
+          userId: user.id,
+          email: user.email
+        },
+        request
+      );
+    }
 
     // Redirect to homepage after logout
     const url = new URL('/', request.url);
     return NextResponse.redirect(url);
 
   } catch (error) {
-    console.error('GET logout error:', error);
+    securityLogger.logAuthEvent(
+      SecurityEventType.AUTH_FAILURE,
+      {
+        operation: 'logout_redirect',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
+      request
+    );
     // Still redirect even if there's an error
     const url = new URL('/', request.url);
     return NextResponse.redirect(url);

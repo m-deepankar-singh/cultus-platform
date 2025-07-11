@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { SidebarProvider } from "@/components/sidebar-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { QueryProvider } from "@/components/providers/query-provider"
+import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,8 +26,10 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <QueryProvider>
           <SidebarProvider>
-            {children}
-            <Toaster />
+            <SessionTimeoutProvider>
+              {children}
+              <Toaster />
+            </SessionTimeoutProvider>
           </SidebarProvider>
           </QueryProvider>
         </ThemeProvider>

@@ -9,16 +9,20 @@ import { useRouter } from "next/navigation";
 import { SessionService } from "@/lib/auth/session-service";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { SESSION_TIMEOUT_CONFIG } from "@/lib/auth/session-timeout-constants";
 
 export function useLogout() {
   const router = useRouter();
   const { toast } = useToast();
   const supabase = createClient();
 
-  const logout = async (userType?: 'admin' | 'student') => {
+  const logout = async (userType?: 'admin' | 'student', reason?: string) => {
     try {
-      // Clear session preferences first
+      // Clear session preferences and timeout data first
       SessionService.clearAllPreferences();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(SESSION_TIMEOUT_CONFIG.LAST_ACTIVITY_KEY);
+      }
 
       // Call logout API endpoint
       const response = await fetch('/api/auth/logout', {
@@ -33,9 +37,13 @@ export function useLogout() {
       }
 
       // Show success message
+      const isSessionTimeout = reason && reason.includes('session') || reason?.includes('timeout');
       toast({
-        title: "Logged out successfully",
-        description: "You have been securely logged out.",
+        title: isSessionTimeout ? "Session Expired" : "Logged out successfully",
+        description: isSessionTimeout 
+          ? "Your session expired due to inactivity. Please log in again." 
+          : "You have been securely logged out.",
+        variant: isSessionTimeout ? "destructive" : "default",
       });
 
       // Redirect based on user type or to homepage
@@ -44,8 +52,11 @@ export function useLogout() {
       router.push(redirectPath);
 
     } catch (error: any) {
-      // Even if logout fails, clear preferences and redirect
+      // Even if logout fails, clear preferences and timeout data
       SessionService.clearAllPreferences();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(SESSION_TIMEOUT_CONFIG.LAST_ACTIVITY_KEY);
+      }
       
       // Fallback: try direct Supabase logout
       try {

@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
+import { SESSION_TIMEOUT_CONFIG } from '@/lib/auth/session-timeout-constants';
 // Removed unsafe JWT imports - now using Supabase's built-in validation
 
 // Admin-specific routes (only Admin can access)
@@ -99,6 +101,60 @@ export async function middleware(request: NextRequest) {
   // IMPORTANT: DO NOT REMOVE auth.getUser() - Required for SSR
   const { data: { user } } = await supabase.auth.getUser();
 
+  // --- 2.1. Check Session Timeout (48 hours) ---
+  if (user) {
+    const lastActivityHeader = request.headers.get('x-last-activity');
+    const lastActivity = lastActivityHeader ? parseInt(lastActivityHeader, 10) : null;
+    
+    if (lastActivity) {
+      const timeSinceActivity = Date.now() - lastActivity;
+      
+      if (timeSinceActivity > SESSION_TIMEOUT_CONFIG.TIMEOUT_DURATION) {
+        // Define route types for timeout handling
+        const isAppRoute = pathname.startsWith('/app') && !pathname.startsWith('/app/login');
+        const isApiAppRoute = pathname.startsWith('/api/app');
+        
+        // Session has expired, force logout
+        securityLogger.logEvent({
+          eventType: SecurityEventType.SESSION_EXPIRED,
+          severity: SecuritySeverity.WARNING,
+          category: SecurityCategory.AUTHENTICATION,
+          userId: user.id,
+          endpoint: pathname,
+          method: request.method,
+          details: {
+            reason: 'Session timeout - 48 hours inactivity',
+            lastActivity: new Date(lastActivity).toISOString(),
+            timeSinceActivity: Math.round(timeSinceActivity / (1000 * 60 * 60 * 24 * 100)) / 100 + ' days',
+            timeoutDuration: SESSION_TIMEOUT_CONFIG.TIMEOUT_DURATION,
+            userAgent: request.headers.get('user-agent')
+          }
+        }, request);
+
+        // Sign out the user
+        await supabase.auth.signOut();
+        
+        // Redirect to appropriate login page
+        const redirectUrl = request.nextUrl.clone();
+        if (isAppRoute || isApiAppRoute) {
+          redirectUrl.pathname = '/app/login';
+        } else {
+          redirectUrl.pathname = '/admin/login';
+        }
+        redirectUrl.search = `sessionExpired=true`;
+        
+        const redirectResponse = NextResponse.redirect(redirectUrl);
+        
+        // Copy all cookies from supabaseResponse to redirectResponse
+        supabaseResponse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+        });
+        
+        return redirectResponse;
+      }
+    }
+  }
+
   // --- 3. Define Public and Protected Routes --- 
   const publicPaths = [
     '/', 
@@ -129,6 +185,22 @@ export async function middleware(request: NextRequest) {
 
   // Redirect unauthenticated users trying to access protected routes
   if (!user && isProtectedRoute) {
+    securityLogger.logEvent({
+      eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+      severity: SecuritySeverity.WARNING,
+      category: SecurityCategory.AUTHORIZATION,
+      endpoint: pathname,
+      method: request.method,
+      details: {
+        attemptedRoute: pathname,
+        isAdminRoute,
+        isAppRoute,
+        isApiAppRoute,
+        userAgent: request.headers.get('user-agent'),
+        reason: 'No authenticated user'
+      }
+    }, request);
+
     const redirectUrl = request.nextUrl.clone();
     
     // Direct users to the appropriate login page based on the route they're trying to access
@@ -186,6 +258,22 @@ export async function middleware(request: NextRequest) {
       // For student app routes, check role validation
       if (isAppRoute || isApiAppRoute) {
         if (userRole !== 'student') {
+          securityLogger.logEvent({
+            eventType: SecurityEventType.ROLE_VALIDATION_FAILED,
+            severity: SecuritySeverity.WARNING,
+            category: SecurityCategory.AUTHORIZATION,
+            userId: user.id,
+            userRole,
+            endpoint: pathname,
+            method: request.method,
+            details: {
+              attemptedRoute: pathname,
+              expectedRole: 'student',
+              actualRole: userRole,
+              reason: 'Non-student trying to access student routes'
+            }
+          }, request);
+
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           
@@ -205,6 +293,22 @@ export async function middleware(request: NextRequest) {
       // Admin-only routes check using verified role
       if (ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
         if (userRole !== 'Admin') {
+          securityLogger.logEvent({
+            eventType: SecurityEventType.ROLE_VALIDATION_FAILED,
+            severity: SecuritySeverity.CRITICAL,
+            category: SecurityCategory.AUTHORIZATION,
+            userId: user.id,
+            userRole,
+            endpoint: pathname,
+            method: request.method,
+            details: {
+              attemptedRoute: pathname,
+              expectedRole: 'Admin',
+              actualRole: userRole,
+              reason: 'Non-admin trying to access admin-only routes'
+            }
+          }, request);
+
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           
@@ -222,6 +326,22 @@ export async function middleware(request: NextRequest) {
       // Admin and Staff routes check using verified role
       if (ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
         if (!['Admin', 'Staff'].includes(userRole || '')) {
+          securityLogger.logEvent({
+            eventType: SecurityEventType.ROLE_VALIDATION_FAILED,
+            severity: SecuritySeverity.WARNING,
+            category: SecurityCategory.AUTHORIZATION,
+            userId: user.id,
+            userRole,
+            endpoint: pathname,
+            method: request.method,
+            details: {
+              attemptedRoute: pathname,
+              expectedRoles: ['Admin', 'Staff'],
+              actualRole: userRole,
+              reason: 'Insufficient privileges for admin/staff routes'
+            }
+          }, request);
+
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           
@@ -239,6 +359,22 @@ export async function middleware(request: NextRequest) {
       // Legacy admin route check using verified role
       if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
         if (userRole !== 'Admin') {
+          securityLogger.logEvent({
+            eventType: SecurityEventType.ROLE_VALIDATION_FAILED,
+            severity: SecuritySeverity.WARNING,
+            category: SecurityCategory.AUTHORIZATION,
+            userId: user.id,
+            userRole,
+            endpoint: pathname,
+            method: request.method,
+            details: {
+              attemptedRoute: pathname,
+              expectedRole: 'Admin',
+              actualRole: userRole,
+              reason: 'Non-admin trying to access legacy admin routes'
+            }
+          }, request);
+
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           

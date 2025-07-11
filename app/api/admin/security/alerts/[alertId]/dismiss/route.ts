@@ -1,0 +1,92 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { alertId: string } }
+) {
+  const { alertId } = params;
+
+  // Log alert dismissal attempt
+  securityLogger.logEvent({
+    eventType: SecurityEventType.ADMIN_ACTION,
+    severity: SecuritySeverity.WARNING,
+    category: SecurityCategory.ADMIN_OPERATIONS,
+    endpoint: `/api/admin/security/alerts/${alertId}/dismiss`,
+    method: 'POST',
+    details: {
+      operation: 'alert_dismiss',
+      alertId,
+      stage: 'attempt'
+    }
+  }, request);
+
+  try {
+    // Authenticate admin user
+    const authResult = await authenticateApiRequestSecure(['Admin']);
+    if ('error' in authResult) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHORIZATION,
+        endpoint: `/api/admin/security/alerts/${alertId}/dismiss`,
+        method: 'POST',
+        details: {
+          operation: 'alert_dismiss',
+          alertId,
+          error: authResult.error
+        }
+      }, request);
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
+    // In a real implementation, this would update the alert status in a database
+    // For now, we'll just log the dismissal
+    securityLogger.logEvent({
+      eventType: SecurityEventType.ADMIN_ACTION,
+      severity: SecuritySeverity.WARNING,
+      category: SecurityCategory.ADMIN_OPERATIONS,
+      userId: authResult.user.id,
+      userRole: authResult.claims.user_role,
+      endpoint: `/api/admin/security/alerts/${alertId}/dismiss`,
+      method: 'POST',
+      details: {
+        operation: 'alert_dismiss',
+        alertId,
+        dismissedBy: authResult.user.id,
+        dismissedAt: new Date().toISOString(),
+        stage: 'success'
+      }
+    }, request);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Alert dismissed successfully',
+      alertId,
+      dismissedBy: authResult.user.id,
+      dismissedAt: new Date().toISOString()
+    });
+
+  } catch (error) {
+    securityLogger.logEvent({
+      eventType: SecurityEventType.ADMIN_ACTION,
+      severity: SecuritySeverity.CRITICAL,
+      category: SecurityCategory.ADMIN_OPERATIONS,
+      endpoint: `/api/admin/security/alerts/${alertId}/dismiss`,
+      method: 'POST',
+      details: {
+        operation: 'alert_dismiss',
+        alertId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stage: 'failed'
+      }
+    }, request);
+
+    console.error('Error dismissing alert:', error);
+    return NextResponse.json(
+      { error: 'Failed to dismiss alert' },
+      { status: 500 }
+    );
+  }
+}

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 /**
  * Extract client IP address from request
@@ -83,24 +84,28 @@ export function isDevelopment(): boolean {
 }
 
 /**
- * Log rate limit event for monitoring
+ * Log rate limit event for monitoring with enhanced security logging
  */
 export function logRateLimitEvent(
   identifier: string,
   endpoint: string,
   allowed: boolean,
   remaining: number,
-  limit: number
+  limit: number,
+  request?: NextRequest
 ): void {
-  if (process.env.NODE_ENV === 'production') {
-    console.log(JSON.stringify({
-      type: 'rate_limit',
+  securityLogger.logEvent({
+    eventType: allowed ? SecurityEventType.RATE_LIMIT_CHECK : SecurityEventType.RATE_LIMIT_EXCEEDED,
+    severity: allowed ? SecuritySeverity.INFO : SecuritySeverity.WARNING,
+    category: SecurityCategory.RATE_LIMITING,
+    endpoint,
+    details: {
       identifier,
-      endpoint,
       allowed,
       remaining,
       limit,
-      timestamp: new Date().toISOString()
-    }));
-  }
+      utilizationPercentage: ((limit - remaining) / limit) * 100,
+      rateLimitType: identifier.includes(':') ? 'user_and_ip' : 'ip_only'
+    }
+  }, request);
 }

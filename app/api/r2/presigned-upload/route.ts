@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { generatePresignedUploadUrl, UPLOAD_CONFIGS } from '@/lib/r2/presigned-upload-service';
 import { z } from 'zod';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 const requestSchema = z.object({
   filename: z.string().min(1).max(255),
@@ -11,10 +12,34 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Log R2 presigned URL generation attempt
+  securityLogger.logEvent({
+    eventType: SecurityEventType.CONFIGURATION_ACCESS,
+    severity: SecuritySeverity.WARNING,
+    category: SecurityCategory.CONFIGURATION,
+    endpoint: '/api/r2/presigned-upload',
+    method: 'POST',
+    details: {
+      operation: 'presigned_url_generation',
+      stage: 'attempt'
+    }
+  }, request);
+
   try {
     // Authenticate request
     const authResult = await authenticateApiRequestSecure(['Admin', 'student']);
     if ('error' in authResult) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHORIZATION,
+        endpoint: '/api/r2/presigned-upload',
+        method: 'POST',
+        details: {
+          operation: 'presigned_url_generation',
+          error: authResult.error
+        }
+      }, request);
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
@@ -37,6 +62,21 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!profile || profile.role?.toLowerCase() !== 'admin') {
+        securityLogger.logEvent({
+          eventType: SecurityEventType.ROLE_VALIDATION_FAILED,
+          severity: SecuritySeverity.CRITICAL,
+          category: SecurityCategory.AUTHORIZATION,
+          userId: authResult.user.id,
+          userRole: profile?.role || 'unknown',
+          endpoint: '/api/r2/presigned-upload',
+          method: 'POST',
+          details: {
+            operation: 'presigned_url_generation',
+            uploadType,
+            requiredRole: 'admin',
+            actualRole: profile?.role || 'unknown'
+          }
+        }, request);
         return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
       }
     }
@@ -53,6 +93,25 @@ export async function POST(request: NextRequest) {
 
     // Generate presigned URL
     const result = await generatePresignedUploadUrl(filename, contentType, config);
+
+    securityLogger.logEvent({
+      eventType: SecurityEventType.CONFIGURATION_ACCESS,
+      severity: SecuritySeverity.WARNING,
+      category: SecurityCategory.CONFIGURATION,
+      userId: authResult.user.id,
+      userRole: authResult.claims.user_role,
+      endpoint: '/api/r2/presigned-upload',
+      method: 'POST',
+      details: {
+        operation: 'presigned_url_generation',
+        uploadType,
+        filename,
+        contentType,
+        bucket: result.bucket,
+        expiresIn: result.expiresIn,
+        stage: 'success'
+      }
+    }, request);
 
     return NextResponse.json({
       success: true,

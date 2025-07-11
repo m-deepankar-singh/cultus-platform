@@ -560,7 +560,7 @@ import { S3FileUpload } from '@/components/ui/s3-file-upload';
 - [x] **`app/api/admin/job-readiness/expert-sessions/route.ts`** - ✅ COMPLETED: Updated to use S3 upload service instead of old R2 helpers
 
 #### ✅ **MEDIUM PRIORITY** - Video Player URL Updates (COMPLETED)
-- [x] **`components/job-readiness/admin/interview-video-player.tsx`** - ✅ VERIFIED: Already handles R2 URLs correctly via `/api/r2/private-url` endpoint (S3 compatible)
+- [x] **`components/job-readiness/admin/interview-video-player.tsx`** - ✅ VERIFIED: Already handles R2 URLs correctly via proxy endpoint (S3 compatible)
 - [x] **`components/courses/LessonViewer.tsx`** - ✅ Already using `lesson.video_url` (no changes needed)
 - [x] **`components/job-readiness/SimplifiedLessonViewer.tsx`** - ✅ Already using `lesson.video_url` (no changes needed)
 - [x] **`components/job-readiness/SimplifiedCourseOverview.tsx`** - ✅ Already using video URLs (no changes needed)

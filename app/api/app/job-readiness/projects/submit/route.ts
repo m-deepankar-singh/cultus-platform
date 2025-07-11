@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { gradeProject } from '@/lib/ai/project-grader';
 import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 /**
  * POST /api/app/job-readiness/projects/submit
@@ -9,6 +10,16 @@ import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
  */
 export async function POST(req: NextRequest) {
   try {
+    // Log project submission attempt
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_API_ACCESS,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      endpoint: '/api/app/job-readiness/projects/submit',
+      method: 'POST',
+      details: { operation: 'project_submission_attempt' }
+    }, req);
+
     // JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
@@ -62,17 +73,21 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (studentError || !student) {
-      console.error('Error fetching student:', studentError);
+      securityLogger.logEvent({
+        eventType: SecurityEventType.SYSTEM_ERROR,
+        severity: SecuritySeverity.CRITICAL,
+        category: SecurityCategory.STUDENT_ACTIVITY,
+        userId: user.id,
+        userRole: 'student',
+        endpoint: '/api/app/job-readiness/projects/submit',
+        method: 'POST',
+        details: { 
+          operation: 'project_submission_error',
+          error: studentError?.message || 'Student not found'
+        }
+      }, req);
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
-
-    // Log student data for debugging
-    console.log('Student data for project submission:', {
-      id: student.id,
-      background: student.job_readiness_background_type,
-      tier: student.job_readiness_tier,
-      starLevel: student.job_readiness_star_level
-    });
 
     // Check if the student has already submitted a SUCCESSFUL project for this product
     const { data: existingSubmission } = await supabase
@@ -183,12 +198,40 @@ export async function POST(req: NextRequest) {
     };
     
     // Grade the project using the AI service
-    console.log('Grading project submission...');
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_SUBMISSION,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      userId: user.id,
+      userRole: 'student',
+      endpoint: '/api/app/job-readiness/projects/submit',
+      method: 'POST',
+      details: { 
+        operation: 'project_grading_started',
+        productId: product_id,
+        projectTitle: project_title,
+        submissionType: submission_type,
+        contentLength: finalSubmissionContent.length
+      }
+    }, req);
+    
     const gradingResult = await gradeProject(submissionData);
-    console.log('Project grading result:', {
-      score: gradingResult.score,
-      passed: gradingResult.passed
-    });
+    
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_SUBMISSION,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      userId: user.id,
+      userRole: 'student',
+      endpoint: '/api/app/job-readiness/projects/submit',
+      method: 'POST',
+      details: { 
+        operation: 'project_grading_completed',
+        productId: product_id,
+        score: gradingResult.score,
+        passed: gradingResult.passed
+      }
+    }, req);
     
     // Define the passing threshold
     const PASSING_SCORE_THRESHOLD = 80;
@@ -228,7 +271,20 @@ export async function POST(req: NextRequest) {
       .single();
       
     if (submissionError) {
-      console.error('Error saving project submission:', submissionError);
+      securityLogger.logEvent({
+        eventType: SecurityEventType.SYSTEM_ERROR,
+        severity: SecuritySeverity.CRITICAL,
+        category: SecurityCategory.STUDENT_ACTIVITY,
+        userId: user.id,
+        userRole: 'student',
+        endpoint: '/api/app/job-readiness/projects/submit',
+        method: 'POST',
+        details: { 
+          operation: 'project_submission_save_error',
+          error: submissionError.message,
+          productId: product_id
+        }
+      }, req);
       return NextResponse.json({ error: 'Failed to save project submission' }, { status: 500 });
     }
 
@@ -336,7 +392,17 @@ export async function POST(req: NextRequest) {
       })
     });
   } catch (error) {
-    console.error('Unexpected error in job-readiness projects submit POST:', error);
+    securityLogger.logEvent({
+      eventType: SecurityEventType.SYSTEM_ERROR,
+      severity: SecuritySeverity.CRITICAL,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      endpoint: '/api/app/job-readiness/projects/submit',
+      method: 'POST',
+      details: { 
+        operation: 'project_submission_system_error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }, req);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

@@ -3,8 +3,22 @@ import { uploadService } from '@/lib/r2/simple-upload-service';
 import { UploadError } from '@/lib/r2/upload-errors';
 import { authenticateApiRequestWithRateLimitSecure } from '@/lib/auth/api-auth';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
+  // Log video upload attempt
+  securityLogger.logEvent({
+    eventType: SecurityEventType.FILE_UPLOAD,
+    severity: SecuritySeverity.INFO,
+    category: SecurityCategory.FILE_OPERATIONS,
+    endpoint: '/api/admin/lessons/upload-video',
+    method: 'POST',
+    details: {
+      uploadType: 'lesson_video',
+      stage: 'attempt'
+    }
+  }, request);
+
   try {
     // JWT-based authentication with rate limiting (bandwidth protection)
     const authResult = await authenticateApiRequestWithRateLimitSecure(
@@ -13,6 +27,17 @@ export async function POST(request: NextRequest) {
       RATE_LIMIT_CONFIGS.UPLOAD_VIDEO
     );
     if ('error' in authResult) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHORIZATION,
+        endpoint: '/api/admin/lessons/upload-video',
+        method: 'POST',
+        details: {
+          uploadType: 'lesson_video',
+          error: authResult.error
+        }
+      }, request);
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
@@ -20,6 +45,20 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
     
     if (!file) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.FILE_UPLOAD,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.FILE_OPERATIONS,
+        userId: authResult.user.id,
+        userRole: authResult.claims.user_role,
+        endpoint: '/api/admin/lessons/upload-video',
+        method: 'POST',
+        details: {
+          uploadType: 'lesson_video',
+          error: 'No file provided',
+          stage: 'validation_failed'
+        }
+      }, request);
       return NextResponse.json(
         { 
           error: 'No file provided',
@@ -47,6 +86,24 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    securityLogger.logEvent({
+      eventType: SecurityEventType.FILE_UPLOAD,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.FILE_OPERATIONS,
+      userId: authResult.user.id,
+      userRole: authResult.claims.user_role,
+      endpoint: '/api/admin/lessons/upload-video',
+      method: 'POST',
+      details: {
+        uploadType: 'lesson_video',
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        storageKey: result.key,
+        stage: 'success'
+      }
+    }, request);
+
     return NextResponse.json({
       success: true,
       url: result.url,
@@ -54,6 +111,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Lesson video upload error:', error);
+    
+    securityLogger.logEvent({
+      eventType: SecurityEventType.FILE_UPLOAD,
+      severity: SecuritySeverity.CRITICAL,
+      category: SecurityCategory.FILE_OPERATIONS,
+      endpoint: '/api/admin/lessons/upload-video',
+      method: 'POST',
+      details: {
+        uploadType: 'lesson_video',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stage: 'failed'
+      }
+    }, request);
     
     if (error instanceof UploadError) {
       return NextResponse.json(

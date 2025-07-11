@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { AssessmentSubmissionSchema } from '@/lib/schemas/progress';
 import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 // Define a schema for UUID validation (reuse or define locally)
 const UuidSchema = z.string().uuid({ message: 'Invalid Assessment ID format' });
@@ -18,7 +19,7 @@ const UuidSchema = z.string().uuid({ message: 'Invalid Assessment ID format' });
  * - Returns the submission result.
  */
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ assessmentId: string }> },
 ) {
   try {
@@ -32,6 +33,19 @@ export async function POST(
       );
     }
     const assessmentId = assessmentIdValidation.data; // Use validated ID
+
+    // Log assessment submission attempt
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_API_ACCESS,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      endpoint: `/api/app/progress/assessment/${assessmentId}`,
+      method: 'POST',
+      details: { 
+        operation: 'assessment_submission_attempt',
+        assessmentId: assessmentId
+      }
+    }, request);
 
     // 2. Parse and Validate Request Body
     let body;
@@ -230,6 +244,24 @@ export async function POST(
         }
     }
 
+    // Log successful assessment submission
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_SUBMISSION,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      userId: user.id,
+      userRole: 'student',
+      endpoint: `/api/app/progress/assessment/${assessmentId}`,
+      method: 'POST',
+      details: { 
+        operation: 'assessment_submission_success',
+        assessmentId: assessmentId,
+        score: scorePercentage,
+        correctCount: correctCount,
+        totalQuestions: totalQuestions
+      }
+    }, request);
+
     // 8. Return Result
     return NextResponse.json(
         {
@@ -242,7 +274,17 @@ export async function POST(
     );
 
   } catch (error) {
-    console.error('Unexpected Error in POST /assessment/[assessmentId]:', error);
+    securityLogger.logEvent({
+      eventType: SecurityEventType.SYSTEM_ERROR,
+      severity: SecuritySeverity.CRITICAL,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      endpoint: `/api/app/progress/assessment/${assessmentId || 'unknown'}`,
+      method: 'POST',
+      details: { 
+        operation: 'assessment_submission_system_error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }, request);
 
     // Check if the error is a Zod validation error
     if (error instanceof z.ZodError) {

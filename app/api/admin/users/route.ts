@@ -3,16 +3,56 @@ import { CreateUserSchema } from '@/lib/schemas/user'; // Adjust path
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
+import { 
+  errorHandler, 
+  createErrorContext, 
+  handleSecureError 
+} from '@/lib/security/error-handler';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 // We likely don't need a separate getUserSession utility here, 
 // as createClient provides a client that can get the user via cookies.
 
 export async function GET(request: NextRequest) {
+  // Log admin data access attempt
+  securityLogger.logEvent({
+    eventType: SecurityEventType.SENSITIVE_DATA_ACCESS,
+    severity: SecuritySeverity.INFO,
+    category: SecurityCategory.ADMIN_OPERATIONS,
+    endpoint: '/api/admin/users',
+    method: 'GET',
+    details: {
+      operation: 'user_list_access',
+      stage: 'attempt'
+    }
+  }, request);
+
+  // Create error context for secure logging
+  const errorContext = createErrorContext('/api/admin/users', 'GET', {
+    ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+    userAgent: request.headers.get('user-agent') || 'unknown',
+  });
+
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHORIZATION,
+        endpoint: '/api/admin/users',
+        method: 'GET',
+        details: {
+          operation: 'user_list_access',
+          error: authResult.error
+        }
+      }, request);
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    
+    // Update error context with authenticated user info
+    errorContext.userId = authResult.user.id;
+    errorContext.userRole = 'Admin';
 
     // Get pagination and filter parameters from query string
     const { searchParams } = new URL(request.url);
@@ -43,8 +83,7 @@ export async function GET(request: NextRequest) {
       });
 
     if (rpcError) {
-      console.error('Error fetching users via RPC:', rpcError);
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+      return handleSecureError(rpcError, errorContext, 'database');
     }
 
     // Extract total count from first record (all records have same total_count)
@@ -58,33 +97,89 @@ export async function GET(request: NextRequest) {
       pageSize
     );
 
+    securityLogger.logEvent({
+      eventType: SecurityEventType.SENSITIVE_DATA_ACCESS,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.ADMIN_OPERATIONS,
+      userId: authResult.user.id,
+      userRole: authResult.claims.user_role,
+      endpoint: '/api/admin/users',
+      method: 'GET',
+      details: {
+        operation: 'user_list_access',
+        recordCount: usersData?.length || 0,
+        totalCount: Number(totalCount),
+        page,
+        pageSize,
+        filters: {
+          search: searchQuery,
+          role: roleFilter,
+          clientId: clientIdFilter
+        },
+        stage: 'success'
+      }
+    }, request);
+
     return NextResponse.json(paginatedResponse);
 
   } catch (error) {
-    console.error('Unexpected error in GET /api/admin/users:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return handleSecureError(error, errorContext, 'generic');
   }
 }
 
 export async function POST(request: Request) {
+  // Log admin user creation attempt
+  securityLogger.logEvent({
+    eventType: SecurityEventType.ADMIN_ACTION,
+    severity: SecuritySeverity.WARNING,
+    category: SecurityCategory.ADMIN_OPERATIONS,
+    endpoint: '/api/admin/users',
+    method: 'POST',
+    details: {
+      operation: 'user_creation',
+      stage: 'attempt'
+    }
+  }, request as NextRequest);
+
+  // Create error context for secure logging
+  const errorContext = createErrorContext('/api/admin/users', 'POST', {
+    ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+    userAgent: request.headers.get('user-agent') || 'unknown',
+  });
+
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHORIZATION,
+        endpoint: '/api/admin/users',
+        method: 'POST',
+        details: {
+          operation: 'user_creation',
+          error: authResult.error
+        }
+      }, request as NextRequest);
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
+    
+    // Update error context with authenticated user info
+    errorContext.userId = authResult.user.id;
+    errorContext.userRole = 'Admin';
 
     // Parse & Validate Request Body
     let body;
     try {
         body = await request.json();
     } catch (e) {
-        return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+        return handleSecureError(e, errorContext, 'validation');
     }
     
     const validationResult = CreateUserSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json({ error: 'Invalid input', details: validationResult.error.flatten() }, { status: 400 });
+      return handleSecureError(validationResult.error, errorContext, 'validation');
     }
     const { email, password, role, client_id, full_name } = validationResult.data;
 
@@ -103,8 +198,7 @@ export async function POST(request: Request) {
     });
 
     if (createAuthError) {
-      console.error('Error creating auth user:', createAuthError);
-      return NextResponse.json({ error: 'Failed to create user account', details: createAuthError.message }, { status: 500 });
+      return handleSecureError(createAuthError, errorContext, 'database');
     }
 
     if (!authData.user) {
@@ -127,10 +221,9 @@ export async function POST(request: Request) {
       .single();
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
       // Cleanup: delete the auth user if profile creation failed
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
-      return NextResponse.json({ error: 'Failed to create user profile', details: profileError.message }, { status: 500 });
+      return handleSecureError(profileError, errorContext, 'database');
     }
 
     // Note: Students should be created via the learners API (/api/admin/learners/)
@@ -142,10 +235,27 @@ export async function POST(request: Request) {
       email: authData.user.email
     };
 
+    securityLogger.logEvent({
+      eventType: SecurityEventType.ADMIN_ACTION,
+      severity: SecuritySeverity.WARNING,
+      category: SecurityCategory.ADMIN_OPERATIONS,
+      userId: authResult.user.id,
+      userRole: authResult.claims.user_role,
+      endpoint: '/api/admin/users',
+      method: 'POST',
+      details: {
+        operation: 'user_creation',
+        createdUserId: newUserId,
+        createdUserEmail: email,
+        createdUserRole: role,
+        clientId: client_id,
+        stage: 'success'
+      }
+    }, request as NextRequest);
+
     return NextResponse.json(responseData, { status: 201 });
 
   } catch (error) {
-    console.error('Unexpected error in POST /api/admin/users:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return handleSecureError(error, errorContext, 'generic');
   }
 } 

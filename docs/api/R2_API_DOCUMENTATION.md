@@ -128,59 +128,7 @@ curl -X DELETE http://localhost:3000/api/r2/delete \
 
 ---
 
-### 3. Private File Access
-
-**Endpoint**: `POST /api/r2/private-url`
-
-Generates time-limited download URLs for private files.
-
-#### Authentication
-- **Required**: Yes (JWT Bearer token)
-- **Roles**: Admin, Staff, Student (with ownership verification)
-
-#### Request Body
-```typescript
-{
-  object_key: string;       // Required: S3 object key for private file
-  expires_in?: number;      // Optional: URL expiration in seconds (60-86400, default 3600)
-  purpose?: string;         // Optional: Purpose for audit logging
-}
-```
-
-#### Response
-```typescript
-{
-  success: true;
-  data: {
-    download_url: string;   // Presigned download URL
-    object_key: string;     // Object key
-    expires_at: string;     // ISO timestamp when URL expires
-    expires_in: number;     // Seconds until expiration
-    purpose: string;        // Purpose for download
-  };
-}
-```
-
-#### Authorization Rules
-- **Admin**: Can access any private file
-- **Staff**: Can access interview recordings and student submissions
-- **Student**: Can only access their own files (ownership verification)
-
-#### Example Request
-```bash
-curl -X POST http://localhost:3000/api/r2/private-url \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "object_key": "interview-recording/user123/session456.mp4",
-    "expires_in": 7200,
-    "purpose": "interview review"
-  }'
-```
-
----
-
-### 4. File Metadata
+### 3. File Metadata
 
 **Endpoint**: `GET /api/r2/metadata` or `POST /api/r2/metadata`
 
@@ -231,13 +179,12 @@ curl "http://localhost:3000/api/r2/metadata?object_key=client-logo/1750181601700
 
 ---
 
-### 5. Health Checks
+### 4. Health Checks
 
 Each service provides health check endpoints:
 
 - `GET /api/r2/upload-url` - Upload service health
 - `GET /api/r2/delete` - Delete service health  
-- `GET /api/r2/private-url` - Private URL service health
 - `OPTIONS /api/r2/metadata` - Metadata service health
 
 ## Error Responses

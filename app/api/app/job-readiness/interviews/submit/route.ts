@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { validateProcessInputs, processTracker } from '@/lib/security/process-validator';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
   try {
+    // Log interview submission attempt
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_API_ACCESS,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      endpoint: '/api/app/job-readiness/interviews/submit',
+      method: 'POST',
+      details: { operation: 'interview_submission_attempt' }
+    }, request);
+
     // JWT-based authentication (0 database queries)
     const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
@@ -30,7 +41,20 @@ export async function POST(request: NextRequest) {
     // Create submission record using pre-uploaded video data
     const submissionId = crypto.randomUUID();
     
-    console.log('Creating interview submission with pre-uploaded video:', video_storage_path);
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_SUBMISSION,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      userId: user.id,
+      userRole: 'student',
+      endpoint: '/api/app/job-readiness/interviews/submit',
+      method: 'POST',
+      details: { 
+        operation: 'interview_submission_started',
+        videoStoragePath: video_storage_path,
+        backgroundId: backgroundId
+      }
+    }, request);
 
     // Get current student data for tier and background tracking
     const { data: studentData } = await supabase
@@ -59,7 +83,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('Failed to save submission:', insertError);
+      securityLogger.logEvent({
+        eventType: SecurityEventType.SYSTEM_ERROR,
+        severity: SecuritySeverity.CRITICAL,
+        category: SecurityCategory.STUDENT_ACTIVITY,
+        userId: user.id,
+        userRole: 'student',
+        endpoint: '/api/app/job-readiness/interviews/submit',
+        method: 'POST',
+        details: { 
+          operation: 'interview_submission_save_error',
+          error: insertError.message
+        }
+      }, request);
       
       return NextResponse.json(
         { error: 'Failed to save submission to database' },
@@ -67,7 +103,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Interview submission saved successfully:', submission.id);
+    securityLogger.logEvent({
+      eventType: SecurityEventType.STUDENT_SUBMISSION,
+      severity: SecuritySeverity.INFO,
+      category: SecurityCategory.STUDENT_ACTIVITY,
+      userId: user.id,
+      userRole: 'student',
+      endpoint: '/api/app/job-readiness/interviews/submit',
+      method: 'POST',
+      details: { 
+        operation: 'interview_submission_saved',
+        submissionId: submission.id
+      }
+    }, request);
 
     // Trigger async video analysis with security validation
     try {

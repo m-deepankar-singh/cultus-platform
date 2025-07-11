@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getClaimsFromToken, isTokenExpired, CustomJWTClaims, getVerifiedClaimsFromSession, getVerifiedClaimsFromUser } from './jwt-utils';
 import { User } from '@supabase/supabase-js';
 import { rateLimitGuard, type RateLimitRule } from '@/lib/rate-limit';
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 export interface ApiAuthResult {
   user: User;
@@ -26,7 +27,16 @@ export interface ApiAuthError {
 export async function authenticateApiRequest(
   requiredRoles?: string[]
 ): Promise<ApiAuthResult | ApiAuthError> {
-  console.warn('SECURITY WARNING: authenticateApiRequest is deprecated. Use authenticateApiRequestSecure() instead.');
+  securityLogger.logEvent({
+    eventType: SecurityEventType.AUTH_FAILURE,
+    severity: SecuritySeverity.WARNING,
+    category: SecurityCategory.AUTHENTICATION,
+    details: {
+      warning: 'DEPRECATED_FUNCTION_USED',
+      function: 'authenticateApiRequest',
+      recommendation: 'Use authenticateApiRequestSecure() instead'
+    }
+  });
   try {
     const supabase = await createClient();
     
@@ -34,6 +44,10 @@ export async function authenticateApiRequest(
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: userError?.message || 'No user found',
+        function: 'authenticateApiRequest'
+      });
       return { error: "Unauthorized", status: 401 };
     }
 
@@ -41,11 +55,19 @@ export async function authenticateApiRequest(
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session?.access_token) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: sessionError?.message || 'No session or access token',
+        function: 'authenticateApiRequest'
+      });
       return { error: "Unauthorized", status: 401 };
     }
 
     // Check token expiration
     if (isTokenExpired(session.access_token)) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_TOKEN_EXPIRED, {
+        userId: user.id,
+        function: 'authenticateApiRequest'
+      });
       return { error: "Token expired", status: 401 };
     }
 
@@ -90,6 +112,11 @@ export async function authenticateApiRequest(
             is_student: false
           };
         } else {
+          securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+            error: 'User profile not found',
+            userId: user.id,
+            function: 'authenticateApiRequest'
+          });
           return { error: "User profile not found", status: 403 };
         }
       }
@@ -102,9 +129,21 @@ export async function authenticateApiRequest(
         (requiredRoles.includes('student') && claims.is_student);
       
       if (!hasRequiredRole) {
+        securityLogger.logAuthEvent(SecurityEventType.ROLE_VALIDATION_FAILED, {
+          userId: user.id,
+          userRole,
+          requiredRoles,
+          function: 'authenticateApiRequest'
+        });
         return { error: "Forbidden", status: 403 };
       }
     }
+
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
+      userId: user.id,
+      userRole: claims.user_role,
+      function: 'authenticateApiRequest'
+    });
 
     return {
       user,
@@ -112,6 +151,10 @@ export async function authenticateApiRequest(
       supabase
     };
   } catch (error) {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      function: 'authenticateApiRequest'
+    });
     console.error('Authentication error:', error);
     return { error: "Authentication failed", status: 500 };
   }
@@ -135,6 +178,10 @@ export async function authenticateApiRequestSecure(
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: userError?.message || 'No user found',
+        function: 'authenticateApiRequestSecure'
+      });
       return { error: "Unauthorized", status: 401 };
     }
 
@@ -144,6 +191,11 @@ export async function authenticateApiRequestSecure(
     try {
       claims = getVerifiedClaimsFromUser(user);
     } catch (error) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: error instanceof Error ? error.message : 'Error extracting verified claims',
+        userId: user.id,
+        function: 'authenticateApiRequestSecure'
+      });
       console.error('Error extracting verified claims from user metadata:', error);
       return { error: "Invalid user metadata", status: 401 };
     }
@@ -186,6 +238,11 @@ export async function authenticateApiRequestSecure(
             is_student: false
           };
         } else {
+          securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+            error: 'User profile not found',
+            userId: user.id,
+            function: 'authenticateApiRequestSecure'
+          });
           return { error: "User profile not found", status: 403 };
         }
       }
@@ -198,11 +255,11 @@ export async function authenticateApiRequestSecure(
                             (requiredRoles.includes('student') && userRole === 'student');
 
       if (!hasRequiredRole) {
-        console.warn('JWT_ACCESS_DENIED: Role validation failed', {
+        securityLogger.logAuthEvent(SecurityEventType.ROLE_VALIDATION_FAILED, {
           userId: user.id,
           userRole,
           requiredRoles,
-          timestamp: new Date().toISOString()
+          function: 'authenticateApiRequestSecure'
         });
         return { 
           error: `Access denied. Required roles: ${requiredRoles.join(', ')}. User role: ${userRole}`, 
@@ -211,10 +268,10 @@ export async function authenticateApiRequestSecure(
       }
     }
 
-    console.log('JWT_API_AUTH_SUCCESS: Secure authentication completed', {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
       userId: user.id,
-      role: claims.user_role,
-      timestamp: new Date().toISOString()
+      userRole: claims.user_role,
+      function: 'authenticateApiRequestSecure'
     });
 
     return {
@@ -224,6 +281,10 @@ export async function authenticateApiRequestSecure(
     };
 
   } catch (error) {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      function: 'authenticateApiRequestSecure'
+    });
     console.error('Authentication error:', error);
     return { error: "Internal server error", status: 500 };
   }
@@ -254,12 +315,26 @@ export async function authenticateApiRequestWithRateLimitSecure(
       );
 
       if (rateLimitResponse) {
+        securityLogger.logEvent({
+          eventType: SecurityEventType.RATE_LIMIT_EXCEEDED,
+          severity: SecuritySeverity.WARNING,
+          category: SecurityCategory.RATE_LIMITING,
+          userId: authResult.user.id,
+          userRole: authResult.claims.user_role,
+          details: {
+            function: 'authenticateApiRequestWithRateLimitSecure'
+          }
+        });
         return { error: "Rate limit exceeded", status: 429 };
       }
     }
 
     return authResult;
   } catch (error) {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      function: 'authenticateApiRequestWithRateLimitSecure'
+    });
     console.error('Authentication with rate limit error:', error);
     return { error: "Internal server error", status: 500 };
   }

@@ -19,6 +19,7 @@ import {
   Menu,
   Package,
   Settings,
+  Shield,
   Users,
   X,
 } from "lucide-react"
@@ -146,6 +147,32 @@ const navItems: NavItem[] = [
     href: "/analytics",
     icon: BarChart3,
     role: ["admin", "staff", "viewer", "client_staff"],
+  },
+  {
+    title: "Security",
+    href: "/admin/security",
+    icon: Shield,
+    role: ["admin"],
+    submenu: [
+      {
+        title: "Dashboard",
+        href: "/admin/security/dashboard",
+        icon: BarChart3,
+        role: ["admin"],
+      },
+      {
+        title: "Event Log",
+        href: "/admin/security/events",
+        icon: FileQuestion,
+        role: ["admin"],
+      },
+      {
+        title: "Alerts",
+        href: "/admin/security/alerts",
+        icon: Shield,
+        role: ["admin"],
+      },
+    ],
   },
   {
     title: "Cache Management",

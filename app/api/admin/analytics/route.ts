@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiRequestSecure } from "@/lib/auth/api-auth";
+import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
 export async function GET(request: NextRequest) {
+  // Log analytics access attempt
+  securityLogger.logEvent({
+    eventType: SecurityEventType.SENSITIVE_DATA_ACCESS,
+    severity: SecuritySeverity.WARNING,
+    category: SecurityCategory.ADMIN_OPERATIONS,
+    endpoint: '/api/admin/analytics',
+    method: 'GET',
+    details: {
+      operation: 'analytics_access',
+      stage: 'attempt'
+    }
+  }, request);
+
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries for auth)
     const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
+      securityLogger.logEvent({
+        eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
+        severity: SecuritySeverity.WARNING,
+        category: SecurityCategory.AUTHORIZATION,
+        endpoint: '/api/admin/analytics',
+        method: 'GET',
+        details: {
+          operation: 'analytics_access',
+          error: authResult.error
+        }
+      }, request);
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
@@ -41,6 +66,26 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching analytics via RPC:', rpcError);
       return NextResponse.json({ error: 'Failed to fetch analytics data' }, { status: 500 });
     }
+
+    // Log successful analytics access
+    securityLogger.logEvent({
+      eventType: SecurityEventType.SENSITIVE_DATA_ACCESS,
+      severity: SecuritySeverity.WARNING,
+      category: SecurityCategory.ADMIN_OPERATIONS,
+      userId: authResult.user.id,
+      userRole: authResult.claims.user_role,
+      endpoint: '/api/admin/analytics',
+      method: 'GET',
+      details: {
+        operation: 'analytics_access',
+        filters: {
+          dateFrom,
+          dateTo,
+          clientId
+        },
+        stage: 'success'
+      }
+    }, request);
 
     // Return the consolidated analytics data
     return NextResponse.json(analyticsData || {}, { status: 200 });
