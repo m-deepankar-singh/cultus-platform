@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 /**
@@ -18,7 +18,7 @@ export async function GET(
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return new NextResponse(JSON.stringify({ error: authResult.error }), {
         status: authResult.status,
@@ -151,7 +151,7 @@ export async function PATCH(
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -270,7 +270,7 @@ export async function DELETE(
 ) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

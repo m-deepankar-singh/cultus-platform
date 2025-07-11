@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { utils, write } from 'xlsx';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Define types for the data we're working with
 interface Student {
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return new NextResponse(JSON.stringify({ error: authResult.error }), {
         status: authResult.status,

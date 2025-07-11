@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadService } from '@/lib/r2/simple-upload-service';
 import { UploadError } from '@/lib/r2/upload-errors';
+import { authenticateApiRequestWithRateLimitSecure } from '@/lib/auth/api-auth';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // JWT-based authentication with rate limiting (bandwidth protection)
+    const authResult = await authenticateApiRequestWithRateLimitSecure(
+      request,
+      ['Admin', 'Staff'],
+      RATE_LIMIT_CONFIGS.UPLOAD_IMAGE
+    );
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     
@@ -19,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const key = uploadService.generateKey('clients/logos', file.name);
     
-    // Upload file with validation
+    // Upload file with enhanced validation
     const result = await uploadService.uploadFile(
       file, 
       key, 
@@ -27,7 +39,11 @@ export async function POST(request: NextRequest) {
       {
         allowedTypes: ['image/*'],
         maxSize: 2 * 1024 * 1024, // 2MB for logos
-        minSize: 100 // 100 bytes minimum
+        minSize: 100, // 100 bytes minimum
+        enableSignatureValidation: true,
+        enableSVGSecurityValidation: true,
+        enableStructureValidation: true,
+        uploadContext: 'client-logo'
       }
     );
 

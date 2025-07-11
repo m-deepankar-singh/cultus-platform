@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkModuleAccess, JOB_READINESS_MODULE_ORDER, JobReadinessModuleType } from '@/lib/api/job-readiness/check-module-access';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/app/job-readiness/test/module-access
@@ -13,7 +13,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 export async function GET(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

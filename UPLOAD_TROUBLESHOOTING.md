@@ -5,10 +5,7 @@
 ### Quick Fix Steps
 
 1. **Check R2 Configuration**
-   ```bash
-   curl http://localhost:3000/api/r2/test-config
-   ```
-   This should return `"configured": true`. If false, check environment variables.
+   Verify that your R2 environment variables are properly set in `.env.local` (see step 2 below).
 
 2. **Verify Environment Variables**
    Add these to your `.env.local`:

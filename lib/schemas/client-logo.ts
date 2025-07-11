@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateFileComprehensive, validateSVGContent } from '@/lib/security/file-signature-validator';
 
 // Max file size for client logos (1MB)
 const MAX_LOGO_SIZE_MB = 1;
@@ -23,6 +24,25 @@ export const ClientLogoSchema = z.instanceof(File)
   })
   .refine((file) => ALLOWED_LOGO_TYPES.includes(file.type), {
     message: `Invalid file type. Only ${ALLOWED_LOGO_TYPES.map(type => type.replace('image/', '')).join(', ')} allowed.`,
+  })
+  .refine(async (file) => {
+    // Enhanced security validation with file signature checking
+    try {
+      const validationResult = await validateFileComprehensive(file, {
+        allowedTypes: ALLOWED_LOGO_TYPES,
+        maxSize: MAX_LOGO_SIZE_BYTES,
+        minSize: 100, // 100 bytes minimum
+        enableStructureValidation: true,
+        enableSVGSecurityValidation: true
+      });
+      
+      return validationResult.isValid;
+    } catch (error) {
+      console.warn('Client logo validation failed:', error);
+      return false;
+    }
+  }, {
+    message: 'Logo validation failed. The file may be corrupted, contain malicious content, or not be a valid image format.',
   });
 
 // Type for client logo upload response

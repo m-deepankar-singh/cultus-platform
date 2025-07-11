@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CreateUserSchema } from '@/lib/schemas/user'; // Adjust path
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 // We likely don't need a separate getUserSession utility here, 
 // as createClient provides a client that can get the user via cookies.
@@ -9,7 +9,7 @@ import { SELECTORS } from '@/lib/api/selectors';
 export async function GET(request: NextRequest) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

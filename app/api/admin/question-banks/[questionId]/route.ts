@@ -4,7 +4,7 @@ import {
     UpdateQuestionApiSchema,
     QuestionBankType // Import QuestionBankType for DELETE query param validation
 } from '@/lib/schemas/question';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 interface RouteParams {
     params: Promise<{ questionId: string }>;
@@ -14,7 +14,7 @@ interface RouteParams {
 export async function GET(request: Request, { params }: RouteParams) {
     try {
         // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
@@ -59,7 +59,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 export async function PUT(request: Request, { params }: RouteParams) {
     try {
         // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
@@ -131,7 +131,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
 export async function DELETE(request: Request, { params }: RouteParams) {
      try {
         // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }

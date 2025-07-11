@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Validation schemas
 const ModuleIdSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -80,7 +80,7 @@ export async function POST(
     const progressData: SaveProgressRequest = validationResult.data;
 
     // 3. 🚀 ENHANCED: JWT-based authentication with comprehensive validation
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

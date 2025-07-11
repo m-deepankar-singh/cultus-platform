@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendLearnerWelcomeEmail } from '@/lib/email/resend-service';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Schema for validating each learner
 const LearnerSchema = z.object({
@@ -60,7 +60,7 @@ const BATCH_SIZE = 50;
 export async function POST(request: Request) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return new NextResponse(JSON.stringify({ error: authResult.error }), {
         status: authResult.status,
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return new NextResponse(JSON.stringify({ error: authResult.error }), {
         status: authResult.status,

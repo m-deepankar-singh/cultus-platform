@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ProductIdSchema } from "@/lib/schemas/product";
 import { ModuleSchema } from "@/lib/schemas/module";
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/products/[productId]/modules
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -80,7 +80,7 @@ export async function POST(
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

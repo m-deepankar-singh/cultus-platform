@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 // Import the actual quiz generator implementation
 import { generateQuizForLesson, transformQuestionsForClient, getFallbackQuestions } from '@/lib/ai/quiz-generator';
 
@@ -92,7 +92,7 @@ export async function GET(
     }
 
     // JWT-based authentication (replaces getUser() + student record lookup)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

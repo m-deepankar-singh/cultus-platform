@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ViewerReportQuerySchema } from '@/lib/schemas/progress';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 // Define the expected structure of the data returned by the function
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['viewer', 'admin']);
+    const authResult = await authenticateApiRequestSecure(['viewer', 'admin']);
     if ('error' in authResult) {
       console.log("DEBUG: Authentication failed", authResult.error);
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });

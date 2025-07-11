@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
-import { getClaimsFromToken, isStudentActive, hasAnyRole, hasRequiredRole } from './lib/auth/jwt-utils';
+// Removed unsafe JWT imports - now using Supabase's built-in validation
 
 // Admin-specific routes (only Admin can access)
 const ADMIN_ONLY_ROUTES = [
@@ -151,19 +151,41 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  // --- 5. JWT-Based Role Authorization ---
+  // --- 5. Secure Role Authorization (Uses Supabase Validation) ---
   if (user) {
-    // Get session to access JWT token
+    // Get verified session from Supabase
     const { data: { session } } = await supabase.auth.getSession();
     
-    if (session?.access_token) {
-      // Extract claims from JWT token - NO DATABASE QUERIES NEEDED!
-      const claims = getClaimsFromToken(session.access_token);
+    if (session?.user) {
+      // Extract user role from verified session metadata or database
+      let userRole = session.user.app_metadata?.user_role;
       
-      // For student app routes, check JWT claims instead of database
+      // If role not in metadata, check database
+      if (!userRole) {
+        // Check if user is a student
+        const { data: student } = await supabase
+          .from('students')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+        
+        if (student) {
+          userRole = 'student';
+        } else {
+          // Check profiles table
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          
+          userRole = profile?.role;
+        }
+      }
+      
+      // For student app routes, check role validation
       if (isAppRoute || isApiAppRoute) {
-        const isActiveStudent = isStudentActive(session.access_token);
-        if (!isActiveStudent) {
+        if (userRole !== 'student') {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           
@@ -180,9 +202,9 @@ export async function middleware(request: NextRequest) {
         return supabaseResponse;
       }
       
-      // Admin-only routes check using JWT claims
+      // Admin-only routes check using verified role
       if (ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-        if (!hasRequiredRole(session.access_token, 'Admin')) {
+        if (userRole !== 'Admin') {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           
@@ -197,9 +219,9 @@ export async function middleware(request: NextRequest) {
         }
       }
       
-      // Admin and Staff routes check using JWT claims
+      // Admin and Staff routes check using verified role
       if (ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-        if (!hasAnyRole(session.access_token, ['Admin', 'Staff'])) {
+        if (!['Admin', 'Staff'].includes(userRole || '')) {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           
@@ -214,9 +236,9 @@ export async function middleware(request: NextRequest) {
         }
       }
       
-      // Legacy admin route check using JWT claims
+      // Legacy admin route check using verified role
       if (isAdminRoute && !ADMIN_AND_STAFF_ROUTES.some(route => pathMatchesPattern(pathname, route)) && !ADMIN_ONLY_ROUTES.some(route => pathMatchesPattern(pathname, route))) {
-        if (!hasRequiredRole(session.access_token, 'Admin')) {
+        if (userRole !== 'Admin') {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = '/admin/login';
           

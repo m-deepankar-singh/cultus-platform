@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/expert-sessions
@@ -9,7 +9,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 export async function GET(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     // JWT-based authentication (using existing auth pattern)
-    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     // JWT-based authentication (consistent with GET and POST)
-    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -457,7 +457,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     // JWT-based authentication (consistent with other methods)
-    const authResult = await authenticateApiRequest(['Admin', 'admin', 'Staff', 'staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'admin', 'Staff', 'staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

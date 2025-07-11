@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Define schemas for validation
 const ModuleIdSchema = z.string().uuid({ message: 'Invalid Module ID format' });
@@ -64,7 +64,7 @@ export async function GET(
     const validModuleId = moduleIdValidation.data;
 
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

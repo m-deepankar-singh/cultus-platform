@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateProject } from '@/lib/ai/project-generator';
-import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { authenticateApiRequestWithRateLimitSecure } from '@/lib/auth/api-auth';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 /**
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     }
     
     // JWT-based authentication with rate limiting (AI cost protection)
-    const authResult = await authenticateApiRequestWithRateLimit(
+    const authResult = await authenticateApiRequestWithRateLimitSecure(
       request,
       ['student'],
       RATE_LIMIT_CONFIGS.AI_PROJECT_GENERATION

@@ -3,7 +3,7 @@ import { ClientIdSchema } from '@/lib/schemas/client';
 import { EnrollStudentSchema } from '@/lib/schemas/enrollment';
 import { USER_ROLES } from '@/lib/schemas/user';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: Request,
@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -65,7 +65,7 @@ export async function POST(
 ) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -309,7 +309,7 @@ if (!studentIdValidation.success) {
     const validatedStudentId = studentIdValidation.data;
 
     // 2. JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -420,7 +420,7 @@ export async function PATCH(
     const { is_active } = bodyValidation.data;
 
     // 2. JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

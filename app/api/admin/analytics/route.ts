@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateApiRequest } from "@/lib/auth/api-auth";
+import { authenticateApiRequestSecure } from "@/lib/auth/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

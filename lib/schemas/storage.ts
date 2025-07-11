@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateFileComprehensive } from '@/lib/security/file-signature-validator';
 
 // --- File Validation Schema ---
 
@@ -11,6 +12,25 @@ export const UploadFileSchema = z.instanceof(File)
   })
   .refine((file) => ALLOWED_FILE_TYPES.includes(file.type), {
     message: `Invalid file type. Only ${ALLOWED_FILE_TYPES.join(', ')} allowed.`,
+  })
+  .refine(async (file) => {
+    // Enhanced security validation with file signature checking
+    try {
+      const validationResult = await validateFileComprehensive(file, {
+        allowedTypes: ALLOWED_FILE_TYPES,
+        maxSize: 500 * 1024 * 1024, // 500MB
+        minSize: 1024, // 1KB
+        enableStructureValidation: true,
+        enableSVGSecurityValidation: false // Not applicable for videos
+      });
+      
+      return validationResult.isValid;
+    } catch (error) {
+      console.warn('Video file validation failed:', error);
+      return false;
+    }
+  }, {
+    message: 'File validation failed. The file may be corrupted or not a valid video format.',
   });
 
 // For backward compatibility, export a validation function

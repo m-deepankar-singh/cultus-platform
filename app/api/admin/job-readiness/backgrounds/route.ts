@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/admin/job-readiness/backgrounds
@@ -8,7 +8,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 export async function GET() {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -39,7 +39,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -208,7 +208,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

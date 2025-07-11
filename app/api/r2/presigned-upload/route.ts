@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { generatePresignedUploadUrl, UPLOAD_CONFIGS } from '@/lib/r2/presigned-upload-service';
 import { z } from 'zod';
 
@@ -13,7 +13,7 @@ const requestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Authenticate request
-    const authResult = await authenticateApiRequest(['Admin', 'student']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

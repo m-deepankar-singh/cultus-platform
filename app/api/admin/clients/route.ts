@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClientSchema } from '@/lib/schemas/client';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   
   try {
     // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
   
   try {
     // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });

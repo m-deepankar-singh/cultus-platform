@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Type for assessment data from database
 interface AssessmentData {
@@ -33,7 +33,7 @@ interface AssessmentData {
 export async function GET(req: NextRequest) {
   try {
     // JWT-based authentication (replaces getUser() + student record lookup)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

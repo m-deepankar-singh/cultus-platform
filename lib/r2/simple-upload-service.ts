@@ -5,8 +5,25 @@ import {
   ValidationError, 
   FileTypeError, 
   FileSizeError, 
+  PathTraversalError,
   createS3Error 
 } from './upload-errors';
+import { 
+  validateUploadKey, 
+  generateSecureKey, 
+  sanitizeFilename 
+} from '@/lib/utils/path-security';
+import { 
+  validateFileComprehensive,
+  validateFileSignature,
+  validateSVGContent,
+  type ValidationResult 
+} from '@/lib/security/file-signature-validator';
+import { 
+  getCurrentSecurityLevel,
+  validateFileSecurityPolicy,
+  getFileTypeConfig 
+} from '@/lib/security/file-validation-config';
 
 export interface UploadResult {
   url: string;
@@ -17,6 +34,10 @@ export interface ValidationOptions {
   allowedTypes?: string[];
   maxSize?: number; // in bytes
   minSize?: number; // in bytes
+  enableSignatureValidation?: boolean;
+  enableSVGSecurityValidation?: boolean;
+  enableStructureValidation?: boolean;
+  uploadContext?: string;
 }
 
 export class SimpleUploadService {
@@ -40,13 +61,19 @@ export class SimpleUploadService {
     }
   }
 
-  private validateFile(file: File | Buffer, options: ValidationOptions = {}): void {
+  private async validateFile(file: File | Buffer, options: ValidationOptions = {}): Promise<ValidationResult | void> {
     const {
       allowedTypes = [],
       maxSize = 500 * 1024 * 1024, // 500MB default
-      minSize = 0
+      minSize = 0,
+      enableSignatureValidation = true,
+      enableSVGSecurityValidation = true,
+      enableStructureValidation = true,
+      uploadContext = 'default'
     } = options;
 
+    const securityLevel = getCurrentSecurityLevel();
+    
     // Get file size
     const fileSize = file instanceof File ? file.size : file.length;
     
@@ -59,7 +86,7 @@ export class SimpleUploadService {
       throw new ValidationError(`File too small. Minimum size: ${minSize} bytes, received: ${fileSize} bytes`);
     }
     
-    // Validate file type (only for File objects)
+    // Basic MIME type validation (legacy support)
     if (file instanceof File && allowedTypes.length > 0) {
       const fileType = file.type;
       const isValidType = allowedTypes.some(type => {
@@ -73,6 +100,104 @@ export class SimpleUploadService {
         throw new FileTypeError(allowedTypes, fileType);
       }
     }
+
+    // Enhanced security validation for File objects
+    if (file instanceof File && (enableSignatureValidation || securityLevel.enforceSignatureValidation)) {
+      // Security policy validation
+      const policyValidation = validateFileSecurityPolicy(
+        file.name,
+        file.type,
+        file.size,
+        uploadContext
+      );
+
+      if (!policyValidation.isAllowed) {
+        console.warn('Security policy violation:', {
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+          context: uploadContext,
+          violations: policyValidation.violations,
+          timestamp: new Date().toISOString()
+        });
+
+        throw new ValidationError(
+          `Security policy violation: ${policyValidation.violations.join(', ')}`,
+          'SECURITY_POLICY_VIOLATION',
+          { 
+            violations: policyValidation.violations,
+            warnings: policyValidation.warnings 
+          }
+        );
+      }
+
+      // Comprehensive file validation
+      const validationResult = await validateFileComprehensive(file, {
+        allowedTypes,
+        maxSize,
+        minSize,
+        enableStructureValidation: enableStructureValidation && securityLevel.enableContentInspection,
+        enableSVGSecurityValidation: enableSVGSecurityValidation && securityLevel.allowSVGUploads
+      });
+
+      if (!validationResult.isValid) {
+        // Log security incidents
+        if (securityLevel.enableSecurityLogging) {
+          console.warn('File validation failed with security implications:', {
+            filename: file.name,
+            claimedType: file.type,
+            detectedType: validationResult.detectedType,
+            errors: validationResult.errors,
+            securityFlags: validationResult.securityFlags,
+            confidence: validationResult.confidence,
+            uploadContext,
+            timestamp: new Date().toISOString(),
+            metadata: validationResult.metadata
+          });
+        }
+
+        // Create appropriate error based on security flags
+        if (validationResult.securityFlags.includes('MIME_TYPE_SPOOFING')) {
+          throw new FileTypeError(
+            allowedTypes,
+            file.type,
+            `File signature validation failed. Claimed type: ${file.type}, detected: ${validationResult.detectedType || 'unknown'}`,
+            'MIME_TYPE_SPOOFING',
+            {
+              detectedType: validationResult.detectedType,
+              securityFlags: validationResult.securityFlags,
+              confidence: validationResult.confidence
+            }
+          );
+        }
+
+        if (validationResult.securityFlags.includes('UNSAFE_SVG_CONTENT')) {
+          throw new ValidationError(
+            'SVG file contains potentially dangerous content',
+            'UNSAFE_SVG_CONTENT',
+            {
+              errors: validationResult.errors,
+              securityFlags: validationResult.securityFlags
+            }
+          );
+        }
+
+        throw new ValidationError(
+          `File validation failed: ${validationResult.errors.join(', ')}`,
+          'FILE_VALIDATION_FAILED',
+          {
+            errors: validationResult.errors,
+            securityFlags: validationResult.securityFlags,
+            detectedType: validationResult.detectedType
+          }
+        );
+      }
+
+      return validationResult;
+    }
+
+    // Return void for Buffer objects or when enhanced validation is disabled
+    return;
   }
 
   async uploadFile(
@@ -82,15 +207,35 @@ export class SimpleUploadService {
     validationOptions?: ValidationOptions
   ): Promise<UploadResult> {
     try {
-      // Validate the file first
+      // Validate the file first (now async for enhanced security)
       if (validationOptions) {
-        this.validateFile(file, validationOptions);
+        await this.validateFile(file, validationOptions);
       }
 
-      // Validate key format
-      if (!key || key.includes('..') || key.startsWith('/') || key.endsWith('/')) {
-        throw new ValidationError('Invalid file key format');
+      // Comprehensive path validation to prevent CVE-2025-004
+      const keyValidation = validateUploadKey(key);
+      if (!keyValidation.isValid) {
+        // Log security issues for monitoring
+        if (keyValidation.securityIssues.length > 0) {
+          console.warn('Security violation in file upload:', {
+            key,
+            securityIssues: keyValidation.securityIssues,
+            errors: keyValidation.errors,
+            timestamp: new Date().toISOString(),
+          });
+          
+          throw new PathTraversalError(
+            keyValidation.errors.join(', '),
+            keyValidation.securityIssues,
+            { originalKey: key }
+          );
+        }
+        
+        throw new ValidationError(`Invalid file key: ${keyValidation.errors.join(', ')}`);
       }
+      
+      // Use sanitized key for upload
+      const sanitizedKey = keyValidation.sanitized || key;
 
 
 
@@ -98,7 +243,7 @@ export class SimpleUploadService {
         client: s3Client,
         params: {
           Bucket: this.bucketName,
-          Key: key,
+          Key: sanitizedKey,
           Body: file,
           ContentType: contentType || (file instanceof File ? file.type : 'application/octet-stream'),
         },
@@ -110,16 +255,16 @@ export class SimpleUploadService {
       // If no public URL is configured, construct a basic URL from the bucket name
       let url: string;
       if (this.publicUrl) {
-        url = `${this.publicUrl}/${key}`;
+        url = `${this.publicUrl}/${sanitizedKey}`;
       } else {
         // Fallback: construct URL from S3 endpoint and bucket
         const endpoint = process.env.R2_ENDPOINT || '';
-        url = endpoint ? `${endpoint}/${this.bucketName}/${key}` : `https://${this.bucketName}.r2.dev/${key}`;
+        url = endpoint ? `${endpoint}/${this.bucketName}/${sanitizedKey}` : `https://${this.bucketName}.r2.dev/${sanitizedKey}`;
       }
       
       return {
         url,
-        key,
+        key: sanitizedKey,
       };
     } catch (error) {
       // If it's already one of our custom errors, re-throw it
@@ -133,10 +278,19 @@ export class SimpleUploadService {
   }
 
   generateKey(prefix: string, filename: string): string {
-    const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2);
-    const extension = filename.split('.').pop();
-    return `${prefix}/${timestamp}_${randomId}.${extension}`;
+    try {
+      // Use the secure key generation function
+      return generateSecureKey(prefix, filename);
+    } catch (error) {
+      // Fallback to safe default if secure generation fails
+      console.warn('Secure key generation failed, using fallback:', error);
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(2, 10);
+      const safeFilename = sanitizeFilename(filename);
+      const extension = safeFilename.split('.').pop() || 'bin';
+      const safeName = safeFilename.replace(/\.[^.]*$/, '') || 'file';
+      return `${prefix}/${timestamp}_${randomId}_${safeName}.${extension}`;
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { UserIdSchema, UpdateUserSchema } from '@/lib/schemas/user'; // Adjust path
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: Request, 
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -74,7 +74,7 @@ export async function PUT(
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -173,7 +173,7 @@ export async function DELETE(
 ) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

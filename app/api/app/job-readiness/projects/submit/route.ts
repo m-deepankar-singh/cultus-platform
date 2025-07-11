@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { gradeProject } from '@/lib/ai/project-grader';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 /**
  * POST /api/app/job-readiness/projects/submit
@@ -10,7 +10,7 @@ import { authenticateApiRequest } from '@/lib/auth/api-auth';
 export async function POST(req: NextRequest) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

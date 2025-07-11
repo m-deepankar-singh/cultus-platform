@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +19,7 @@ export async function GET(
     }
 
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -28,7 +28,7 @@ export async function GET(
     console.log('👤 User:', user?.id);
     console.log('🔍 Looking for submission:', submissionId, 'owned by:', user?.id);
 
-    // Get submission from database - TEMPORARILY REMOVE USER CHECK
+    // Get submission from database
     const { data: submission, error: submissionError } = await supabase
       .from('job_readiness_ai_interview_submissions')
       .select(`
@@ -48,7 +48,7 @@ export async function GET(
         tier_when_submitted
       `)
       .eq('id', submissionId)
-      // .eq('student_id', user.id)  // TEMPORARILY DISABLED
+      .eq('student_id', user.id)
       .single();
 
     console.log('📊 Submission found:', !!submission);

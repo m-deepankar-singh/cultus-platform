@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadService } from '@/lib/r2/simple-upload-service';
 import { UploadError } from '@/lib/r2/upload-errors';
-import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { authenticateApiRequestWithRateLimitSecure } from '@/lib/auth/api-auth';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
     // JWT-based authentication with rate limiting (bandwidth protection)
-    const authResult = await authenticateApiRequestWithRateLimit(
+    const authResult = await authenticateApiRequestWithRateLimitSecure(
       request,
       ['Admin', 'Staff'],
       RATE_LIMIT_CONFIGS.UPLOAD_IMAGE

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 /**
  * DELETE handler to unassign a client from a specific product.
@@ -13,7 +13,7 @@ export async function DELETE(
   context: { params: Promise<{ productId: string; clientId: string }> }
 ) {
   // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-  const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+  const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 /**
@@ -19,7 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ clientI
   
   try {
     // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
@@ -83,7 +83,7 @@ export async function PUT(request: Request, context: { params: Promise<{ clientI
     
     try {
         // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         
         if ('error' in authResult) {
           return NextResponse.json({ error: authResult.error }, { status: authResult.status });
@@ -165,7 +165,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ clie
     
     try {
         // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         
         if ('error' in authResult) {
           return NextResponse.json({ error: authResult.error }, { status: authResult.status });

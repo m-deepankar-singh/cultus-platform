@@ -3,6 +3,13 @@ import { GoogleGenAI, createUserContent, createPartFromUri, Type } from '@google
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { 
+  validateProcessInputs, 
+  createProcessTimeout, 
+  validateVideoSize, 
+  checkMemoryUsage,
+  RESOURCE_LIMITS 
+} from '@/lib/security/process-validator';
 
 // Define the structured output schema for interview analysis
 const interviewAnalysisSchema = {
@@ -381,6 +388,45 @@ export async function analyzeInterview(submissionId: string, userId: string) {
   try {
     console.log(`🔍 Starting analysis for submission ${submissionId} by user ${userId}`);
     
+    // Security validation to prevent CVE-2025-007
+    const validationResult = validateProcessInputs(submissionId, userId);
+    if (!validationResult.isValid) {
+      console.error('❌ Input validation failed:', validationResult.error);
+      throw new Error(`Security validation failed: ${validationResult.error}`);
+    }
+    
+    // Use sanitized inputs for the rest of the function
+    const sanitizedSubmissionId = validationResult.sanitizedSubmissionId!;
+    const sanitizedUserId = validationResult.sanitizedUserId!;
+    
+    // Create timeout to prevent resource exhaustion
+    const timeoutPromise = createProcessTimeout();
+    
+    try {
+      // Run analysis with timeout protection
+      return await Promise.race([
+        analyzeInterviewInternal(sanitizedSubmissionId, sanitizedUserId),
+        timeoutPromise
+      ]);
+    } catch (error) {
+      // Check if it's a timeout error
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.error('❌ Analysis timeout exceeded resource limits');
+        throw new Error('Analysis process exceeded time limit');
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('❌ Error in video analysis:', error);
+    console.error('❌ Full error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    throw error;
+  }
+}
+
+async function analyzeInterviewInternal(submissionId: string, userId: string) {
+  try {
+    console.log(`🔍 Internal analysis for submission ${submissionId} by user ${userId}`);
+    
     // Create Supabase client
     const supabase = await createClient();
     console.log('✅ Supabase client created successfully');
@@ -473,6 +519,13 @@ export async function analyzeInterview(submissionId: string, userId: string) {
       }
       
       videoData = new Blob([combined], { type: 'video/webm' });
+      
+      // Validate video size to prevent memory exhaustion
+      const sizeValidation = validateVideoSize(videoData.size);
+      if (!sizeValidation.isValid) {
+        console.error('❌ Video size validation failed:', sizeValidation.error);
+        throw new Error(sizeValidation.error);
+      }
     } catch (downloadError) {
       console.error('❌ Failed to download video from R2:', downloadError);
       console.log('🔄 Updating status to error...');
@@ -494,6 +547,13 @@ export async function analyzeInterview(submissionId: string, userId: string) {
     }
 
     console.log(`✅ Video downloaded successfully, size: ${videoData.size} bytes`);
+    
+    // Check memory usage before proceeding with analysis
+    const memoryCheck = checkMemoryUsage();
+    if (!memoryCheck.isWithinLimits) {
+      console.warn('⚠️ Memory usage warning:', memoryCheck.warning);
+      // Continue but with monitoring
+    }
 
     // Initialize Gemini AI
     const apiKey = process.env.GEMINI_API_KEY;

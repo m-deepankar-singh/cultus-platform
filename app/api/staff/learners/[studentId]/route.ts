@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selectors';
 
 /**
@@ -18,7 +18,7 @@ export async function GET(
 ) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
-import { authenticateApiRequest } from '@/lib/auth/api-auth'
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth'
 
 const querySchema = z.object({
   page: z.string().optional().default('1'),
@@ -21,7 +21,7 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

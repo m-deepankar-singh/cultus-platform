@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Schema for quiz submission validation
 const QuizSubmissionSchema = z.object({
@@ -72,7 +72,7 @@ export async function POST(
     const validLessonId = lessonIdValidation.data;
 
     // 2. JWT-based authentication (Phase 1 optimization - 0 database queries for auth)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

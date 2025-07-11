@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 const ProductIdQuerySchema = z.object({
   productId: z.string().uuid(),
@@ -51,7 +51,7 @@ interface CourseModule {
 export async function GET(request: NextRequest) {
   try {
     // JWT-based authentication (replaces getUser() + student record lookup)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

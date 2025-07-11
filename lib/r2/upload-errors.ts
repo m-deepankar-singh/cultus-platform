@@ -11,20 +11,27 @@ export class UploadError extends Error {
 }
 
 export class ValidationError extends UploadError {
-  constructor(message: string, details?: any) {
-    super(message, 'VALIDATION_ERROR', 400, details);
+  constructor(message: string, code: string = 'VALIDATION_ERROR', details?: any) {
+    super(message, code, 400, details);
     this.name = 'ValidationError';
   }
 }
 
 export class FileTypeError extends ValidationError {
-  constructor(expectedTypes: string[], receivedType: string) {
+  constructor(
+    expectedTypes: string[], 
+    receivedType: string, 
+    customMessage?: string,
+    code: string = 'INVALID_FILE_TYPE',
+    details?: any
+  ) {
+    const message = customMessage || `Invalid file type. Expected: ${expectedTypes.join(', ')}, received: ${receivedType}`;
     super(
-      `Invalid file type. Expected: ${expectedTypes.join(', ')}, received: ${receivedType}`,
-      { expectedTypes, receivedType }
+      message,
+      code,
+      { expectedTypes, receivedType, ...details }
     );
     this.name = 'FileTypeError';
-    this.code = 'INVALID_FILE_TYPE';
   }
 }
 
@@ -35,10 +42,10 @@ export class FileSizeError extends ValidationError {
     
     super(
       `File too large. Maximum size: ${maxSizeMB}MB, received: ${receivedSizeMB}MB`,
+      'FILE_TOO_LARGE',
       { maxSize, receivedSize, maxSizeMB, receivedSizeMB }
     );
     this.name = 'FileSizeError';
-    this.code = 'FILE_TOO_LARGE';
   }
 }
 
@@ -60,6 +67,17 @@ export class ConfigurationError extends UploadError {
   constructor(message: string, details?: any) {
     super(message, 'CONFIGURATION_ERROR', 500, details);
     this.name = 'ConfigurationError';
+  }
+}
+
+export class PathTraversalError extends ValidationError {
+  constructor(message: string, securityIssues: string[], details?: any) {
+    super(
+      `Path traversal attack detected: ${message}`,
+      { securityIssues, ...details }
+    );
+    this.name = 'PathTraversalError';
+    this.code = 'PATH_TRAVERSAL_ATTACK';
   }
 }
 

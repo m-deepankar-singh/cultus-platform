@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 // import { getUserSessionAndRole } from '@/lib/auth/utils'; // Removed incorrect assumption
 import { QuestionBankQuerySchema, QuestionApiSchema } from '@/lib/schemas/question';
 import { createPaginatedResponse, calculatePaginationRange } from '@/lib/pagination';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(request: Request) {
     try {
         // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }
@@ -104,7 +104,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-        const authResult = await authenticateApiRequest(['Admin']);
+        const authResult = await authenticateApiRequestSecure(['Admin']);
         if ('error' in authResult) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }

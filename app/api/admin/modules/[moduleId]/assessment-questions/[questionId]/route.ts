@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ModuleIdSchema } from '@/lib/schemas/module';
 import { z } from 'zod';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Create a QuestionIdSchema directly following the same pattern as ModuleIdSchema
 const QuestionIdSchema = z.object({
@@ -24,7 +24,7 @@ export async function DELETE(
     const { moduleId: rawModuleId, questionId: rawQuestionId } = await params;
     
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequest(['Admin']);
+    const authResult = await authenticateApiRequestSecure(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, message: 'Authentication required' }, { status: authResult.status });
     }

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { cacheManager } from '@/lib/cache/cache-manager';
 
 export async function POST(request: NextRequest) {
-  const authResult = await authenticateApiRequest(['Admin']);
+  const authResult = await authenticateApiRequestSecure(['Admin']);
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authResult = await authenticateApiRequest(['Admin']);
+  const authResult = await authenticateApiRequestSecure(['Admin']);
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }

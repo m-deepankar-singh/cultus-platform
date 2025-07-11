@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { AssessmentSubmissionSchema } from '@/lib/schemas/progress';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Define a schema for UUID validation (reuse or define locally)
 const UuidSchema = z.string().uuid({ message: 'Invalid Assessment ID format' });
@@ -52,7 +52,7 @@ export async function POST(
     const submissionData = bodyValidation.data;
 
     // 3. 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

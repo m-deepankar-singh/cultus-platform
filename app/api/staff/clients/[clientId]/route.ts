@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(
@@ -12,7 +12,7 @@ export async function GET(
     const { clientId } = resolvedParams;
 
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -71,7 +71,7 @@ export async function PUT(
     const { clientId } = resolvedParams;
 
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

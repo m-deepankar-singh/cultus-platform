@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { ClientIdSchema } from '@/lib/schemas/client';
 import { ProductAssignmentSchema } from '@/lib/schemas/assignment';
 import type { Product } from '@/lib/types/supabase';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 
 // Define the expected structure of the assignment data including the joined product
 type AssignmentWithProduct = {
@@ -23,7 +23,7 @@ export async function GET(
   const params = await context.params;
 
   // JWT-based authentication (0 database queries)
-  const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+  const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
@@ -92,7 +92,7 @@ export async function POST(
   const params = await context.params;
   
   // JWT-based authentication (0 database queries)
-  const authResult = await authenticateApiRequest(['Staff', 'Admin']);
+  const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }

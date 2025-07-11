@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequestWithRateLimit } from '@/lib/auth/api-auth';
+import { authenticateApiRequestWithRateLimitSecure } from '@/lib/auth/api-auth';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 /**
@@ -11,7 +11,7 @@ import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 export async function GET(request: NextRequest) {
   try {
     // JWT-based authentication with rate limiting (0 database queries for basic user info)
-    const authResult = await authenticateApiRequestWithRateLimit(
+    const authResult = await authenticateApiRequestWithRateLimitSecure(
       request,
       undefined, // No role restrictions
       RATE_LIMIT_CONFIGS.AUTH_VALIDATION

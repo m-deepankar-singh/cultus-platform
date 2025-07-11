@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequest } from '@/lib/auth/api-auth';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { validateProcessInputs, processTracker } from '@/lib/security/process-validator';
 
 export async function POST(request: NextRequest) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequest(['student']);
+    const authResult = await authenticateApiRequestSecure(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -68,19 +69,48 @@ export async function POST(request: NextRequest) {
 
     console.log('Interview submission saved successfully:', submission.id);
 
-    // Trigger async video analysis directly (no HTTP call needed)
+    // Trigger async video analysis with security validation
     try {
+      // Validate inputs before dynamic import to prevent CVE-2025-007
+      const validationResult = validateProcessInputs(submission.id, user.id);
+      if (!validationResult.isValid) {
+        console.error('Input validation failed:', validationResult.error);
+        return NextResponse.json(
+          { error: 'Invalid submission data' },
+          { status: 400 }
+        );
+      }
+
+      // Check if user can start new background process
+      if (!processTracker.canStartProcess(user.id)) {
+        console.warn('Process limit exceeded for user:', user.id);
+        return NextResponse.json(
+          { error: 'Too many active analysis processes. Please wait for current analyses to complete.' },
+          { status: 429 }
+        );
+      }
+
       // Import the analysis function and call it directly
       const { analyzeInterview } = await import('../analyze/analyze-function');
       
-      // Don't await this - let it run in background
-      analyzeInterview(submission.id, user.id).catch(error => {
-        console.error('Failed to trigger video analysis:', error);
-      });
+      // Register process start for tracking
+      processTracker.startProcess(user.id, submission.id);
+      
+      // Don't await this - let it run in background with proper cleanup
+      analyzeInterview(validationResult.sanitizedSubmissionId!, validationResult.sanitizedUserId!)
+        .catch(error => {
+          console.error('Failed to trigger video analysis:', error);
+        })
+        .finally(() => {
+          // Ensure process is unregistered when complete
+          processTracker.endProcess(user.id, submission.id);
+        });
       
       console.log('Video analysis triggered for submission:', submission.id);
     } catch (triggerError) {
       console.warn('Failed to trigger video analysis:', triggerError);
+      // Ensure process is unregistered on error
+      processTracker.endProcess(user.id, submission.id);
     }
 
     // Create response with cache invalidation headers

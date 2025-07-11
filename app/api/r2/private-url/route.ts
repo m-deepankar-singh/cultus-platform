@@ -3,7 +3,7 @@ import { z } from "zod";
 import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3Client } from '@/lib/r2/s3-client';
-import { authenticateApiRequest } from "@/lib/auth/api-auth";
+import { authenticateApiRequestSecure } from "@/lib/auth/api-auth";
 
 // Request validation schema
 const privateUrlRequestSchema = z.object({
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     // Authenticate the request - Admin, Staff, and Students can access private files
     // But authorization will be checked based on file ownership
-    const authResult = await authenticateApiRequest(['Admin', 'Staff', 'Student']);
+    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff', 'Student']);
     if ('error' in authResult) {
       return NextResponse.json(
         { 
