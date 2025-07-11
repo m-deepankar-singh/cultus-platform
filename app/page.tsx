@@ -1,19 +1,21 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { HomePageClient } from '@/components/app/HomePageClient';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export default function HomePage() {
   return (
     <main>
         {/* Container for top-right navigation buttons */}
-      <div className="absolute top-4 right-4 z-20 flex gap-4">
+      <div className="absolute top-4 right-4 z-20 flex gap-4 items-center">
+        <ThemeToggle />
         <Link href="/admin/login" passHref>
-          <span className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-md text-black dark:text-white font-medium transition-all duration-200">
+          <span className="px-4 py-2 bg-white/20 hover:bg-white/30 dark:bg-white/10 dark:hover:bg-white/20 backdrop-blur-md rounded-md text-black dark:text-white hover:text-black dark:hover:text-white font-medium transition-all duration-200 border border-black/10 dark:border-white/10">
             Admin
           </span>
           </Link>
         <Link href="/app/login" passHref>
-          <span className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-md text-black dark:text-white font-medium transition-all duration-200">
+          <span className="px-4 py-2 bg-white/20 hover:bg-white/30 dark:bg-white/10 dark:hover:bg-white/20 backdrop-blur-md rounded-md text-black dark:text-white hover:text-black dark:hover:text-white font-medium transition-all duration-200 border border-black/10 dark:border-white/10">
             Login
           </span>
           </Link>

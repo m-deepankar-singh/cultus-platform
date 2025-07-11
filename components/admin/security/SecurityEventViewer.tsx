@@ -67,22 +67,22 @@ interface PaginatedResponse {
 }
 
 const SEVERITY_COLORS = {
-  INFO: 'bg-blue-100 text-blue-800',
-  WARNING: 'bg-yellow-100 text-yellow-800',
-  CRITICAL: 'bg-red-100 text-red-800',
-  EMERGENCY: 'bg-red-500 text-white'
+  INFO: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
+  WARNING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
+  CRITICAL: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
+  EMERGENCY: 'bg-red-500 text-white dark:bg-red-600 dark:text-white'
 };
 
 const CATEGORY_COLORS = {
-  AUTHENTICATION: 'bg-green-100 text-green-800',
-  AUTHORIZATION: 'bg-orange-100 text-orange-800',
-  DATA_ACCESS: 'bg-purple-100 text-purple-800',
-  FILE_OPERATIONS: 'bg-blue-100 text-blue-800',
-  ADMIN_OPERATIONS: 'bg-red-100 text-red-800',
-  RATE_LIMITING: 'bg-yellow-100 text-yellow-800',
-  CONFIGURATION: 'bg-gray-100 text-gray-800',
-  SECURITY_INCIDENT: 'bg-red-200 text-red-900',
-  STUDENT_ACTIVITY: 'bg-indigo-100 text-indigo-800'
+  AUTHENTICATION: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
+  AUTHORIZATION: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300',
+  DATA_ACCESS: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
+  FILE_OPERATIONS: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
+  ADMIN_OPERATIONS: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
+  RATE_LIMITING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
+  CONFIGURATION: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300',
+  SECURITY_INCIDENT: 'bg-red-200 text-red-900 dark:bg-red-900/30 dark:text-red-200',
+  STUDENT_ACTIVITY: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300'
 };
 
 const EVENT_TYPE_ICONS = {
@@ -246,10 +246,10 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
     return (
       <div className={`space-y-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-300 rounded w-1/4 mb-4"></div>
+          <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-1/4 mb-4"></div>
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 bg-gray-300 rounded"></div>
+              <div key={i} className="h-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
             ))}
           </div>
         </div>
@@ -261,7 +261,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Security Events</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Security Events</h2>
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setShowFilters(!showFilters)}
@@ -393,7 +393,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
           <CardTitle className="flex items-center justify-between">
             <span>Security Events ({pagination.total.toLocaleString()})</span>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
                 Page {pagination.page} of {pagination.totalPages}
               </span>
             </div>
@@ -404,7 +404,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
             {events.map((event) => (
               <div
                 key={event.eventId}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-center gap-4 flex-1">
                   <div className="flex-shrink-0">
@@ -415,7 +415,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-gray-900 truncate">
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
                         {getEventTypeDisplayName(event.eventType)}
                       </h3>
                       <Badge variant="secondary" className={SEVERITY_COLORS[event.severity]}>
@@ -426,7 +426,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatTimestamp(event.timestamp)}
@@ -516,7 +516,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
                           
                           <div>
                             <h4 className="font-medium mb-2">Event Details</h4>
-                            <pre className="bg-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
+                            <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm overflow-x-auto">
                               {JSON.stringify(selectedEvent.details, null, 2)}
                             </pre>
                           </div>
@@ -524,7 +524,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
                           {selectedEvent.metadata && Object.keys(selectedEvent.metadata).length > 0 && (
                             <div>
                               <h4 className="font-medium mb-2">Metadata</h4>
-                              <pre className="bg-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
+                              <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm overflow-x-auto">
                                 {JSON.stringify(selectedEvent.metadata, null, 2)}
                               </pre>
                             </div>
@@ -538,8 +538,8 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
             ))}
             
             {events.length === 0 && !loading && (
-              <div className="text-center py-12 text-gray-500">
-                <Shield className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <Shield className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
                 <h3 className="text-lg font-medium mb-2">No security events found</h3>
                 <p>Try adjusting your filters or check back later.</p>
               </div>
@@ -549,7 +549,7 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
           {/* Pagination */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
                 Showing {(pagination.page - 1) * pagination.pageSize + 1} to{' '}
                 {Math.min(pagination.page * pagination.pageSize, pagination.total)} of{' '}
                 {pagination.total} events

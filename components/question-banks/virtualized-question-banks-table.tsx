@@ -76,9 +76,9 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
   }
 
   return (
-    <div style={style} className="grid grid-cols-5 gap-6 px-6 py-4 border-b hover:bg-muted/50 transition-colors">
+    <div style={style} className="grid gap-6 px-6 py-4 border-b hover:bg-muted/50 transition-colors" style={{...style, gridTemplateColumns: "2fr 0.5fr 0.7fr 0.8fr 0.7fr"}}>
       <div className="space-y-1">
-        <p className="text-sm font-medium line-clamp-2">{question.question_text}</p>
+        <p className="text-sm font-medium line-clamp-3">{question.question_text}</p>
         <div className="flex gap-1 flex-wrap">
           {question.topic && (
             <Badge variant="secondary" className="text-xs">
@@ -94,12 +94,15 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
       </div>
       <div>
         <Badge 
-          variant={
-            question.difficulty === 'easy' 
-              ? 'default' 
-              : question.difficulty === 'medium' 
-              ? 'secondary' 
-              : 'destructive'
+          variant="outline"
+          className={
+            question.difficulty === 'easy'
+              ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800'
+              : question.difficulty === 'medium'
+              ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'
+              : question.difficulty === 'hard'
+              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800'
+              : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
           }
         >
           {question.difficulty || 'N/A'}
@@ -332,7 +335,7 @@ export function VirtualizedQuestionBanksTable() {
           {/* Table Container */}
           <div className="rounded-md border">
             {/* Table Header */}
-            <div className="grid grid-cols-5 gap-6 px-6 py-4 font-medium bg-muted/50 border-b text-sm">
+            <div className="grid gap-6 px-6 py-4 font-medium bg-muted/50 border-b text-sm" style={{gridTemplateColumns: "2fr 0.5fr 0.7fr 0.8fr 0.7fr"}}>
               <div>Question</div>
               <div>Type</div>
               <div>Difficulty</div>

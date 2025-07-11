@@ -606,11 +606,8 @@ export default function ExpertSessionsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead>Product</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Students</TableHead>
-                <TableHead>Completion Rate</TableHead>
                 <TableHead>Uploaded</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -627,21 +624,6 @@ export default function ExpertSessionsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm space-y-1">
-                      {session.job_readiness_expert_session_products?.length ? (
-                        session.job_readiness_expert_session_products.map((item) => (
-                          <Badge key={item.product_id} variant="outline" className="mr-1 mb-1">
-                            {item.products.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          No products assigned
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
                       {formatDuration(session.video_duration)}
@@ -651,16 +633,6 @@ export default function ExpertSessionsPage() {
                     <Badge variant={session.is_active ? 'default' : 'secondary'}>
                       {session.is_active ? 'Active' : 'Inactive'}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {session.completion_stats?.completed_students || 0} / {session.completion_stats?.total_students || 0}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {Math.round(session.completion_stats?.completion_rate || 0)}%
-                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-muted-foreground">

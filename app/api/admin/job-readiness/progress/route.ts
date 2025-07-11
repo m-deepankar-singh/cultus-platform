@@ -112,6 +112,28 @@ export async function GET(req: NextRequest) {
       clientProductMap.get(cp.client_id).push(cp.products);
     });
 
+    // Get student IDs for module progress query
+    const studentIds = studentsWithAccess.map((s: any) => s.id);
+
+    // Get module progress for all students using a raw SQL approach
+    const { data: moduleProgressData, error: moduleProgressError } = await supabase.rpc('get_job_readiness_module_progress', {
+      student_ids: studentIds
+    });
+
+    if (moduleProgressError) {
+      console.error('Error fetching module progress:', moduleProgressError);
+    }
+
+    // Convert module progress data to a map for easy lookup
+    const studentModuleProgress = new Map();
+    moduleProgressData?.forEach((mp: any) => {
+      studentModuleProgress.set(mp.student_id, {
+        total_modules: parseInt(mp.total_modules) || 0,
+        completed_modules: parseInt(mp.completed_modules) || 0,
+        completion_percentage: parseInt(mp.completion_percentage) || 0,
+      });
+    });
+
     // Transform students to match frontend expectations
     const transformedStudents = studentsWithAccess.map((student: any) => {
       const products = clientProductMap.get(student.client_id) || [];
@@ -121,6 +143,13 @@ export async function GET(req: NextRequest) {
       const nameParts = student.full_name?.split(' ') || ['Unknown'];
       const first_name = nameParts[0] || 'Unknown';
       const last_name = nameParts.slice(1).join(' ') || '';
+
+      // Get actual module progress for this student
+      const moduleProgress = studentModuleProgress.get(student.id) || {
+        total_modules: 0,
+        completed_modules: 0,
+        completion_percentage: 0,
+      };
 
       return {
         id: student.id,
@@ -150,12 +179,8 @@ export async function GET(req: NextRequest) {
           name: 'No Product Assigned',
           description: '',
         },
-        // Module progress placeholder - you can enhance this later
-        module_progress: {
-          total_modules: 0,
-          completed_modules: 0,
-          completion_percentage: 0,
-        },
+        // Real module progress data
+        module_progress: moduleProgress,
         // Keep client information for reference
         client: student.clients,
       };

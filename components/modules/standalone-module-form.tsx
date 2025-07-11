@@ -256,30 +256,7 @@ export function StandaloneModuleForm({ type }: StandaloneModuleFormProps) {
             
             {/* Type-specific fields */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">{type} Configuration</h3>
               
-              {type === "Course" && (
-                <FormField
-                  control={form.control}
-                  name="video_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Video URL (Optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="https://example.com/video" 
-                          {...field} 
-                          value={field.value || ""}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Link to the intro video for this course module.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
               
               {type === "Assessment" && (
                 <>

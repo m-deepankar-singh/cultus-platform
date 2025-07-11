@@ -202,24 +202,24 @@ export function getTierLevelLabel(tier: string): string {
 
 export function getTierColor(tier: string): string {
   const colors: Record<string, string> = {
-    BRONZE: "bg-amber-100 text-amber-800 border-amber-300",
-    SILVER: "bg-slate-100 text-slate-800 border-slate-300", 
-    GOLD: "bg-yellow-100 text-yellow-800 border-yellow-300"
+    BRONZE: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-700",
+    SILVER: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-900/20 dark:text-slate-200 dark:border-slate-700", 
+    GOLD: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-200 dark:border-yellow-700"
   }
-  return colors[tier] || "bg-gray-100 text-gray-800 border-gray-300"
+  return colors[tier] || "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-200 dark:border-gray-700"
 }
 
 export function getStarLevelColor(level: string | null): string {
-  if (!level) return "bg-gray-100 text-gray-800 border-gray-300"
+  if (!level) return "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-200 dark:border-gray-700"
   
   const colors: Record<string, string> = {
-    ONE: "bg-red-100 text-red-800 border-red-300",
-    TWO: "bg-orange-100 text-orange-800 border-orange-300",
-    THREE: "bg-yellow-100 text-yellow-800 border-yellow-300",
-    FOUR: "bg-blue-100 text-blue-800 border-blue-300",
-    FIVE: "bg-green-100 text-green-800 border-green-300"
+    ONE: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/20 dark:text-red-200 dark:border-red-700",
+    TWO: "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/20 dark:text-orange-200 dark:border-orange-700",
+    THREE: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-200 dark:border-yellow-700",
+    FOUR: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-700",
+    FIVE: "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/20 dark:text-green-200 dark:border-green-700"
   }
-  return colors[level] || "bg-gray-100 text-gray-800 border-gray-300"
+  return colors[level] || "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-200 dark:border-gray-700"
 }
 
 export function formatModuleProgress(progress?: { total_modules: number; completed_modules: number; completion_percentage: number }): string {

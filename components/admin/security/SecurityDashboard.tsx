@@ -40,10 +40,10 @@ interface SecurityAlert {
 }
 
 const SEVERITY_COLORS = {
-  INFO: 'bg-blue-100 text-blue-800',
-  WARNING: 'bg-yellow-100 text-yellow-800',
-  CRITICAL: 'bg-red-100 text-red-800',
-  EMERGENCY: 'bg-red-500 text-white'
+  INFO: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
+  WARNING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
+  CRITICAL: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
+  EMERGENCY: 'bg-red-500 text-white dark:bg-red-600 dark:text-white'
 };
 
 const EVENT_TYPE_ICONS = {
@@ -164,10 +164,10 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="pb-2">
-                <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-gray-300 rounded w-1/2"></div>
+                <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
               </CardContent>
             </Card>
           ))}
@@ -179,9 +179,9 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
   if (error) {
     return (
       <div className={`${className}`}>
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertTriangle className="h-5 w-5" />
               <span>Error loading security dashboard: {error}</span>
             </div>
@@ -204,7 +204,7 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Security Dashboard</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Security Dashboard</h2>
         <div className="flex items-center gap-4">
           <Select value={timeWindow} onValueChange={setTimeWindow}>
             <SelectTrigger className="w-40">
@@ -228,53 +228,53 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Total Events
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{metrics.totalEvents.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">{formatTimeWindow(timeWindow)}</p>
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{metrics.totalEvents.toLocaleString()}</div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatTimeWindow(timeWindow)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <Users className="h-4 w-4" />
               Unique Users
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{metrics.uniqueUsers.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Active users</p>
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{metrics.uniqueUsers.toLocaleString()}</div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Active users</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Suspicious Activity
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{metrics.suspiciousActivityCount.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Requires attention</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Requires attention</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Alerts Generated
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{metrics.alertsGenerated.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">System alerts</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">System alerts</p>
           </CardContent>
         </Card>
       </div>
@@ -301,7 +301,7 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-20 bg-gray-200 rounded-full h-2">
+                    <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
                         className="bg-blue-600 h-2 rounded-full" 
                         style={{
@@ -309,7 +309,7 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
                         }}
                       ></div>
                     </div>
-                    <span className="text-sm text-gray-600 min-w-[3ch]">{count}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3ch]">{count}</span>
                   </div>
                 </div>
               ))}
@@ -337,7 +337,7 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-20 bg-gray-200 rounded-full h-2">
+                    <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
                         className="bg-red-600 h-2 rounded-full" 
                         style={{
@@ -345,7 +345,7 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
                         }}
                       ></div>
                     </div>
-                    <span className="text-sm text-gray-600 min-w-[3ch]">{count}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3ch]">{count}</span>
                   </div>
                 </div>
               ))}
@@ -366,27 +366,27 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {recentEvents.map((event) => (
-                <div key={event.eventId} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                <div key={event.eventId} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex-shrink-0">
                     <Badge variant="secondary" className={SEVERITY_COLORS[event.severity]}>
                       {event.severity}
                     </Badge>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                       {getEventTypeDisplayName(event.eventType)}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {event.endpoint} • {event.ipAddress}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                       {new Date(event.timestamp).toLocaleString()}
                     </p>
                   </div>
                 </div>
               ))}
               {recentEvents.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   No recent events in the selected time window
                 </div>
               )}
@@ -404,17 +404,17 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {alerts.map((alert) => (
-                <div key={alert.id} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                <div key={alert.id} className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
                   <div className="flex-shrink-0">
                     <Badge variant="secondary" className={SEVERITY_COLORS[alert.severity]}>
                       {alert.severity}
                     </Badge>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {alert.description}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {new Date(alert.timestamp).toLocaleString()}
                     </p>
                     {alert.actionRequired && (
@@ -449,13 +449,13 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
             {metrics.topEndpoints.map((endpoint, index) => (
               <div key={endpoint.endpoint} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                  <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-xs font-medium text-blue-600 dark:text-blue-300">
                     {index + 1}
                   </div>
-                  <span className="text-sm font-mono text-gray-700">{endpoint.endpoint}</span>
+                  <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{endpoint.endpoint}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-24 bg-gray-200 rounded-full h-2">
+                  <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div 
                       className="bg-blue-600 h-2 rounded-full" 
                       style={{
@@ -463,7 +463,7 @@ export default function SecurityDashboard({ className = '' }: SecurityDashboardP
                       }}
                     ></div>
                   </div>
-                  <span className="text-sm text-gray-600 min-w-[3ch]">{endpoint.count}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3ch]">{endpoint.count}</span>
                 </div>
               </div>
             ))}

@@ -4,7 +4,7 @@ import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
-import { Plus, Wand2 } from "lucide-react"
+import { Plus, Wand2, Settings, Users, FolderOpen } from "lucide-react"
 import { JrBackgroundsTable } from "@/components/job-readiness/admin/jr-backgrounds-table"
 import { JrBackgroundForm } from "@/components/job-readiness/admin/jr-background-form"
 import {
@@ -119,12 +119,15 @@ export default function JobReadinessBackgroundsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Background Configuration</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Wand2 className="h-8 w-8" />
+            Background Configuration
+          </h1>
+          <p className="text-muted-foreground mt-2">
             Configure AI project generation settings for different student backgrounds and skill levels.
           </p>
         </div>
@@ -135,11 +138,11 @@ export default function JobReadinessBackgroundsPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Configurations</CardTitle>
-            <Wand2 className="h-4 w-4 text-muted-foreground" />
+            <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{backgrounds.length}</div>
@@ -152,7 +155,7 @@ export default function JobReadinessBackgroundsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Background Types</CardTitle>
-            <Wand2 className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -167,7 +170,7 @@ export default function JobReadinessBackgroundsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Project Types</CardTitle>
-            <Wand2 className="h-4 w-4 text-muted-foreground" />
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">

@@ -16,13 +16,7 @@ import {
   JrProgressApiError,
 } from "@/lib/api/job-readiness/progress"
 import { getJrProducts } from "@/lib/api/job-readiness/products"
-
-// Mock client data - in real app this would come from an API
-const mockClients = [
-  { id: "client-1", name: "Tech Corp" },
-  { id: "client-2", name: "Data Solutions Inc" },
-  { id: "client-3", name: "Innovation Labs" },
-]
+import { getClients } from "@/lib/api/clients"
 
 export default function JobReadinessProgressPage() {
   const [progress, setProgress] = React.useState<JrStudentProgress[]>([])
@@ -39,6 +33,7 @@ export default function JobReadinessProgressPage() {
 
   // Filter options
   const [products, setProducts] = React.useState<{ id: string; name: string }[]>([])
+  const [clients, setClients] = React.useState<{ id: string; name: string }[]>([])
 
   // Load products for filter dropdown
   const loadProducts = React.useCallback(async () => {
@@ -47,6 +42,16 @@ export default function JobReadinessProgressPage() {
       setProducts(data.map(p => ({ id: p.id, name: p.name })))
     } catch (error) {
       console.error("Failed to load products:", error)
+    }
+  }, [])
+
+  // Load clients for filter dropdown
+  const loadClients = React.useCallback(async () => {
+    try {
+      const data = await getClients()
+      setClients(data.map(c => ({ id: c.id, name: c.name })))
+    } catch (error) {
+      console.error("Failed to load clients:", error)
     }
   }, [])
 
@@ -70,7 +75,8 @@ export default function JobReadinessProgressPage() {
 
   React.useEffect(() => {
     loadProducts()
-  }, [loadProducts])
+    loadClients()
+  }, [loadProducts, loadClients])
 
   React.useEffect(() => {
     loadProgress()
@@ -180,19 +186,22 @@ export default function JobReadinessProgressPage() {
   }, [progress, filters.clientId])
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Student Progress</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="h-8 w-8" />
+            Student Progress
+          </h1>
+          <p className="text-muted-foreground mt-2">
             Monitor and manage student progression through Job Readiness programs.
           </p>
         </div>
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
@@ -281,7 +290,7 @@ export default function JobReadinessProgressPage() {
               filters={filters}
               onFiltersChange={setFilters}
               products={products}
-              clients={mockClients}
+              clients={clients}
             />
           )}
         </CardContent>

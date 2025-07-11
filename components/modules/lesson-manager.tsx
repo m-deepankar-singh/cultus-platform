@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronUp, ChevronDown, Pencil, Trash, Plus, Save } from "lucide-react"
+import { ChevronUp, ChevronDown, Pencil, Trash, Plus, Save, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { 
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { LessonForm } from "@/components/modules/lesson-form"
 
 interface Lesson {
@@ -64,6 +65,9 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string | null>(null)
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false)
   const [newLesson, setNewLesson] = useState<Partial<Lesson>>({
     title: "",
     description: "",
@@ -107,6 +111,23 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
     fetchLessons()
   }, [moduleId, toast])
   
+  // Add beforeunload event listener to warn about unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = 'You have unsaved changes to the lesson order. Are you sure you want to leave?'
+        return 'You have unsaved changes to the lesson order. Are you sure you want to leave?'
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [hasUnsavedChanges])
+  
   // Move lesson up in sequence
   const moveUp = (index: number) => {
     if (index <= 0) return
@@ -123,6 +144,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
     
     setLessons(newLessons)
     setSaveSuccess(false)
+    setHasUnsavedChanges(true)
   }
   
   // Move lesson down in sequence
@@ -141,6 +163,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
     
     setLessons(newLessons)
     setSaveSuccess(false)
+    setHasUnsavedChanges(true)
   }
   
   // Save lesson order changes
@@ -204,6 +227,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
       })
       
       setSaveSuccess(true)
+      setHasUnsavedChanges(false)
       router.refresh()
       
     } catch (error) {
@@ -270,6 +294,9 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
         title: "Success",
         description: "New lesson has been created",
       })
+      
+      // Close the modal
+      setIsCreateModalOpen(false)
       
       // Refresh the page to show updated lessons
       router.refresh()
@@ -383,9 +410,18 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
   
   return (
     <div className="space-y-6">
+      {hasUnsavedChanges && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            You have unsaved changes to the lesson order. Please save your changes before leaving this page.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2 ml-auto"> 
-          {lessons.length > 0 && !saveSuccess && (
+          {lessons.length > 0 && hasUnsavedChanges && (
             <Button 
               variant="outline" 
               onClick={saveOrder}
@@ -402,7 +438,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
             </Button>
           )}
           
-          <Dialog>
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -425,8 +461,7 @@ export function LessonManager({ moduleId }: LessonManagerProps) {
                   return Promise.resolve()
                 }}
                 onCancel={() => {
-                  const closeButton = document.querySelector('[data-id="close-dialog"]') as HTMLButtonElement
-                  if (closeButton) closeButton.click()
+                  setIsCreateModalOpen(false)
                 }}
                 isSubmitting={isSaving}
               />

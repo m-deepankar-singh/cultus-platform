@@ -99,27 +99,9 @@ const navItems: NavItem[] = [
         role: ["admin"],
       },
       {
-        title: "Assessments",
-        href: "/admin/job-readiness/assessments",
-        icon: FileQuestion,
-        role: ["admin"],
-      },
-      {
-        title: "Courses",
-        href: "/admin/job-readiness/courses",
-        icon: BookOpen,
-        role: ["admin"],
-      },
-      {
         title: "Expert Sessions",
         href: "/admin/job-readiness/expert-sessions",
         icon: GraduationCap,
-        role: ["admin"],
-      },
-      {
-        title: "Projects",
-        href: "/admin/job-readiness/projects",
-        icon: Layers,
         role: ["admin"],
       },
       {

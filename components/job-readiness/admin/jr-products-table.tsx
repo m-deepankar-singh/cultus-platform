@@ -52,7 +52,7 @@ export function JrProductsTable({
     return (
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+          <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
             Bronze
           </Badge>
           <span className="text-xs text-muted-foreground">
@@ -60,7 +60,7 @@ export function JrProductsTable({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
+          <Badge variant="outline" className="text-xs bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
             Silver
           </Badge>
           <span className="text-xs text-muted-foreground">
@@ -68,7 +68,7 @@ export function JrProductsTable({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+          <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">
             Gold
           </Badge>
           <span className="text-xs text-muted-foreground">

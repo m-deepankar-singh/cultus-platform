@@ -280,12 +280,7 @@ export function VirtualizedUsersTable({ clientOptions }: VirtualizedUsersTablePr
         </Alert>
       )}
       
-      <div className="p-6 space-y-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground">Manage your system users and their access permissions.</p>
-        </div>
-        
+      <div className="p-6 space-y-4">        
         {/* Search and Filter Controls */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
@@ -307,9 +302,6 @@ export function VirtualizedUsersTable({ clientOptions }: VirtualizedUsersTablePr
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               Filters
             </Button>
-            {!isStaffUser && (
-              <AddUserDialog clients={clientOptions} />
-            )}
           </div>
           
           {/* Expanded Filters */}

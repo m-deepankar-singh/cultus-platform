@@ -66,7 +66,7 @@ export function CompletionRates({ rates, error }: CompletionRatesProps) {
                 <TableCell>
                   <Badge 
                     variant={rate.moduleType === 'Course' ? 'secondary' : 'outline'}
-                    className={rate.moduleType === 'Course' ? "border-blue-200 bg-blue-50 text-blue-700" : "border-purple-200 bg-purple-50 text-purple-700"}
+                    className={rate.moduleType === 'Course' ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" : "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300"}
                   >
                     {rate.moduleType}
                   </Badge>

@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { 
   ChevronLeft, 
-  Pencil, 
   Trash, 
   Tag, 
   Calendar, 
@@ -22,7 +21,6 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DeleteModuleButton } from "@/components/modules/delete-module-button"
 import { LessonManager } from "@/components/modules/lesson-manager"
 import { AssessmentQuestionManager } from "@/components/modules/assessment-question-manager"
@@ -82,12 +80,6 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/modules/${moduleId}/edit`}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Module
-            </Link>
-          </Button>
           <DeleteModuleButton moduleId={moduleId} />
         </div>
       </div>
@@ -141,88 +133,33 @@ export default async function ModuleDetailPage({ params }: ModulePageProps) {
         </Card>
       )}
 
-      <Tabs defaultValue="details" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="details">Module Details</TabsTrigger>
-          {module.type === "Course" && <TabsTrigger value="lessons">Lessons</TabsTrigger>}
-          {module.type === "Assessment" && <TabsTrigger value="questions">Questions</TabsTrigger>}
-        </TabsList>
-        
-        <TabsContent value="details">
-          <Card>
-            <CardHeader>
-              <CardTitle>Module Configuration</CardTitle>
-              <CardDescription>
-                Configuration settings for this {module.type.toLowerCase()} module
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {module.type === "Course" && (
-                <div>
-                  {module.configuration?.video_url && (
-                    <div className="mb-4">
-                      <h3 className="font-semibold mb-2">Intro Video</h3>
-                      <a 
-                        href={module.configuration.video_url as string} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {module.configuration.video_url as string}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {module.type === "Assessment" && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <h3 className="font-semibold">Time Limit</h3>
-                    <div className="flex items-center">
-                      <Clock className="mr-2 h-4 w-4" />
-                      <span>{module.configuration?.time_limit_minutes || 60} minutes</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <h3 className="font-semibold">Pass Threshold</h3>
-                    <span>{module.configuration?.pass_threshold || 70}%</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="lessons">
-          <Card>
-            <CardHeader>
-              <CardTitle>Lessons</CardTitle>
-              <CardDescription>
-                Manage the lessons for this course module
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LessonManager moduleId={moduleId} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="questions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assessment Questions</CardTitle>
-              <CardDescription>
-                Manage the questions for this assessment module
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AssessmentQuestionManager moduleId={moduleId} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {module.type === "Course" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Lessons</CardTitle>
+            <CardDescription>
+              Manage the lessons for this course module
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LessonManager moduleId={moduleId} />
+          </CardContent>
+        </Card>
+      )}
+      
+      {module.type === "Assessment" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Assessment Questions</CardTitle>
+            <CardDescription>
+              Manage the questions for this assessment module
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AssessmentQuestionManager moduleId={moduleId} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 } 

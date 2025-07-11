@@ -203,14 +203,14 @@ export default function QuestionList({ questions: initialQuestions, initialData 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Question</TableHead>
-              <TableHead>Bank Type</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Correct Answer</TableHead>
-              <TableHead>Topic</TableHead>
-              <TableHead>Difficulty</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[40%]">Question</TableHead>
+              <TableHead className="w-[8%]">Bank Type</TableHead>
+              <TableHead className="w-[6%]">Type</TableHead>
+              <TableHead className="w-[15%]">Correct Answer</TableHead>
+              <TableHead className="w-[8%]">Topic</TableHead>
+              <TableHead className="w-[8%]">Difficulty</TableHead>
+              <TableHead className="w-[8%]">Created</TableHead>
+              <TableHead className="w-[7%] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -223,8 +223,8 @@ export default function QuestionList({ questions: initialQuestions, initialData 
             ) : questions.length > 0 ? (
               questions.map((question) => (
                 <TableRow key={question.id}>
-                  <TableCell className="font-medium max-w-xs truncate" title={question.question_text}>
-                    {question.question_text}
+                  <TableCell className="font-medium" title={question.question_text}>
+                    <div className="break-words">{question.question_text}</div>
                   </TableCell>
                   <TableCell>
                     {question.bankType 
@@ -238,7 +238,17 @@ export default function QuestionList({ questions: initialQuestions, initialData 
                     {getCorrectAnswerText(question)}
                   </TableCell>
                   <TableCell>{question.topic || '-'}</TableCell>
-                  <TableCell>{question.difficulty || '-'}</TableCell>
+                  <TableCell>
+                    {question.difficulty ? (
+                      <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
+                        {question.difficulty}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700">
+                        N/A
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>{formatDate(question.created_at)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
