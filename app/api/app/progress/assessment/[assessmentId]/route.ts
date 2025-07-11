@@ -22,9 +22,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ assessmentId: string }> },
 ) {
+  // 1. Validate Route Parameter (assessmentId)
+  const resolvedParams = await params;
+  
   try {
-    // 1. Validate Route Parameter (assessmentId)
-    const resolvedParams = await params;
     const assessmentIdValidation = UuidSchema.safeParse(resolvedParams.assessmentId);
     if (!assessmentIdValidation.success) {
       return NextResponse.json(
@@ -278,7 +279,7 @@ export async function POST(
       eventType: SecurityEventType.SYSTEM_ERROR,
       severity: SecuritySeverity.CRITICAL,
       category: SecurityCategory.STUDENT_ACTIVITY,
-      endpoint: `/api/app/progress/assessment/${assessmentId || 'unknown'}`,
+      endpoint: `/api/app/progress/assessment/${resolvedParams.assessmentId || 'unknown'}`,
       method: 'POST',
       details: { 
         operation: 'assessment_submission_system_error',

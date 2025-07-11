@@ -84,11 +84,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (filters.ipAddress) {
-      events = events.filter(event => event.ipAddress.includes(filters.ipAddress));
+      events = events.filter(event => event.ipAddress?.includes(filters.ipAddress!));
     }
 
     if (filters.endpoint) {
-      events = events.filter(event => event.endpoint?.includes(filters.endpoint));
+      events = events.filter(event => event.endpoint?.includes(filters.endpoint!));
     }
 
     if (filters.dateFrom) {

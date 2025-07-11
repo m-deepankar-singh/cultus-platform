@@ -390,7 +390,7 @@ export default function SecurityAlertPanel({ className = '' }: SecurityAlertPane
                   {getAlertActions(alert).map((action) => (
                     <Button
                       key={action.id}
-                      onClick={action.action}
+                      onClick={() => action.action(alert)}
                       variant={action.id === 'dismiss' ? 'destructive' : 'outline'}
                       size="sm"
                     >

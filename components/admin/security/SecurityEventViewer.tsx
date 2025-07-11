@@ -81,13 +81,16 @@ const CATEGORY_COLORS = {
   ADMIN_OPERATIONS: 'bg-red-100 text-red-800',
   RATE_LIMITING: 'bg-yellow-100 text-yellow-800',
   CONFIGURATION: 'bg-gray-100 text-gray-800',
-  SECURITY_INCIDENT: 'bg-red-200 text-red-900'
+  SECURITY_INCIDENT: 'bg-red-200 text-red-900',
+  STUDENT_ACTIVITY: 'bg-indigo-100 text-indigo-800'
 };
 
 const EVENT_TYPE_ICONS = {
   AUTH_SUCCESS: '✅',
   AUTH_FAILURE: '❌',
   AUTH_TOKEN_EXPIRED: '🔒',
+  SESSION_EXPIRED: '⏰',
+  SESSION_REFRESHED: '🔄',
   ROLE_VALIDATION_FAILED: '🚫',
   RATE_LIMIT_EXCEEDED: '⚡',
   RATE_LIMIT_CHECK: '🔄',
@@ -95,11 +98,18 @@ const EVENT_TYPE_ICONS = {
   FILE_UPLOAD: '📁',
   FILE_ACCESS: '📄',
   SENSITIVE_DATA_ACCESS: '🔐',
+  DATA_ACCESS_FAILURE: '💾',
   ADMIN_ACTION: '👤',
   BULK_OPERATION: '📊',
   CONFIGURATION_ACCESS: '⚙️',
   SUSPICIOUS_ACTIVITY: '🔍',
-  PRIVILEGE_ESCALATION: '⬆️'
+  PRIVILEGE_ESCALATION: '⬆️',
+  SYSTEM_ERROR: '💥',
+  STUDENT_API_ACCESS: '📚',
+  STUDENT_AUTH_SUCCESS: '✅',
+  STUDENT_AUTH_FAILURE: '❌',
+  STUDENT_SUBMISSION: '📤',
+  STUDENT_PROGRESS: '📈'
 };
 
 export default function SecurityEventViewer({ className = '' }: SecurityEventViewerProps) {
@@ -207,6 +217,8 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
       AUTH_SUCCESS: 'Authentication Success',
       AUTH_FAILURE: 'Authentication Failure',
       AUTH_TOKEN_EXPIRED: 'Token Expired',
+      SESSION_EXPIRED: 'Session Expired',
+      SESSION_REFRESHED: 'Session Refreshed',
       ROLE_VALIDATION_FAILED: 'Role Validation Failed',
       RATE_LIMIT_EXCEEDED: 'Rate Limit Exceeded',
       RATE_LIMIT_CHECK: 'Rate Limit Check',
@@ -214,11 +226,18 @@ export default function SecurityEventViewer({ className = '' }: SecurityEventVie
       FILE_UPLOAD: 'File Upload',
       FILE_ACCESS: 'File Access',
       SENSITIVE_DATA_ACCESS: 'Sensitive Data Access',
+      DATA_ACCESS_FAILURE: 'Data Access Failure',
       ADMIN_ACTION: 'Admin Action',
       BULK_OPERATION: 'Bulk Operation',
       CONFIGURATION_ACCESS: 'Configuration Access',
       SUSPICIOUS_ACTIVITY: 'Suspicious Activity',
-      PRIVILEGE_ESCALATION: 'Privilege Escalation'
+      PRIVILEGE_ESCALATION: 'Privilege Escalation',
+      SYSTEM_ERROR: 'System Error',
+      STUDENT_API_ACCESS: 'Student API Access',
+      STUDENT_AUTH_SUCCESS: 'Student Auth Success',
+      STUDENT_AUTH_FAILURE: 'Student Auth Failure',
+      STUDENT_SUBMISSION: 'Student Submission',
+      STUDENT_PROGRESS: 'Student Progress'
     };
     return names[eventType] || eventType;
   };

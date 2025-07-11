@@ -4,9 +4,9 @@ import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { alertId: string } }
+  { params }: { params: Promise<{ alertId: string }> }
 ) {
-  const { alertId } = params;
+  const { alertId } = await params;
 
   // Log alert dismissal attempt
   securityLogger.logEvent({
