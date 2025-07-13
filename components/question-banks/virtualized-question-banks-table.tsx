@@ -76,7 +76,7 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
   }
 
   return (
-    <div style={style} className="grid gap-6 px-6 py-4 border-b hover:bg-muted/50 transition-colors" style={{...style, gridTemplateColumns: "2fr 0.5fr 0.7fr 0.8fr 0.7fr"}}>
+    <div className="grid gap-6 px-6 py-4 border-b hover:bg-muted/50 transition-colors" style={{...style, gridTemplateColumns: "2fr 0.5fr 0.7fr 0.8fr 0.7fr"}}>
       <div className="space-y-1">
         <p className="text-sm font-medium line-clamp-3">{question.question_text}</p>
         <div className="flex gap-1 flex-wrap">

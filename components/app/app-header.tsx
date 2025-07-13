@@ -2,12 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Settings, Menu, LucideIcon, Briefcase } from "lucide-react"
+import { Home, Menu, LucideIcon, Briefcase, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedButton } from "@/components/ui/animated-button"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
@@ -138,32 +137,16 @@ export function AppHeader() {
             <DropdownMenuTrigger asChild>
               {mounted && theme === "dark" ? (
                 <AnimatedButton variant="ghost" size="icon" className="rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg" alt="User" />
-                    <AvatarFallback>ST</AvatarFallback>
-                  </Avatar>
+                  <User className="h-5 w-5" />
                 </AnimatedButton>
               ) : (
                 <Button variant="ghost" size="icon" className="rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg" alt="User" />
-                    <AvatarFallback>ST</AvatarFallback>
-                  </Avatar>
+                  <User className="h-5 w-5" />
                 </Button>
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className={mounted && theme === "dark" ? "glass-effect" : ""}>
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/app/profile">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Profile Settings</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <span>Help Center</span>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout('student')}>
                 Log out
