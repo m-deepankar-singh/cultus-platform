@@ -27,7 +27,7 @@ export function PerformanceOptimizer({ children }: PerformanceOptimizerProps) {
     // Detect low-end devices (basic heuristics)
     const checkLowEnd = () => {
       const isLowEnd = navigator.hardwareConcurrency <= 2 || 
-                      navigator.deviceMemory <= 2 ||
+                      ((navigator as any).deviceMemory && (navigator as any).deviceMemory <= 2) ||
                       /android.*(mobile|sm-|md-)/i.test(navigator.userAgent)
       setIsLowEnd(isLowEnd)
     }
@@ -98,7 +98,7 @@ export function usePerformanceContext() {
   useEffect(() => {
     const isMobile = window.innerWidth <= 768
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const isLowEnd = navigator.hardwareConcurrency <= 2 || navigator.deviceMemory <= 2
+    const isLowEnd = navigator.hardwareConcurrency <= 2 || ((navigator as any).deviceMemory && (navigator as any).deviceMemory <= 2)
 
     setContext({ isMobile, isLowEnd, reducedMotion })
   }, [])

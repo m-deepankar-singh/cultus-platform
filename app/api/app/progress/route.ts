@@ -61,13 +61,8 @@ export async function GET() {
 
     // Transform the consolidated response to match the expected API format
     // This maintains backward compatibility while leveraging the optimized data structure
-    const transformedResponse = (progressData?.products || []).map((product: any) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      image_url: product.image_url || null,
-      type: product.type,
-      modules: (product.modules || []).map((module: any) => ({
+    const transformedResponse = (progressData?.products || []).map((product: any) => {
+      const modules = (product.modules || []).map((module: any) => ({
         id: module.id,
         name: module.name,
         type: module.type,
@@ -83,16 +78,49 @@ export async function GET() {
         lessons: [], // Populated on-demand via course-specific endpoint
         // Assessment questions (populated on-demand via assessment-specific endpoint)  
         questions: [], // Populated on-demand via assessment-specific endpoint
-      })),
-      // Add progress summary for backward compatibility
-      progressSummary: {
-        totalModules: product.progress_summary?.total_modules || 0,
-        completedModules: product.progress_summary?.completed_modules || 0,
-        inProgressModules: product.progress_summary?.in_progress_modules || 0,
-        notStartedModules: product.progress_summary?.not_started_modules || 0,
-        completionPercentage: product.progress_summary?.completion_percentage || 0,
-      },
-    }));
+      }));
+
+      // Calculate product progress percentage
+      let totalProgress = 0;
+      modules.forEach((m: any) => {
+        totalProgress += m.progress_percentage || 0;
+      });
+      const productProgressPercentage = modules.length > 0 ? Math.round(totalProgress / modules.length) : 0;
+      
+      // Determine product status
+      let productStatus: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed' = 'NotStarted';
+      if (modules.length > 0) {
+        const allNotStarted = modules.every((m: any) => m.status === 'NotStarted');
+        const allCompleted = modules.every((m: any) => m.status === 'Completed');
+        
+        if (allNotStarted) {
+          productStatus = 'NotStarted';
+        } else if (allCompleted) {
+          productStatus = 'Completed';
+        } else {
+          productStatus = 'InProgress';
+        }
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        image_url: product.image_url || null,
+        type: product.type,
+        modules,
+        product_progress_percentage: productProgressPercentage,
+        product_status: productStatus,
+        // Add progress summary for backward compatibility
+        progressSummary: {
+          totalModules: product.progress_summary?.total_modules || 0,
+          completedModules: product.progress_summary?.completed_modules || 0,
+          inProgressModules: product.progress_summary?.in_progress_modules || 0,
+          notStartedModules: product.progress_summary?.not_started_modules || 0,
+          completionPercentage: product.progress_summary?.completion_percentage || 0,
+        },
+      };
+    });
 
     // Add metadata for debugging and monitoring
     const response = {

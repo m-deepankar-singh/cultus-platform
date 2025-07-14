@@ -7,9 +7,19 @@ interface User {
   email: string
 }
 
+interface Profile {
+  fullName: string | null
+  backgroundType?: string | null
+  tier?: string | null
+  starLevel?: number | null
+  clientId?: string | null
+  isActive?: boolean
+}
+
 interface CurrentUserResponse {
   user: User | null
   role: string | null
+  profile: Profile | null
   isLoading: boolean
   error: Error | null
 }
@@ -17,6 +27,7 @@ interface CurrentUserResponse {
 export function useCurrentUser(): CurrentUserResponse {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<string | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
@@ -34,6 +45,7 @@ export function useCurrentUser(): CurrentUserResponse {
         
         setUser(data.user || null)
         setRole(data.role || null)
+        setProfile(data.profile || null)
       } catch (err) {
         console.error('Error fetching user data:', err)
         setError(err instanceof Error ? err : new Error('Unknown error'))
@@ -45,5 +57,5 @@ export function useCurrentUser(): CurrentUserResponse {
     fetchUserProfile()
   }, [])
 
-  return { user, role, isLoading, error }
+  return { user, role, profile, isLoading, error }
 } 

@@ -27,6 +27,9 @@ interface Product {
   name: string
   description: string | null
   type?: string
+  product_progress_percentage?: number
+  product_status?: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed'
+  modules?: any[]
 }
 
 interface PaginatedResponse {

@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
+import { AnimatedButton } from '@/components/ui/animated-button'
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAssessmentDetails } from '@/hooks/useAssessmentDetails'
 import { useSubmitAssessment } from '@/hooks/useSubmitAssessment'
 import { Clock, CheckCircle2, AlertCircle, FileText, Trophy, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
+import gsap from 'gsap'
 
 interface AssessmentInterfaceProps {
   moduleId: string
@@ -33,6 +34,25 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
   const [isStarted, setIsStarted] = useState(false)
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    
+    if (!isLoading && assessmentData) {
+      gsap.fromTo(
+        ".assessment-card",
+        { y: 30, opacity: 0 },
+        { 
+          y: 0, 
+          opacity: 1, 
+          stagger: 0.1, 
+          duration: 0.6, 
+          ease: "power2.out"
+        }
+      );
+    }
+  }, [isLoading, assessmentData])
 
   const handleSubmitAssessment = useCallback(async () => {
     if (!assessmentData?.assessment.questions) return
@@ -175,43 +195,62 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="animate-pulse space-y-2">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <PerformantAnimatedCard 
+          variant="glass" 
+          className="assessment-card"
+          staggerIndex={0}
+        >
+          <div className="p-6">
             <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+              <div className="h-8 bg-gray-200/50 dark:bg-gray-700/50 rounded w-1/2"></div>
+              <div className="h-4 bg-gray-200/50 dark:bg-gray-700/50 rounded w-3/4"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200/50 dark:bg-gray-700/50 rounded"></div>
+                <div className="h-4 bg-gray-200/50 dark:bg-gray-700/50 rounded w-2/3"></div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </PerformantAnimatedCard>
       </div>
     )
   }
 
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load assessment. Please try again or contact support.
-        </AlertDescription>
-      </Alert>
+      <PerformantAnimatedCard variant="glass" className="assessment-card">
+        <div className="p-6 text-center space-y-4">
+          <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30 w-fit mx-auto">
+            <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-red-900 dark:text-red-100 mb-2">Error Loading Assessment</h2>
+            <p className="text-red-700 dark:text-red-300">
+              Failed to load assessment. Please try again or contact support.
+            </p>
+          </div>
+          <AnimatedButton onClick={() => window.location.reload()}>
+            Try Again
+          </AnimatedButton>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
   if (!assessmentData) {
     return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Assessment not found.
-        </AlertDescription>
-      </Alert>
+      <PerformantAnimatedCard variant="glass" className="assessment-card">
+        <div className="p-6 text-center space-y-4">
+          <div className="p-3 rounded-full bg-gray-100 dark:bg-gray-800 w-fit mx-auto">
+            <AlertCircle className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">Assessment Not Found</h2>
+            <p className="text-muted-foreground">
+              The requested assessment could not be found.
+            </p>
+          </div>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
@@ -224,61 +263,106 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
   if (!isStarted) {
     return (
       <div className="space-y-6">
-        <Card className="border-blue-200 dark:border-blue-600">
-          <CardHeader className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30">
-                <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+        <PerformantAnimatedCard 
+          variant="glass" 
+          hoverEffect="lift"
+          className="assessment-card"
+          staggerIndex={0}
+        >
+          <div className="p-8 text-center space-y-6">
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <div className="p-4 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur">
+                <FileText className="h-12 w-12 text-blue-600 dark:text-blue-400" />
               </div>
-              <div>
-                <CardTitle className="text-2xl">{assessment.name}</CardTitle>
-                <CardDescription className="text-lg mt-2">
-                  {assessment.instructions || 'Complete this assessment to determine your skill level.'}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Assessment Info */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Assessment Details</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                    <span className="text-sm">{questions.length} Questions</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                    <span className="text-sm">{assessment.time_limit_minutes} minutes</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                    <span className="text-sm">Passing threshold: {assessment.passing_threshold}%</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Important Notes</h3>
-                <ul className="text-sm space-y-2 text-gray-600 dark:text-gray-400">
-                  <li>• You can navigate between questions</li>
-                  <li>• Your progress is automatically saved</li>
-                  <li>• The timer will start when you begin</li>
-                  <li>• Assessment will auto-submit when time expires</li>
-                </ul>
+              <div className="text-left">
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight gradient-text mb-2">
+                  {assessment.name}
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                  {assessment.instructions || 'Complete this assessment to unlock your first star and advance your learning journey.'}
+                </p>
               </div>
             </div>
 
-            {/* Start Button */}
-            <div className="text-center pt-4">
-              <Button onClick={handleStartAssessment} size="lg" className="px-8">
-                <Clock className="h-5 w-5 mr-2" />
-                Start Assessment
-              </Button>
+            <div className="grid md:grid-cols-2 gap-8 text-left">
+              <PerformantAnimatedCard 
+                variant="subtle" 
+                hoverEffect="scale"
+                staggerIndex={1}
+                className="space-y-4"
+              >
+                <h3 className="font-semibold text-xl flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  Assessment Details
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/10 to-accent/10">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Questions</span>
+                    </div>
+                    <span className="text-sm font-bold">{questions.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/10 to-accent/10">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Time Limit</span>
+                    </div>
+                    <span className="text-sm font-bold">{assessment.time_limit_minutes} min</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/10 to-accent/10">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Pass Threshold</span>
+                    </div>
+                    <span className="text-sm font-bold">{assessment.passing_threshold}%</span>
+                  </div>
+                </div>
+              </PerformantAnimatedCard>
+              
+              <PerformantAnimatedCard 
+                variant="subtle" 
+                hoverEffect="scale"
+                staggerIndex={2}
+                className="space-y-4"
+              >
+                <h3 className="font-semibold text-xl flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  Important Notes
+                </h3>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0"></div>
+                    <span>Navigate freely between questions</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0"></div>
+                    <span>Progress is automatically saved</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0"></div>
+                    <span>Timer starts when you begin</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0"></div>
+                    <span>Auto-submit when time expires</span>
+                  </li>
+                </ul>
+              </PerformantAnimatedCard>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="pt-6">
+              <AnimatedButton 
+                onClick={handleStartAssessment} 
+                size="lg" 
+                className="px-12 py-4 text-lg bg-gradient-to-r from-primary to-accent"
+              >
+                <Clock className="h-6 w-6 mr-3" />
+                Start Assessment
+              </AnimatedButton>
+            </div>
+          </div>
+        </PerformantAnimatedCard>
       </div>
     )
   }
@@ -287,15 +371,26 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
   return (
     <div className="space-y-6">
       {/* Progress Header */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
+      <PerformantAnimatedCard 
+        variant="glass" 
+        hoverEffect="glow"
+        className="assessment-card"
+        staggerIndex={0}
+      >
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold">{assessment.name}</h1>
+              <h1 className="text-2xl font-bold gradient-text">{assessment.name}</h1>
               {timeRemaining !== null && (
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur border border-blue-200/30 dark:border-blue-600/30">
+                  <OptimizedProgressRing
+                    value={timeRemaining < 300 ? (timeRemaining / 300) * 100 : 100}
+                    size={24}
+                    color={timeRemaining < 300 ? "danger" : "primary"}
+                    showValue={false}
+                  />
                   <Timer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className={`font-mono text-sm ${
+                  <span className={`font-mono text-sm font-bold ${
                     timeRemaining < 300 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
                   }`}>
                     {formatTime(timeRemaining)}
@@ -303,52 +398,92 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                 </div>
               )}
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Question {currentQuestionIndex + 1} of {questions.length}
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {getAnsweredCount()} answered • {Math.round(progress)}% complete
+              </div>
             </div>
           </div>
-          <Progress value={progress} className="h-2" />
-          <div className="flex items-center justify-between mt-2 text-sm text-gray-600 dark:text-gray-400">
-            <span>{getAnsweredCount()} of {questions.length} answered</span>
-            <span>{Math.round(progress)}% complete</span>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Progress</span>
+              <OptimizedProgressRing
+                value={progress}
+                size={40}
+                color="primary"
+                showValue={true}
+                delay={200}
+              />
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000 ease-out"
+                style={{ 
+                  width: `${mounted ? progress : 0}%`,
+                  transitionDelay: '300ms'
+                }}
+              />
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </PerformantAnimatedCard>
 
       {/* Current Question */}
       {currentQuestion && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <CardTitle className="text-lg flex-1">
+        <PerformantAnimatedCard 
+          variant="glass" 
+          hoverEffect="lift"
+          className="assessment-card"
+          staggerIndex={1}
+        >
+          <div className="p-6">
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-xl font-semibold flex-1 leading-relaxed">
                 {currentQuestion.question_text}
-              </CardTitle>
-              <Badge variant="outline" className="ml-2 text-xs">
+              </h2>
+              <Badge 
+                variant="outline" 
+                className="ml-4 text-xs bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20"
+              >
                 {currentQuestion.question_type === 'MSQ' ? 'Multiple Select' : 
                  currentQuestion.question_type === 'TF' ? 'True/False' : 'Multiple Choice'}
               </Badge>
             </div>
-          </CardHeader>
-          <CardContent>
+            <div>
             {currentQuestion.question_type === 'MSQ' ? (
               // Multiple Select Question - Checkboxes
-              <div className="space-y-3">
-                <div className="text-sm text-blue-600 dark:text-blue-400 mb-3 font-medium">
-                  Select all correct answers:
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/30 dark:border-blue-600/30">
+                  <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                    Select all correct answers:
+                  </span>
                 </div>
-                {currentQuestion.options?.map((option) => (
-                  <div key={option.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={option.id}
-                      checked={isMSQOptionSelected(currentQuestion.id, option.id)}
-                      onCheckedChange={(checked) => 
-                        handleMSQAnswerChange(currentQuestion.id, option.id, !!checked)
-                      }
-                    />
-                    <Label htmlFor={option.id} className="flex-1 cursor-pointer">
-                      {option.text}
-                    </Label>
-                  </div>
+                {currentQuestion.options?.map((option, index) => (
+                  <PerformantAnimatedCard
+                    key={option.id}
+                    variant="subtle"
+                    hoverEffect="scale"
+                    staggerIndex={index}
+                    className="transition-all duration-200 hover:shadow-md border-2 hover:border-primary/30"
+                  >
+                    <div className="p-4 flex items-center space-x-3">
+                      <Checkbox
+                        id={option.id}
+                        checked={isMSQOptionSelected(currentQuestion.id, option.id)}
+                        onCheckedChange={(checked) => 
+                          handleMSQAnswerChange(currentQuestion.id, option.id, !!checked)
+                        }
+                      />
+                      <Label htmlFor={option.id} className="flex-1 cursor-pointer text-base">
+                        {option.text}
+                      </Label>
+                    </div>
+                  </PerformantAnimatedCard>
                 ))}
               </div>
             ) : (
@@ -359,99 +494,134 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                   : ''
                 }
                 onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
+                className="space-y-4"
               >
-                <div className="space-y-3">
-                  {currentQuestion.options?.map((option) => (
-                    <div key={option.id} className="flex items-center space-x-2">
+                {currentQuestion.options?.map((option, index) => (
+                  <PerformantAnimatedCard
+                    key={option.id}
+                    variant="subtle"
+                    hoverEffect="scale"
+                    staggerIndex={index}
+                    className="transition-all duration-200 hover:shadow-md border-2 hover:border-primary/30"
+                  >
+                    <div className="p-4 flex items-center space-x-3">
                       <RadioGroupItem value={option.id} id={option.id} />
-                      <Label htmlFor={option.id} className="flex-1 cursor-pointer">
+                      <Label htmlFor={option.id} className="flex-1 cursor-pointer text-base">
                         {option.text}
                       </Label>
                     </div>
-                  ))}
-                </div>
+                  </PerformantAnimatedCard>
+                ))}
               </RadioGroup>
             )}
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </PerformantAnimatedCard>
       )}
 
       {/* Navigation */}
-      <Card>
-        <CardContent className="pt-6">
+      <PerformantAnimatedCard 
+        variant="glass" 
+        hoverEffect="glow"
+        className="assessment-card"
+        staggerIndex={2}
+      >
+        <div className="p-6">
           <div className="flex items-center justify-between">
-            <Button
+            <AnimatedButton
               variant="outline"
               onClick={handlePreviousQuestion}
               disabled={currentQuestionIndex === 0}
+              className="px-6"
             >
               Previous
-            </Button>
+            </AnimatedButton>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {currentQuestionIndex === questions.length - 1 ? (
-                <Button 
+                <AnimatedButton 
                   onClick={() => setShowConfirmSubmit(true)}
-                  className="px-6"
+                  className="px-8 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
                   disabled={getAnsweredCount() === 0}
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  <CheckCircle2 className="h-5 w-5 mr-2" />
                   Submit Assessment
-                </Button>
+                </AnimatedButton>
               ) : (
-                <Button
+                <AnimatedButton
                   onClick={handleNextQuestion}
                   disabled={currentQuestionIndex === questions.length - 1}
+                  className="px-6 bg-gradient-to-r from-primary to-accent"
                 >
                   Next
-                </Button>
+                </AnimatedButton>
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </PerformantAnimatedCard>
 
       {/* Submit Confirmation */}
       {showConfirmSubmit && (
-        <Card className="border-orange-200 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100">
-                  Ready to Submit?
-                </h3>
-                <p className="text-sm text-orange-700 dark:text-orange-300 mt-2">
-                  You have answered {getAnsweredCount()} of {questions.length} questions. 
+        <PerformantAnimatedCard 
+          variant="glass" 
+          hoverEffect="glow"
+          className="assessment-card border-2 border-orange-300/50 dark:border-orange-600/50 bg-gradient-to-r from-orange-500/10 to-amber-500/10"
+          staggerIndex={3}
+        >
+          <div className="p-8 text-center space-y-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-amber-500/20 backdrop-blur">
+                <AlertCircle className="h-12 w-12 text-orange-600 dark:text-orange-400" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-orange-900 dark:text-orange-100 mb-3">
+                Ready to Submit?
+              </h3>
+              <div className="space-y-2">
+                <p className="text-orange-700 dark:text-orange-300">
+                  You have answered <span className="font-bold">{getAnsweredCount()}</span> of <span className="font-bold">{questions.length}</span> questions.
+                </p>
+                <p className="text-sm text-orange-600 dark:text-orange-400">
                   Once submitted, you cannot change your answers.
                 </p>
               </div>
-              <div className="flex items-center justify-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowConfirmSubmit(false)}
-                >
-                  Review Answers
-                </Button>
-                <Button
-                  onClick={handleSubmitAssessment}
-                  disabled={submitAssessment.isPending}
-                >
-                  {submitAssessment.isPending ? (
-                    <>
-                      <Timer className="h-4 w-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Submit Final Answers
-                    </>
-                  )}
-                </Button>
-              </div>
             </div>
-          </CardContent>
-        </Card>
+            
+            <div className="flex items-center justify-center gap-4">
+              <AnimatedButton
+                variant="outline"
+                onClick={() => setShowConfirmSubmit(false)}
+                className="px-6 border-orange-300 hover:bg-orange-50 dark:border-orange-600 dark:hover:bg-orange-900/20"
+              >
+                Review Answers
+              </AnimatedButton>
+              <AnimatedButton
+                onClick={handleSubmitAssessment}
+                disabled={submitAssessment.isPending}
+                className="px-8 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+              >
+                {submitAssessment.isPending ? (
+                  <>
+                    <OptimizedProgressRing
+                      value={100}
+                      size={16}
+                      color="warning"
+                      showValue={false}
+                    />
+                    <span className="ml-2">Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Submit Final Answers
+                  </>
+                )}
+              </AnimatedButton>
+            </div>
+          </div>
+        </PerformantAnimatedCard>
       )}
     </div>
   )

@@ -46,7 +46,7 @@ function parseExcelRowToQuestion(row: any, rowIndex: number): { question: Partia
   try {
     // Handle both column-based format and JSON format
     let options: { id: string; text: string }[] = [];
-    let correctAnswer: string | { answers: string[] };
+    let correctAnswer: string | { answers: string[] } = '';
     
     // Check if using JSON format
     if (row.options_json && row.correct_answer_json) {

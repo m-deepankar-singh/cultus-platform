@@ -1,17 +1,20 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Home, Menu, LucideIcon, Briefcase, User } from "lucide-react"
+import { Home, Menu, LucideIcon, Briefcase, User, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { PerformantAnimatedCard } from "@/components/ui/performant-animated-card"
+import { AnimatedButton } from "@/components/ui/animated-button"
+import { OptimizedProgressRing } from "@/components/ui/optimized-progress-ring"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { AnimatedButton } from "@/components/ui/animated-button"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import gsap from "gsap"
 import { useLogout } from "@/hooks/use-logout"
+import { useCurrentUser } from "@/hooks/use-current-user"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,19 +37,27 @@ export function AppHeader() {
   const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const { logout } = useLogout()
+  const { user, profile, isLoading } = useCurrentUser()
   
   useEffect(() => {
     setMounted(true)
     
-    if (theme === "dark") {
-      // Animate header on mount
-      gsap.fromTo(
-        ".header-content",
-        { y: -20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.8, ease: "power3.out", stagger: 0.1 }
-      )
-    }
-  }, [theme])
+    // Enhanced animations for all header elements
+    gsap.fromTo(
+      ".header-element",
+      { y: -30, opacity: 0, scale: 0.9 },
+      { 
+        y: 0, 
+        opacity: 1, 
+        scale: 1,
+        duration: 0.8, 
+        ease: "power3.out", 
+        stagger: 0.1,
+        delay: 0.2
+      }
+    )
+    
+  }, [mounted])
 
   const routes: RouteItem[] = [
     {
@@ -64,97 +75,194 @@ export function AppHeader() {
   ]
 
   return (
-    <header className={cn(
-      "sticky top-0 z-50 w-full border-b backdrop-blur supports-[backdrop-filter]:bg-background/60",
-      mounted && theme === "dark" && "bg-black/20 border-primary/10 dark-glow"
-    )}>
-      <div className="container flex h-14 items-center header-content">
-        <div className="md:hidden mr-2">
+    <PerformantAnimatedCard
+      variant="glass"
+      hoverEffect="glow"
+      className="sticky top-0 z-50 w-full border-b-2 border-primary/20 backdrop-blur-xl bg-background/80 dark:bg-black/40 shadow-lg dark:shadow-primary/10"
+      staggerIndex={0}
+    >
+      <div className="max-w-5xl mx-auto flex h-14 items-center justify-between px-4">
+        <div className="md:hidden header-element">
           <Sheet>
             <SheetTrigger asChild>
-              {mounted && theme === "dark" ? (
-                <AnimatedButton variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Toggle menu</span>
-                </AnimatedButton>
-              ) : (
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Toggle menu</span>
-                </Button>
-              )}
+              <AnimatedButton 
+                variant="ghost" 
+                size="icon"
+                className="rounded-xl hover:bg-primary/10 transition-all duration-300"
+              >
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle menu</span>
+              </AnimatedButton>
             </SheetTrigger>
-            <SheetContent side="left" className={cn(
-              "w-[240px] sm:w-[300px]",
-              mounted && theme === "dark" && "glass-effect"
-            )}>
-              <nav className="flex flex-col gap-4 mt-8">
-                {routes.map((route) => (
-                  <Link
-                    key={route.href}
-                    href={route.href}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all duration-300",
-                      route.active
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                      mounted && theme === "dark" && route.active && "dark-glow"
-                    )}
-                  >
-                    <route.icon className="h-4 w-4" />
-                    {route.label}
-                  </Link>
-                ))}
-              </nav>
+            <SheetContent 
+              side="left" 
+              className="w-[280px] sm:w-[320px] bg-background/95 dark:bg-black/95 backdrop-blur-xl border-r-2 border-primary/20"
+            >
+              <div className="mt-8">
+                <PerformantAnimatedCard
+                  variant="glass"
+                  className="p-6 mb-6"
+                >
+                  <h2 className="text-xl font-bold gradient-text mb-2">Navigation</h2>
+                  <p className="text-sm text-muted-foreground">Choose your learning path</p>
+                </PerformantAnimatedCard>
+                
+                <nav className="space-y-3">
+                  {routes.map((route, index) => (
+                    <PerformantAnimatedCard
+                      key={route.href}
+                      variant="subtle"
+                      hoverEffect="lift"
+                      staggerIndex={index}
+                      className={cn(
+                        "transition-all duration-300",
+                        route.active && "border-2 border-primary/50 bg-primary/10"
+                      )}
+                    >
+                      <Link
+                        href={route.href}
+                        className="flex items-center gap-3 p-4 w-full"
+                      >
+                        <div className={cn(
+                          "p-2 rounded-lg transition-all duration-300",
+                          route.active 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-muted text-muted-foreground"
+                        )}>
+                          <route.icon className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <span className={cn(
+                            "font-medium transition-colors",
+                            route.active ? "text-primary" : "text-foreground"
+                          )}>
+                            {route.label}
+                          </span>
+                        </div>
+                        {route.active && (
+                          <OptimizedProgressRing
+                            value={100}
+                            size={20}
+                            color="primary"
+                            showValue={false}
+                          />
+                        )}
+                      </Link>
+                    </PerformantAnimatedCard>
+                  ))}
+                </nav>
+              </div>
             </SheetContent>
           </Sheet>
         </div>
-        <Link href="/app/dashboard" className="flex items-center gap-2 mr-6 header-content">
-          <span className={cn(
-            "font-bold text-xl",
-            mounted && theme === "dark" && "gradient-text"
-          )}>EduLearn</span>
+        <Link href="/app/dashboard" className="header-element">
+          <Image
+            src="/Cultus-white (1).png"
+            alt="Cultus Platform"
+            width={100}
+            height={32}
+            className="object-contain filter brightness-0 invert dark:filter-none"
+            priority
+          />
         </Link>
-        <nav className="hidden md:flex items-center gap-6 text-sm header-content">
-          {routes.map((route) => (
-            <Link
+        <nav className="hidden md:flex items-center gap-3 header-element">
+          {routes.map((route, index) => (
+            <PerformantAnimatedCard
               key={route.href}
-              href={route.href}
+              variant={route.active ? "glass" : "subtle"}
+              hoverEffect="lift"
+              staggerIndex={index + 1}
               className={cn(
-                "flex items-center gap-1 font-medium transition-colors hover:text-foreground",
-                route.active ? "text-foreground" : "text-muted-foreground",
-                mounted && theme === "dark" && route.active && "animate-pulse-glow px-3 py-1 rounded-md"
+                "transition-all duration-300",
+                route.active && "border-2 border-primary/50 bg-primary/10"
               )}
             >
-              <route.icon className="h-4 w-4" />
-              {route.label}
-            </Link>
+              <Link
+                href={route.href}
+                className="flex items-center gap-2 px-3 py-1.5 font-medium transition-all duration-300 group"
+              >
+                <div className={cn(
+                  "p-1.5 rounded-lg transition-all duration-300",
+                  route.active 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
+                )}>
+                  <route.icon className="h-4 w-4" />
+                </div>
+                <span className={cn(
+                  "transition-colors duration-300",
+                  route.active 
+                    ? "text-primary font-semibold" 
+                    : "text-muted-foreground group-hover:text-foreground"
+                )}>
+                  {route.label}
+                </span>
+                {route.active && (
+                  <OptimizedProgressRing
+                    value={100}
+                    size={16}
+                    color="primary"
+                    showValue={false}
+                    delay={300 + index * 100}
+                  />
+                )}
+              </Link>
+            </PerformantAnimatedCard>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2 header-content">
-          <ModeToggle />
+        <div className="flex items-center gap-2 header-element">
+          <PerformantAnimatedCard
+            variant="glass"
+            hoverEffect="glow"
+            className="p-1 rounded-xl"
+          >
+            <ModeToggle />
+          </PerformantAnimatedCard>
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {mounted && theme === "dark" ? (
-                <AnimatedButton variant="ghost" size="icon" className="rounded-full">
-                  <User className="h-5 w-5" />
-                </AnimatedButton>
-              ) : (
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <User className="h-5 w-5" />
-                </Button>
-              )}
+              <PerformantAnimatedCard
+                variant="glass"
+                hoverEffect="lift"
+                className="p-2 rounded-full cursor-pointer group"
+              >
+                <div className="relative">
+                  <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background animate-pulse"></div>
+                </div>
+              </PerformantAnimatedCard>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className={mounted && theme === "dark" ? "glass-effect" : ""}>
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-56 bg-background/95 dark:bg-black/95 backdrop-blur-xl border-2 border-primary/20 shadow-lg"
+            >
+              <PerformantAnimatedCard variant="subtle" className="m-1 p-3">
+                <DropdownMenuLabel className="flex items-center gap-2 font-normal">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold">
+                      {isLoading ? "Loading..." : profile?.fullName || user?.email || "User"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">Student Portal</span>
+                  </div>
+                </DropdownMenuLabel>
+              </PerformantAnimatedCard>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout('student')}>
-                Log out
+              <DropdownMenuItem 
+                onClick={() => logout('student')}
+                className="flex items-center gap-2 p-3 cursor-pointer hover:bg-red-500/10 text-red-600 dark:text-red-400 transition-colors duration-200"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
-    </header>
+    </PerformantAnimatedCard>
   )
 }

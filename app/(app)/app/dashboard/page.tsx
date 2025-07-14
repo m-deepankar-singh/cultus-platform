@@ -64,12 +64,12 @@ export default function Dashboard() {
   }, [isPending]);
   
   // Derived statistics (unchanged logic)
-  const coursesInProgress = products.filter((p: Product) => p.product_status === 'InProgress').length;
-  const completedProducts = products.filter((p: Product) => p.product_status === 'Completed').length;
+  const coursesInProgress = products.filter((p: Product) => (p.product_status || 'NotStarted') === 'InProgress').length;
+  const completedProducts = products.filter((p: Product) => (p.product_status || 'NotStarted') === 'Completed').length;
   
   // Get upcoming assessments (unchanged logic)
   const upcomingAssessments = products
-    .flatMap((p: Product) => p.modules.filter((m: Module) => m.type === 'Assessment' && m.status !== 'Completed'))
+    .flatMap((p: Product) => (p.modules || []).filter((m: Module) => m.type === 'Assessment' && m.status !== 'Completed'))
     .map((assessment: Module) => ({
       id: assessment.id,
       title: assessment.name,
@@ -118,7 +118,7 @@ export default function Dashboard() {
             <ProgressRingGroup
               rings={[
                 {
-                  value: Math.round(products.reduce((acc, p) => acc + p.product_progress_percentage, 0) / (products.length || 1)),
+                  value: Math.round(products.reduce((acc, p) => acc + (p.product_progress_percentage || 0 || 0), 0) / (products.length || 1)),
                   label: "Overall Progress",
                   color: "primary",
                   size: 100
@@ -163,7 +163,7 @@ export default function Dashboard() {
               <div className="flex justify-center">
                 <OptimizedProgressRing
                   value={Math.round(products.reduce((acc, p) => 
-                    acc + (p.product_status === 'InProgress' ? 1 : 0), 0) / (products.length || 1) * 100)}
+                    acc + ((p.product_status || 'NotStarted') === 'InProgress' ? 1 : 0), 0) / (products.length || 1) * 100)}
                   size={70}
                   color="warning"
                   delay={300}
@@ -203,7 +203,7 @@ export default function Dashboard() {
             >
               <div className="flex justify-center">
                 <OptimizedProgressRing
-                  value={Math.round(products.reduce((acc, p) => acc + p.product_progress_percentage, 0) / (products.length || 1))}
+                  value={Math.round(products.reduce((acc, p) => acc + (p.product_progress_percentage || 0), 0) / (products.length || 1))}
                   size={70}
                   color="primary"
                   delay={500}
@@ -212,7 +212,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Overall Progress</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {Math.round(products.reduce((acc, p) => acc + p.product_progress_percentage, 0) / (products.length || 1))}%
+                  {Math.round(products.reduce((acc, p) => acc + (p.product_progress_percentage || 0), 0) / (products.length || 1))}%
                 </p>
               </div>
             </PerformantAnimatedCard>
@@ -287,12 +287,12 @@ export default function Dashboard() {
                         onError={(e) => {
                           // Hide broken image and show fallback
                           e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling?.nextElementSibling;
+                          const fallback = e.currentTarget.nextElementSibling?.nextElementSibling as HTMLElement;
                           if (fallback) fallback.style.display = 'flex';
                         }}
                         onLoad={(e) => {
                           // Ensure gradient overlay is visible once image loads
-                          const overlay = e.currentTarget.nextElementSibling;
+                          const overlay = e.currentTarget.nextElementSibling as HTMLElement;
                           if (overlay) overlay.style.display = 'block';
                         }}
                       />
@@ -311,14 +311,14 @@ export default function Dashboard() {
                   {/* Progress Overlay */}
                   <div className="absolute top-2 right-2">
                     <OptimizedProgressRing
-                      value={product.product_progress_percentage}
+                      value={product.product_progress_percentage || 0}
                       size={36}
                       strokeWidth={3}
                       showValue={false}
                       color={
-                        product.product_progress_percentage < 30 ? "danger" : 
-                        product.product_progress_percentage < 60 ? "warning" : 
-                        product.product_progress_percentage < 85 ? "warning" : 
+                        product.product_progress_percentage || 0 < 30 ? "danger" : 
+                        product.product_progress_percentage || 0 < 60 ? "warning" : 
+                        product.product_progress_percentage || 0 < 85 ? "warning" : 
                         "success"
                       }
                       delay={800 + index * 100}
@@ -329,10 +329,10 @@ export default function Dashboard() {
                   <div className="absolute bottom-2 left-2 right-2">
                     <div className="flex justify-between items-center text-sm text-white">
                       <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded">
-                        {product.modules.filter((m: Module) => m.status === 'Completed').length}/{product.modules.length} modules
+                        {(product.modules || []).filter((m: Module) => m.status === 'Completed').length}/{(product.modules || []).length} modules
                       </span>
                       <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded">
-                        {product.product_progress_percentage}%
+                        {product.product_progress_percentage || 0}%
                       </span>
                     </div>
                   </div>
@@ -351,13 +351,13 @@ export default function Dashboard() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Progress</span>
-                      <span>{product.product_progress_percentage}%</span>
+                      <span>{product.product_progress_percentage || 0}%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000 ease-out"
                         style={{ 
-                          width: `${mounted ? product.product_progress_percentage : 0}%`,
+                          width: `${mounted ? product.product_progress_percentage || 0 : 0}%`,
                           transitionDelay: `${1000 + index * 100}ms`
                         }}
                       />
@@ -368,8 +368,8 @@ export default function Dashboard() {
                   <div className="mt-auto">
                     <Link href={`/app/product-details/${product.id}`} className="block">
                       <AnimatedButton className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground">
-                        {product.product_status === 'NotStarted' ? 'Start Learning' : 
-                         product.product_status === 'Completed' ? 'View Certificate' : 'Continue Learning'}
+                        {(product.product_status || 'NotStarted') === 'NotStarted' ? 'Start Learning' : 
+                         (product.product_status || 'NotStarted') === 'Completed' ? 'View Certificate' : 'Continue Learning'}
                       </AnimatedButton>
                     </Link>
                   </div>

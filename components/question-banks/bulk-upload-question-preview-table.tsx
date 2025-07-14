@@ -151,7 +151,7 @@ export function BulkUploadQuestionPreviewTable({ questions }: BulkUploadQuestion
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
                             <ul className="list-disc pl-4 space-y-1">
-                              {Object.entries(question._errors).map(([field, error]) => (
+                              {Object.entries(question._errors || {}).map(([field, error]) => (
                                 <li key={`${index}-tooltip-${field}`} className="text-xs">
                                   <span className="font-medium">{field}:</span> {error}
                                 </li>
@@ -243,7 +243,7 @@ export function BulkUploadQuestionPreviewTable({ questions }: BulkUploadQuestion
                               <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded">
                                 <h4 className="font-medium text-destructive mb-2">Validation Errors</h4>
                                 <ul className="space-y-1">
-                                  {Object.entries(question._errors).map(([field, error]) => (
+                                  {Object.entries(question._errors || {}).map(([field, error]) => (
                                     <li key={`${index}-error-${field}`} className="text-sm">
                                       <span className="font-medium text-destructive">{field}:</span>
                                       <span className="ml-2 text-muted-foreground">{error}</span>

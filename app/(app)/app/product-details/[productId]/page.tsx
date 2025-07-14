@@ -1,7 +1,7 @@
-"use client";  // Change to client component
+"use client";
 
-import React, { useState, use } from 'react';
-import { createClient } from '@/lib/supabase/client'; // Changed to client
+import React, { useState, use, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,10 +9,25 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Target, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { 
+  BookOpen, 
+  Target, 
+  ChevronRight, 
+  Image as ImageIcon, 
+  CheckCircle2, 
+  Clock, 
+  PlayCircle,
+  GraduationCap,
+  Award,
+  AlertCircle
+} from 'lucide-react';
 import { AssessmentResultModal } from '@/components/assessment/assessment-result-modal';
-import { AnimatedCard } from '@/components/ui/animated-card';
+import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card';
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring';
+import { AnimatedButton } from '@/components/ui/animated-button';
+import { AdaptiveParticles } from '@/components/ui/floating-particles';
 import { cn } from '@/lib/utils';
+import gsap from 'gsap';
 
 interface ProductDetailsPageProps {
   params: Promise<{
@@ -80,9 +95,18 @@ const getStatusColor = (status: string): string => {
       return 'bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400';
     case 'InProgress':
       return 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400';
+    case 'NotStarted':
     default:
       return 'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
   }
+};
+
+// Progress color helper for OptimizedProgressRing
+const getProgressColor = (progress: number): 'primary' | 'success' | 'warning' | 'danger' => {
+  if (progress >= 100) return 'success';
+  if (progress >= 50) return 'warning';
+  if (progress > 0) return 'primary';
+  return 'primary';
 };
 
 // Type color helper
@@ -90,6 +114,18 @@ const getTypeColor = (type: string): string => {
   return type === 'Course' 
     ? 'bg-sky-500/20 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' 
     : 'bg-violet-500/20 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400';
+};
+
+// Status icon helper
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'Completed':
+      return <CheckCircle2 className="h-4 w-4" />;
+    case 'InProgress':
+      return <Clock className="h-4 w-4" />;
+    default:
+      return <PlayCircle className="h-4 w-4" />;
+  }
 };
 
 // This is now a Client Component
@@ -101,8 +137,13 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
   const [productData, setProductData] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     async function fetchData() {
       setLoading(true);
       setError(null);
@@ -296,6 +337,23 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
     fetchData();
   }, [productId]);
 
+  // GSAP animations for entry
+  useEffect(() => {
+    if (!loading && productData && mounted) {
+      gsap.fromTo(
+        ".dashboard-card",
+        { y: 30, opacity: 0 },
+        { 
+          y: 0, 
+          opacity: 1, 
+          stagger: 0.1, 
+          duration: 0.6, 
+          ease: "power2.out"
+        }
+      );
+    }
+  }, [loading, productData, mounted]);
+
   // Handle assessment result view
   const handleViewResult = (assessmentId: string) => {
     setSelectedAssessmentId(assessmentId);
@@ -304,136 +362,235 @@ export default function ProductDetailsPage({ params: paramsProp }: ProductDetail
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-0 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-400 dark:border-neutral-300"></div>
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="container mx-auto py-12 px-4 md:px-0">
+          <div className="space-y-8 animate-pulse">
+            {/* Header skeleton */}
+            <div className="space-y-3">
+              <div className="h-10 bg-neutral-200 dark:bg-neutral-800 rounded-lg w-3/4"></div>
+              <div className="h-6 bg-neutral-200 dark:bg-neutral-800 rounded-lg w-1/2"></div>
+            </div>
+            {/* Image skeleton */}
+            <div className="aspect-video bg-neutral-200 dark:bg-neutral-800 rounded-xl"></div>
+            {/* Module skeletons */}
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-32 bg-neutral-200 dark:bg-neutral-800 rounded-xl"></div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-0">
-        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
-          <div className="p-4">{error}</div>
-        </AnimatedCard>
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="flex flex-col items-center justify-center h-full space-y-4 container mx-auto py-24">
+          <PerformantAnimatedCard variant="glass" hoverEffect="none" className="max-w-md w-full">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-destructive">Error</h2>
+              <p className="text-center max-w-md text-muted-foreground">
+                {error || 'Something went wrong. Please try again.'}
+              </p>
+              <AnimatedButton onClick={() => window.location.reload()} className="bg-gradient-to-r from-primary to-accent">
+                Try Again
+              </AnimatedButton>
+            </div>
+          </PerformantAnimatedCard>
+        </div>
       </div>
     );
   }
 
   if (!productData) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-0">
-        <AnimatedCard className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">
-          <div className="p-4">Product not found</div>
-        </AnimatedCard>
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="flex flex-col items-center justify-center h-full space-y-4 container mx-auto py-24">
+          <PerformantAnimatedCard variant="glass" hoverEffect="none" className="max-w-md w-full">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+              </div>
+              <h2 className="text-xl font-semibold">Product Not Found</h2>
+              <p className="text-center max-w-md text-muted-foreground">
+                The product you're looking for doesn't exist or you don't have access to it.
+              </p>
+              <Link href="/app/dashboard">
+                <AnimatedButton className="bg-gradient-to-r from-primary to-accent">
+                  Back to Dashboard
+                </AnimatedButton>
+              </Link>
+            </div>
+          </PerformantAnimatedCard>
+        </div>
       </div>
     );
   }
 
   // 4. Render UI
   return (
-    <div className="container mx-auto py-8 px-4 md:px-0">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400">
-          {productData.name}
-        </h1>
-        {productData.description && 
-          <p className="text-lg text-neutral-600 dark:text-neutral-400">
-            {productData.description}
-          </p>
-        }
-      </div>
-
-      {/* Product Image */}
-      {productData.image_url && (
-        <div className="mb-8">
-          <AnimatedCard className="overflow-hidden">
-            <div className="relative w-full aspect-video">
-              <Image
-                src={productData.image_url}
-                alt={productData.name || "Product image"}
-                fill
-                className="object-cover"
-              />
-            </div>
-          </AnimatedCard>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {productData.modules.length > 0 ? (
-          productData.modules.map((module) => (
-            <AnimatedCard 
-              key={module.id} 
-              className="overflow-hidden border border-white/20 dark:border-neutral-800/30"
-            >
-              <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex-grow">
-                  <div className="flex items-center gap-2 mb-2">
-                     {/* Module type badge */}
-                     <span className={cn(
-                       "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
-                       getTypeColor(module.type)
-                     )}>
-                       {module.type === 'Course' ? 
-                         <BookOpen className="h-3 w-3 mr-1" /> : 
-                         <Target className="h-3 w-3 mr-1" />
-                       }
-                       {module.type}
-                     </span>
-                     <h3 className="text-lg font-semibold text-neutral-800 dark:text-white ml-1">
-                       {module.name}
-                     </h3>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-sm ml-0 md:ml-6">
-                    <span className="text-neutral-500 dark:text-neutral-400">Status:</span>
-                     <span className={cn(
-                       "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium",
-                       getStatusColor(module.status)
-                     )}>
-                       {module.status.replace(/([A-Z])/g, ' $1').trim()}
-                     </span>
-                     {/* Show progress bar and percentage only when In Progress */}
-                     {module.status === 'InProgress' && (
-                       <div className="flex items-center gap-2 ml-1">
-                         <Progress value={module.progress_percentage} className="w-24 h-2" />
-                         <span className="text-neutral-500 dark:text-neutral-400">({module.progress_percentage}%)</span>
-                       </div>
-                     )}
-                  </div>
-                </div>
-                {/* Action buttons with consistent styling */}
-                {module.type === 'Assessment' && module.status === 'Completed' ? (
-                  <Button 
-                    className="w-full md:w-auto mt-2 md:mt-0 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
-                    onClick={() => handleViewResult(module.id)}
-                  >
-                    View Results <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                ) : (
-                  <Link href={getModuleLink(module)} passHref>
-                    <Button 
-                      className={cn(
-                        "w-full md:w-auto mt-2 md:mt-0",
-                        module.status === 'Completed' 
-                          ? "bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-600 hover:to-emerald-700 dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500 text-white"
-                          : "bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
-                      )}
-                    >
-                      {getModuleCtaText(module)} <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </Link>
-                )}
+    <div className="relative min-h-screen">
+      {/* Background particles */}
+      <AdaptiveParticles />
+      
+      <div className="relative space-y-8">
+        {/* Hero Section */}
+        <div className="container mx-auto pt-8 px-4 md:px-0">
+          <div className="flex flex-col space-y-4 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
+              {productData.name}
+            </h1>
+            {productData.description && 
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                {productData.description}
+              </p>
+            }
+            <div className="flex items-center justify-center gap-6 pt-2">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium">
+                  {productData.modules.filter(m => m.type === 'Course').length} Courses
+                </span>
               </div>
-            </AnimatedCard>
-          ))
-        ) : (
-          <AnimatedCard>
-            <div className="p-6 text-center">
-              <p className="text-neutral-500 dark:text-neutral-400">This product currently has no modules.</p>
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium">
+                  {productData.modules.filter(m => m.type === 'Assessment').length} Assessments
+                </span>
+              </div>
             </div>
-          </AnimatedCard>
-        )}
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 md:px-0">
+          {/* Modules Section */}
+          <div className="space-y-6 pb-12">
+            <div className="flex items-center gap-3">
+              <Award className="h-6 w-6 text-primary" />
+              <h2 className="text-2xl font-semibold">
+                Learning Modules
+              </h2>
+            </div>
+            
+            {productData.modules.length > 0 ? (
+              <div className="space-y-4">
+                {productData.modules.map((module, index) => (
+                  <PerformantAnimatedCard 
+                    key={module.id}
+                    variant="glass"
+                    hoverEffect="lift"
+                    staggerIndex={index}
+                    className="dashboard-card group h-full"
+                  >
+                    <div className="p-6">
+                      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                        <div className="flex-grow space-y-4">
+                          {/* Module Header with Progress Ring */}
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0">
+                              <OptimizedProgressRing
+                                value={module.progress_percentage || 0}
+                                size={60}
+                                color={getProgressColor(module.progress_percentage)}
+                                delay={300 + index * 100}
+                                showValue={false}
+                              />
+                            </div>
+                            <div className="flex-grow space-y-2">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span className={cn(
+                                  "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+                                  getTypeColor(module.type)
+                                )}>
+                                  {module.type === 'Course' ? 
+                                    <BookOpen className="h-3 w-3 mr-1" /> : 
+                                    <Target className="h-3 w-3 mr-1" />
+                                  }
+                                  {module.type}
+                                </span>
+                                <h3 className="font-semibold text-lg">
+                                  {module.name}
+                                </h3>
+                              </div>
+                      
+                              {/* Status Section */}
+                              <div className="flex flex-wrap items-center gap-4">
+                                <span className={cn(
+                                  "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+                                  getStatusColor(module.status)
+                                )}>
+                                  {getStatusIcon(module.status)}
+                                  {module.status.replace(/([A-Z])/g, ' $1').trim()}
+                                </span>
+                                
+                                {/* Progress text */}
+                                <span className="text-sm text-muted-foreground">
+                                  {module.progress_percentage}% Complete
+                                </span>
+                                
+                                {/* Completion date for completed modules */}
+                                {module.status === 'Completed' && module.completed_at && (
+                                  <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    <span>{new Date(module.completed_at).toLocaleDateString()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Action buttons */}
+                        <div className="flex-shrink-0">
+                          {module.type === 'Assessment' && module.status === 'Completed' ? (
+                            <AnimatedButton 
+                              className="bg-gradient-to-r from-primary to-accent"
+                              onClick={() => handleViewResult(module.id)}
+                            >
+                              View Results
+                            </AnimatedButton>
+                          ) : (
+                            <Link href={getModuleLink(module)} passHref>
+                              <AnimatedButton className="bg-gradient-to-r from-primary to-accent">
+                                {getModuleCtaText(module)}
+                              </AnimatedButton>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </PerformantAnimatedCard>
+                ))}
+              </div>
+            ) : (
+              <PerformantAnimatedCard variant="glass" className="dashboard-card py-16">
+                <div className="text-center space-y-4">
+                  <div className="mx-auto w-16 h-16 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                    <BookOpen className="h-8 w-8 text-neutral-400 dark:text-neutral-600" />
+                  </div>
+                  <h3 className="text-lg font-medium">
+                    No Modules Available
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                    This product currently has no modules. Please check back later or contact your administrator.
+                  </p>
+                  <Link href="/app/dashboard">
+                    <AnimatedButton className="bg-gradient-to-r from-primary to-accent">
+                      Back to Dashboard
+                    </AnimatedButton>
+                  </Link>
+                </div>
+              </PerformantAnimatedCard>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Assessment Result Modal */}

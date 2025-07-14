@@ -16,6 +16,11 @@ interface Product {
   created_at: string
   updated_at: string
   created_by: string | null
+  is_active?: boolean
+  version?: string | null
+  product_progress_percentage?: number
+  product_status?: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed'
+  modules?: any[]
 }
 
 interface AssignedProductsProps {

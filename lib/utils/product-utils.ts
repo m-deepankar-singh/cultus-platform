@@ -2,7 +2,7 @@
  * Utility functions for product operations and validation
  */
 
-import type { Product } from '@/lib/types/supabase';
+import type { Product } from '@/lib/query-options';
 
 /**
  * Check if a product is a job readiness product

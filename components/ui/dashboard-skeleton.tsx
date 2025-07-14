@@ -63,7 +63,7 @@ function HeroSectionSkeleton() {
 // Analytics section skeleton
 function AnalyticsSectionSkeleton() {
   return (
-    <CardSkeleton className="glass-card">
+    <div className="glass-card p-6">
       <div className="flex flex-col space-y-6">
         {/* Section header skeleton */}
         <div className="flex items-center space-x-2">
@@ -79,7 +79,7 @@ function AnalyticsSectionSkeleton() {
           gap="md" 
         />
       </div>
-    </CardSkeleton>
+    </div>
   );
 }
 
@@ -187,12 +187,12 @@ export function CompactDashboardSkeleton() {
         </div>
         
         {/* Compact analytics */}
-        <CardSkeleton>
+        <div className="bg-card/60 backdrop-blur-sm p-4 rounded-lg">
           <div className="space-y-4">
             <ShimmerSkeleton className="h-6 w-32" />
             <GridSkeleton columns={2} rows={1} variant="analytics" />
           </div>
-        </CardSkeleton>
+        </div>
         
         {/* Compact courses */}
         <div className="space-y-4">
