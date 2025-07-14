@@ -129,20 +129,6 @@ export async function POST(
     
     const { product_id } = bodyValidation.data;
     
-    // Supabase client already available from authResult
-    
-    // Verify product exists first (optional but good practice)
-    const { data: productExists, error: productCheckError } = await supabase
-      .from('products')
-      .select('id')
-      .eq('id', product_id)
-      .single();
-    
-    if (productCheckError || !productExists) {
-      console.error('Product not found or error checking product:', productCheckError);
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-    
     // Verify client exists first (good practice)
     const { data: clientExists, error: clientCheckError } = await supabase
       .from('clients')
@@ -153,6 +139,38 @@ export async function POST(
     if (clientCheckError || !clientExists) {
       console.error('Client not found or error checking client:', clientCheckError);
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+    
+    // Verify product exists and check job readiness eligibility
+    const { data: productExists, error: productCheckError } = await supabase
+      .from('products')
+      .select('id, type')
+      .eq('id', product_id)
+      .single();
+    
+    if (productCheckError || !productExists) {
+      console.error('Product not found or error checking product:', productCheckError);
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+    
+    // Check job readiness constraint using database function
+    const { data: eligibilityCheck, error: eligibilityError } = await supabase
+      .rpc('check_client_job_readiness_eligibility', {
+        p_client_id: validatedClientId,
+        p_product_id: product_id
+      });
+    
+    if (eligibilityError) {
+      console.error('Error checking job readiness eligibility:', eligibilityError);
+      return NextResponse.json({ error: 'Error checking assignment eligibility' }, { status: 500 });
+    }
+    
+    // If not eligible, return conflict with details
+    if (!eligibilityCheck.eligible) {
+      return NextResponse.json({
+        error: eligibilityCheck.reason,
+        existing_job_readiness_product: eligibilityCheck.existing_job_readiness_product
+      }, { status: 409 }); // Conflict
     }
     
     // Insert assignment
@@ -172,6 +190,14 @@ export async function POST(
         return NextResponse.json({
           error: 'Product already assigned to this client',
           details: error.message
+        }, { status: 409 }); // Conflict
+      }
+      
+      // Handle job readiness constraint violation from trigger
+      if (error.message?.includes('job readiness product')) {
+        return NextResponse.json({
+          error: error.message,
+          hint: error.hint || 'Check existing client product assignments for job readiness products.'
         }, { status: 409 }); // Conflict
       }
       

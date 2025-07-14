@@ -1,6 +1,9 @@
- "use client"
+"use client"
 
+import { useState, useEffect } from "react"
 import { OverallProgressDisplay } from "@/components/job-readiness/OverallProgressDisplay"
+import { PerformantAnimatedCard } from "@/components/ui/performant-animated-card"
+import { PerformanceOptimizer } from "@/components/job-readiness/PerformanceOptimizer"
 
 interface JobReadinessLayoutProps {
   children: React.ReactNode
@@ -15,31 +18,51 @@ export function JobReadinessLayout({
   description, 
   showProgress = true 
 }: JobReadinessLayoutProps) {
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
   return (
-    <div className="container mx-auto p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Page Header */}
-        {(title || description) && (
-          <div className="text-center space-y-4">
-            {title && (
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                {title}
-              </h1>
+    <PerformanceOptimizer>
+      <div className="relative min-h-screen">
+        <div className="container mx-auto py-8 px-4 md:px-0">
+          <div className="max-w-6xl mx-auto space-y-8">
+            {/* Page Header */}
+            {(title || description) && (
+              <div className="text-center space-y-4">
+                {title && (
+                  <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                    {title}
+                  </h1>
+                )}
+                {description && (
+                  <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                    {description}
+                  </p>
+                )}
+              </div>
             )}
-            {description && (
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                {description}
-              </p>
+
+            {/* Progress Display */}
+            {showProgress && (
+              <div>
+                <PerformantAnimatedCard 
+                  variant="glass"
+                >
+                  <OverallProgressDisplay />
+                </PerformantAnimatedCard>
+              </div>
             )}
+
+            {/* Page Content */}
+            <div>
+              {children}
+            </div>
           </div>
-        )}
-
-        {/* Progress Display */}
-        {showProgress && <OverallProgressDisplay />}
-
-        {/* Page Content */}
-        {children}
+        </div>
       </div>
-    </div>
+    </PerformanceOptimizer>
   )
 }

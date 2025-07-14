@@ -105,6 +105,13 @@ pnpm performance:check      # Lighthouse performance check
 - **Video interview simulation** with AI analysis
 - **Real-world project grading** with AI feedback
 - **Promotion exam system** for tier advancement
+- **Star System Details**:
+  - Star 0: Initial state when learner first logs in (no modules completed)
+  - Star 1: Completed assessment module
+  - Star 2: Completed course modules
+  - Star 3: Completed expert session
+  - Star 4: Completed real-world projects
+  - Star 5: Completed simulated interview
 
 ### Multi-Tenant Architecture
 - **Client-based data isolation** using RLS policies
@@ -189,3 +196,4 @@ pnpm deploy:workers
 - **Test AI integrations** with fallback mechanisms
 - **Optimize bundle size** using dynamic imports for large components
 - **Monitor performance** with Lighthouse and bundle analyzer
+```

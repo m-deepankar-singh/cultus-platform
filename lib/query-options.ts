@@ -33,6 +33,7 @@ export interface Product {
   product_progress_percentage: number;
   product_status: 'NotStarted' | 'InProgress' | 'Completed' | 'Mixed';
   image_url?: string | null;
+  type?: string;
   modules: Module[];
 }
 
@@ -120,6 +121,7 @@ export function studentDashboardOptions() {
           name: product.name,
           description: product.description,
           image_url: product.image_url || null,
+          type: product.type,
           modules,
           product_progress_percentage: productProgressPercentage,
           product_status: productStatus

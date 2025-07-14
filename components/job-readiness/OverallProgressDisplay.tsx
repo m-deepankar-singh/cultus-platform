@@ -1,162 +1,124 @@
- "use client"
+"use client"
 
-import { Star, Clock } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Star, Trophy, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { PerformantAnimatedCard } from "@/components/ui/performant-animated-card"
 import { cn } from "@/lib/utils"
 import { useJobReadinessProgress } from "@/hooks/useJobReadinessProgress"
 
 interface TierConfig {
   name: string
-  color: string
   bgColor: string
   textColor: string
+  starColor: string
+  starGradient: string
 }
 
 const tierConfigs: Record<string, TierConfig> = {
   BRONZE: {
     name: "Bronze",
-    color: "bg-amber-600",
-    bgColor: "bg-amber-50 dark:bg-amber-950/20",
-    textColor: "text-amber-700 dark:text-amber-400"
+    bgColor: "bg-orange-100 dark:bg-orange-900/20",
+    textColor: "text-orange-800 dark:text-orange-300",
+    starColor: "text-orange-500",
+    starGradient: "from-orange-400 to-orange-600"
   },
   SILVER: {
-    name: "Silver",
-    color: "bg-gray-400",
-    bgColor: "bg-gray-50 dark:bg-gray-950/20",
-    textColor: "text-gray-700 dark:text-gray-400"
+    name: "Silver", 
+    bgColor: "bg-gray-100 dark:bg-gray-900/20",
+    textColor: "text-gray-800 dark:text-gray-300",
+    starColor: "text-gray-500",
+    starGradient: "from-gray-400 to-gray-600"
   },
   GOLD: {
     name: "Gold",
-    color: "bg-yellow-500",
-    bgColor: "bg-yellow-50 dark:bg-yellow-950/20",
-    textColor: "text-yellow-700 dark:text-yellow-400"
+    bgColor: "bg-yellow-100 dark:bg-yellow-900/20", 
+    textColor: "text-yellow-800 dark:text-yellow-300",
+    starColor: "text-yellow-500",
+    starGradient: "from-yellow-400 to-yellow-600"
   }
 }
 
 export function OverallProgressDisplay() {
   const { data: progress, isLoading, error } = useJobReadinessProgress()
-
+  
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Progress</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="flex space-x-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-8 w-8 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="p-6">
+        <div className="animate-pulse flex items-center justify-center gap-4">
+          <div className="h-6 bg-muted rounded w-32"></div>
+          <div className="h-8 bg-muted rounded w-24"></div>
+        </div>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Progress</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-red-500">Error loading progress data</p>
-        </CardContent>
-      </Card>
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">Unable to load progress</p>
+      </div>
     )
   }
 
-  const currentStars = progress?.currentStars || 0
   const currentTier = progress?.currentTier
+  const currentStars = progress?.currentStars || 0
   const tierConfig = currentTier ? tierConfigs[currentTier] : null
 
   return (
-    <Card className={cn("border-2", tierConfig?.bgColor || "bg-gray-50 dark:bg-gray-950/20")}>
-      <CardHeader className="text-center">
-        <CardTitle className="flex items-center justify-center gap-3">
-          <span>Your Progress</span>
-          {currentTier ? (
-            <Badge variant="secondary" className={cn("text-sm", tierConfig?.textColor, tierConfig?.color)}>
-              {tierConfig?.name} Tier
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-sm text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-600">
-              <Clock className="h-3 w-3 mr-1" />
-              No Tier Yet
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* 5-Star Display */}
-        <div className="flex justify-center items-center gap-3">
-          {[1, 2, 3, 4, 5].map((starNumber) => {
+    <div className="p-6">
+      <div className="flex items-center justify-between w-full max-w-2xl mx-auto">
+        <h2 className="text-lg font-medium">Your Progress</h2>
+        
+        {/* Universal 5-Star System - Middle */}
+        <div className="flex items-center justify-center gap-1">
+          {Array.from({ length: 5 }, (_, index) => {
+            const starNumber = index + 1
             const isEarned = starNumber <= currentStars
+            const starColor = tierConfig?.starColor || "text-yellow-500"
             return (
-              <div key={starNumber} className="relative">
-                <Star
+              <div 
+                key={index}
+                className="relative w-8 h-8"
+              >
+                <Star 
                   className={cn(
-                    "w-12 h-12 transition-all duration-300",
-                    isEarned && tierConfig
-                      ? `fill-current ${tierConfig.textColor} ${tierConfig.color}`
-                      : isEarned 
-                        ? "fill-current text-blue-600 bg-blue-600"
-                        : "text-gray-300 dark:text-gray-600"
+                    "w-8 h-8 transition-all duration-300",
+                    isEarned 
+                      ? `fill-current ${starColor} drop-shadow-lg` 
+                      : "text-muted-foreground"
                   )}
+                  style={{
+                    filter: isEarned ? 'drop-shadow(0 0 6px currentColor) brightness(1.2)' : 'none'
+                  }}
                 />
-                <span className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs font-medium">
-                  {starNumber}
-                </span>
               </div>
             )
           })}
         </div>
-
-        {/* Progress Text */}
-        <div className="text-center space-y-2">
-          <p className="text-2xl font-bold">
-            {currentStars} of 5 Stars Earned
-          </p>
-          <p className="text-muted-foreground">
-            {currentStars === 0 && "Start your journey by completing the initial assessments"}
-            {currentStars === 1 && "Great start! Continue with the courses to earn your second star"}
-            {currentStars === 2 && "Excellent progress! Watch expert sessions to earn your third star"}
-            {currentStars === 3 && "You're halfway there! Complete a real-world project for your fourth star"}
-            {currentStars === 4 && "Almost done! Finish the interview simulation to earn your final star"}
-            {currentStars === 5 && "Congratulations! You've completed the Job Readiness program"}
-          </p>
-        </div>
-
-        {/* Next Steps */}
-        {currentStars < 5 && (
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Next: {getNextStepText(currentStars)}
-            </p>
-          </div>
+        
+        {/* Tier Badge - Right */}
+        {currentTier && tierConfig ? (
+          <Badge 
+            variant="secondary"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-base font-medium",
+              tierConfig.bgColor,
+              tierConfig.textColor,
+              "border"
+            )}
+          >
+            <Trophy className="h-5 w-5" />
+            {tierConfig.name} Tier
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="flex items-center gap-2 px-4 py-2 text-base">
+            <Clock className="h-4 w-4" />
+            No Tier Yet
+          </Badge>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
-function getNextStepText(currentStars: number): string {
-  switch (currentStars) {
-    case 0:
-      return "Complete Initial Assessments"
-    case 1:
-      return "Complete Course Modules"
-    case 2:
-      return "Watch 5 Expert Sessions"
-    case 3:
-      return "Complete AI-Generated Project"
-    case 4:
-      return "Complete Interview Simulation"
-    default:
-      return "Program Complete!"
-  }
-}

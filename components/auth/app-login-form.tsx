@@ -104,14 +104,14 @@ export function AppLoginForm() {
 
 	return (
 		<>
-			<div className="text-center mb-8">
-				<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
-					<GraduationCap className="w-6 h-6 text-green-600 dark:text-green-400" />
+			<div className="text-center mb-6 sm:mb-8">
+				<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
+					<GraduationCap className="w-6 h-6 text-primary" />
 				</div>
-				<h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-900 to-green-600 dark:from-green-400 dark:to-green-200">
+				<h1 className="text-2xl sm:text-3xl font-bold mb-2 text-foreground">
 					Student Login
 				</h1>
-				<p className="text-neutral-600 dark:text-neutral-300">
+				<p className="text-sm sm:text-base text-muted-foreground">
 					Enter your credentials to access your learning dashboard
 				</p>
 			</div>
@@ -147,7 +147,7 @@ export function AppLoginForm() {
 			)}
 			
 			<Form {...form}>
-				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
 					<FormField
 						control={form.control}
 						name="email"
@@ -212,7 +212,7 @@ export function AppLoginForm() {
 
 					<Button 
 						type="submit" 
-						className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 dark:from-green-500 dark:to-green-600 dark:hover:from-green-600 dark:hover:to-green-700 text-white shadow-lg mt-2"
+						className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg mt-2"
 						disabled={isLoading}
 					>
 						{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -221,7 +221,7 @@ export function AppLoginForm() {
 				</form>
 			</Form>
 			
-			<div className="mt-6 text-sm text-center text-neutral-600 dark:text-neutral-400">
+			<div className="mt-4 sm:mt-6 text-xs sm:text-sm text-center text-muted-foreground">
 				<p>First time logging in? Use the temporary password provided in your welcome email.</p>
 			</div>
 		</>

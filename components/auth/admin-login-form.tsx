@@ -94,20 +94,20 @@ export function AdminLoginForm() {
 
 	return (
 		<>
-			<div className="text-center mb-8">
-				<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
-					<Shield className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+			<div className="text-center mb-6 sm:mb-8">
+				<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
+					<Shield className="w-6 h-6 text-primary" />
 				</div>
-				<h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-900 to-blue-600 dark:from-blue-400 dark:to-blue-200">
+				<h1 className="text-2xl sm:text-3xl font-bold mb-2 text-foreground">
 					Admin Login
 				</h1>
-				<p className="text-neutral-600 dark:text-neutral-300">
+				<p className="text-sm sm:text-base text-muted-foreground">
 					Access the admin dashboard with your credentials
 				</p>
 			</div>
 
 			<Form {...form}>
-				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
 					{submissionError && (
 						<Alert variant="destructive" className="bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
 							<AlertCircle className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function AdminLoginForm() {
 					
 					<Button 
 						type="submit" 
-						className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white shadow-lg"
+						className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
 						disabled={isLoading}
 					>
 						{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -190,7 +190,7 @@ export function AdminLoginForm() {
 				</form>
 			</Form>
 			
-			<div className="mt-6 text-sm text-center text-neutral-600 dark:text-neutral-400">
+			<div className="mt-4 sm:mt-6 text-xs sm:text-sm text-center text-muted-foreground">
 				<p>Admin and Staff accounts only. Need help? Contact your system administrator.</p>
 			</div>
 		</>

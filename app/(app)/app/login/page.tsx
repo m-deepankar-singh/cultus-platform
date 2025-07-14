@@ -7,8 +7,8 @@ import { StaticBackground } from "@/components/ui/static-background";
 export default function AppLoginPage() {
 	return (
 		<div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden">
-			{/* Logo overlay */}
-			<div className="absolute top-8 left-8 z-20">
+			{/* Responsive Logo overlay */}
+			<div className="absolute top-4 left-4 md:top-6 md:left-6 lg:top-8 lg:left-8 z-20">
 				<Link href="/">
 					<Image 
 						src="/Cultus-white (1).png"
@@ -16,7 +16,7 @@ export default function AppLoginPage() {
 						width={150}
 						height={75}
 						priority
-						className="dark:opacity-100 opacity-80"
+						className="dark:opacity-100 opacity-80 w-16 h-8 sm:w-20 sm:h-10 md:w-24 md:h-12 lg:w-32 lg:h-16 xl:w-36 xl:h-18 object-contain"
 					/>
 				</Link>
 			</div>
@@ -26,9 +26,9 @@ export default function AppLoginPage() {
 				<StaticBackground title="" />
 			</div>
 
-			{/* Login card with glassmorphism effect */}
-			<Card className="w-full max-w-md mx-auto z-10 bg-white/60 dark:bg-black/60 backdrop-blur-lg border border-white/20 dark:border-neutral-800/30 shadow-xl">
-				<CardContent className="pt-8 pb-6 px-6">
+			{/* Responsive Login card with glassmorphism effect */}
+			<Card className="w-full max-w-md mx-4 sm:mx-auto z-10 bg-white/60 dark:bg-black/60 backdrop-blur-lg border border-white/20 dark:border-neutral-800/30 shadow-xl">
+				<CardContent className="pt-6 pb-6 px-4 sm:pt-8 sm:px-6">
 					<AppLoginForm />
 				</CardContent>
 			</Card>

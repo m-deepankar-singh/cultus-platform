@@ -65,6 +65,7 @@ export async function GET() {
       id: product.id,
       name: product.name,
       description: product.description,
+      image_url: product.image_url || null,
       type: product.type,
       modules: (product.modules || []).map((module: any) => ({
         id: module.id,

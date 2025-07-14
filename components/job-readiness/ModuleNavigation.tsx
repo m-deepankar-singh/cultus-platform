@@ -1,10 +1,12 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { FileText, BookOpen, GraduationCap, Briefcase, Video, Lock, CheckCircle } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { FileText, BookOpen, GraduationCap, Briefcase, Video, Lock, CheckCircle, ArrowRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { PerformantAnimatedCard, CardGrid } from "@/components/ui/performant-animated-card"
+import { OptimizedProgressRing } from "@/components/ui/optimized-progress-ring"
+import { AnimatedButton } from "@/components/ui/animated-button"
 import { cn } from "@/lib/utils"
 import { useJobReadinessModuleGroups } from "@/hooks/useJobReadinessModuleGroups"
 
@@ -19,29 +21,54 @@ const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = 
 
 export function ModuleNavigation() {
   const { data: moduleGroups, isLoading } = useJobReadinessModuleGroups()
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-full"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-10 bg-gray-200 rounded"></div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+            Program Modules
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="group relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl blur opacity-25 group-hover:opacity-40 transition-opacity"></div>
+              <PerformantAnimatedCard variant="glass" className="relative animate-pulse h-80">
+                <div className="p-8 space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-muted rounded-xl"></div>
+                    <div className="flex-1 space-y-3">
+                      <div className="h-5 bg-muted rounded w-3/4"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </div>
+                  </div>
+                  <div className="h-4 bg-muted rounded w-full"></div>
+                  <div className="h-12 bg-muted rounded-lg"></div>
+                </div>
+              </PerformantAnimatedCard>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   if (!moduleGroups) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">No Job Readiness modules available.</p>
+      <div className="text-center py-20">
+        <div className="mx-auto w-24 h-24 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-full flex items-center justify-center mb-6">
+          <BookOpen className="h-12 w-12 text-muted-foreground" />
+        </div>
+        <h3 className="text-2xl font-semibold mb-3">No Modules Available</h3>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          Job Readiness modules will appear here once they're assigned to you.
+        </p>
       </div>
     )
   }
@@ -49,98 +76,159 @@ export function ModuleNavigation() {
   const currentStars = moduleGroups.student.currentStars
 
   return (
-    <div>
-      <h2 className="text-2xl font-semibold mb-6">Program Modules</h2>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold">Program Modules</h2>
+        <div className="flex items-center gap-3">
+          <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary transition-all duration-1000 ease-out"
+              style={{ 
+                width: `${(moduleGroups.moduleGroups.filter(m => m.isCompleted).length / moduleGroups.moduleGroups.length) * 100}%` 
+              }}
+            />
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {moduleGroups.moduleGroups.filter(m => m.isCompleted).length}/{moduleGroups.moduleGroups.length}
+          </span>
+        </div>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {moduleGroups.moduleGroups.map((moduleGroup) => {
+      <div className="space-y-3">
+        {moduleGroups.moduleGroups.map((moduleGroup, index) => {
           const isUnlocked = moduleGroup.isUnlocked
           const isCompleted = moduleGroup.isCompleted
           const isCurrent = currentStars === moduleGroup.requiredStars
           const IconComponent = iconMap[moduleGroup.icon] || FileText
-
+          
           return (
-            <Card
+            <div 
               key={moduleGroup.type}
               className={cn(
-                "transition-all duration-200 hover:shadow-lg",
-                isUnlocked ? "border-primary/50" : "border-gray-200 bg-gray-50/50 dark:bg-gray-950/50",
-                isCurrent && "ring-2 ring-primary/20 shadow-lg",
-                isCompleted && "border-green-500/50 bg-green-50/50 dark:bg-green-950/20"
+                "group relative transition-all duration-300",
+                isCurrent && "scale-[1.01]"
               )}
+              style={{ animationDelay: `${index * 100}ms` }}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "p-2 rounded-lg",
-                      isCompleted ? "bg-green-100 dark:bg-green-900/30" :
-                      isUnlocked ? "bg-primary/10" : "bg-gray-100 dark:bg-gray-800"
+              <div className={cn(
+                "relative flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 group-hover:shadow-md",
+                isCompleted 
+                  ? "bg-emerald-50/50 border-emerald-200/50 dark:bg-emerald-950/20 dark:border-emerald-800/30" 
+                  : isUnlocked 
+                    ? "bg-card border-border group-hover:border-primary/30" 
+                    : "bg-muted/30 border-muted",
+                isCurrent && "ring-2 ring-primary/20 shadow-sm"
+              )}>
+                
+                {/* Icon */}
+                <div className={cn(
+                  "flex-shrink-0 p-3 rounded-lg transition-all duration-300",
+                  isCompleted 
+                    ? "bg-emerald-100 dark:bg-emerald-900/40" 
+                    : isUnlocked 
+                      ? "bg-primary/10" 
+                      : "bg-muted"
+                )}>
+                  {isCompleted ? (
+                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  ) : isUnlocked ? (
+                    <IconComponent className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Lock className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className={cn(
+                      "font-semibold",
+                      !isUnlocked && "text-muted-foreground"
                     )}>
-                      {isCompleted ? (
-                        <CheckCircle className="h-6 w-6 text-green-600" />
-                      ) : isUnlocked ? (
-                        <IconComponent className="h-6 w-6 text-primary" />
-                      ) : (
-                        <Lock className="h-6 w-6 text-gray-400" />
-                      )}
-                    </div>
-                    <div>
-                      <CardTitle className={cn(
-                        "text-lg",
-                        !isUnlocked && "text-gray-400"
-                      )}>
-                        {moduleGroup.title}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge 
-                          variant={isCompleted ? "default" : isUnlocked ? "secondary" : "outline"}
-                          className="text-xs"
-                        >
-                          {isCompleted ? "Completed" : 
-                           isCurrent ? "Current" : 
-                           isUnlocked ? "Available" : "Locked"}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          Star {moduleGroup.requiredStars + 1}
-                        </span>
-                        {moduleGroup.totalCount > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            ({moduleGroup.completedCount}/{moduleGroup.totalCount})
-                          </span>
+                      {moduleGroup.title}
+                    </h3>
+                    
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant={isCompleted ? "default" : isUnlocked ? "secondary" : "outline"}
+                        className={cn(
+                          "text-xs px-2 py-0.5",
+                          isCompleted && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                          isCurrent && !isCompleted && "bg-primary/10 text-primary border-primary/30"
                         )}
-                      </div>
+                      >
+                        {isCompleted ? "Completed" : isCurrent ? "Current" : isUnlocked ? "Available" : "Locked"}
+                      </Badge>
+                      
+                      <Badge variant="outline" className="text-xs px-2 py-0.5">
+                        Star {moduleGroup.requiredStars + 1}
+                      </Badge>
                     </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <CardDescription className={cn(
-                  "mb-4",
-                  !isUnlocked && "text-gray-400"
-                )}>
-                  {moduleGroup.description}
+                  
+                  <p className={cn(
+                    "text-sm mb-2",
+                    isUnlocked ? "text-muted-foreground" : "text-muted-foreground/60"
+                  )}>
+                    {moduleGroup.description}
+                  </p>
+                  
+                  {/* Progress */}
                   {moduleGroup.totalCount > 0 && (
-                    <span className="block mt-1 text-xs font-medium">
-                      {moduleGroup.totalCount} {moduleGroup.type.replace('_', ' ')} available
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">
+                        {moduleGroup.completedCount}/{moduleGroup.totalCount} {moduleGroup.type.replace('_', ' ')}
+                      </span>
+                      <div className="h-1 flex-1 bg-muted/50 rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full transition-all duration-1000 ease-out",
+                            isCompleted 
+                              ? "bg-emerald-500" 
+                              : "bg-primary"
+                          )}
+                          style={{ 
+                            width: `${moduleGroup.isCompleted ? 100 : (moduleGroup.completedCount / moduleGroup.totalCount) * 100}%`
+                          }}
+                        />
+                      </div>
+                      {isCompleted && (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Complete</span>
+                      )}
+                    </div>
                   )}
-                </CardDescription>
-                
-                {isUnlocked ? (
-                  <Button asChild className="w-full">
+                </div>
+
+                {/* Action */}
+                <div className="flex-shrink-0">
+                  {isUnlocked ? (
                     <Link href={moduleGroup.href}>
-                      {isCompleted ? "Review" : isCurrent ? "Start" : "Continue"}
+                      <AnimatedButton 
+                        size="sm"
+                        className={cn(
+                          "transition-all duration-300",
+                          isCompleted 
+                            ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
+                            : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                        )}
+                      >
+                        {isCompleted ? "Review" : isCurrent ? "Start" : "Continue"}
+                        <ArrowRight className="h-3 w-3 ml-1 transition-transform group-hover:translate-x-0.5" />
+                      </AnimatedButton>
                     </Link>
-                  </Button>
-                ) : (
-                  <Button disabled className="w-full">
-                    <Lock className="h-4 w-4 mr-2" />
-                    Requires {moduleGroup.requiredStars} {moduleGroup.requiredStars === 1 ? "star" : "stars"}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                  ) : (
+                    <AnimatedButton 
+                      size="sm"
+                      disabled 
+                      className="bg-muted text-muted-foreground cursor-not-allowed"
+                    >
+                      <Lock className="h-3 w-3 mr-1" />
+                      Locked
+                    </AnimatedButton>
+                  )}
+                </div>
+              </div>
+            </div>
           )
         })}
       </div>

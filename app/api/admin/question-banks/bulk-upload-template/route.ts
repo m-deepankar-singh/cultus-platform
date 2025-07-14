@@ -1,0 +1,167 @@
+import { NextResponse } from 'next/server';
+import { utils, write } from 'xlsx';
+import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+
+/**
+ * GET /api/admin/question-banks/bulk-upload-template
+ * 
+ * Generates and returns an Excel template for bulk question bank upload.
+ * Only accessible by Admin roles.
+ */
+export async function GET(request: Request) {
+  try {
+    // JWT-based authentication (0 database queries for auth)
+    const authResult = await authenticateApiRequestSecure(['Admin']);
+    if ('error' in authResult) {
+      return new NextResponse(JSON.stringify({ error: authResult.error }), {
+        status: authResult.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Create workbook with sample data and instructions
+    const wb = utils.book_new();
+    
+    // Create the main template sheet with column-based format
+    const templateData = [
+      {
+        question_text: 'What is the capital of France?',
+        question_type: 'MCQ',
+        option_1: 'London',
+        option_2: 'Berlin',
+        option_3: 'Paris',
+        option_4: 'Madrid',
+        correct_answer: 'option_3',
+        topic: 'Geography',
+        difficulty: 'easy'
+      },
+      {
+        question_text: 'Which of the following are programming languages? (Select all that apply)',
+        question_type: 'MSQ',
+        option_1: 'JavaScript',
+        option_2: 'HTML',
+        option_3: 'Python',
+        option_4: 'CSS',
+        correct_answer: 'option_1,option_3',
+        topic: 'Programming',
+        difficulty: 'medium'
+      },
+      {
+        question_text: 'What does API stand for?',
+        question_type: 'MCQ',
+        option_1: 'Application Programming Interface',
+        option_2: 'Advanced Programming Integration',
+        option_3: 'Automated Process Interface',
+        option_4: 'Application Process Integration',
+        correct_answer: 'option_1',
+        topic: 'Technology',
+        difficulty: 'easy'
+      }
+    ];
+    
+    const templateSheet = utils.json_to_sheet(templateData);
+    utils.book_append_sheet(wb, templateSheet, 'Questions');
+    
+    // Create JSON format sheet for advanced users
+    const jsonTemplateData = [
+      {
+        question_text: 'Which cloud services are provided by AWS? (Select all that apply)',
+        question_type: 'MSQ',
+        options_json: '[{"id":"opt1","text":"EC2"},{"id":"opt2","text":"S3"},{"id":"opt3","text":"Azure"},{"id":"opt4","text":"Lambda"}]',
+        correct_answer_json: '["opt1","opt2","opt4"]',
+        topic: 'Cloud Computing',
+        difficulty: 'medium'
+      },
+      {
+        question_text: 'What is the time complexity of binary search?',
+        question_type: 'MCQ',
+        options_json: '[{"id":"a","text":"O(n)"},{"id":"b","text":"O(log n)"},{"id":"c","text":"O(n²)"},{"id":"d","text":"O(1)"}]',
+        correct_answer_json: 'b',
+        topic: 'Algorithms',
+        difficulty: 'hard'
+      }
+    ];
+    
+    const jsonTemplateSheet = utils.json_to_sheet(jsonTemplateData);
+    utils.book_append_sheet(wb, jsonTemplateSheet, 'Questions (JSON Format)');
+    
+    // Add question types reference sheet
+    const questionTypesData = [
+      { type: 'MCQ', description: 'Multiple Choice Question - Single correct answer', correct_answer_format: 'option_1, option_2, etc. OR single option ID' },
+      { type: 'MSQ', description: 'Multiple Select Question - Multiple correct answers', correct_answer_format: 'option_1,option_2,option_3 OR comma-separated option IDs' }
+    ];
+    
+    const questionTypesSheet = utils.json_to_sheet(questionTypesData);
+    utils.book_append_sheet(wb, questionTypesSheet, 'Question Types');
+    
+    // Add difficulty levels reference sheet
+    const difficultyData = [
+      { difficulty: 'easy', description: 'Basic level questions' },
+      { difficulty: 'medium', description: 'Intermediate level questions' },
+      { difficulty: 'hard', description: 'Advanced level questions' }
+    ];
+    
+    const difficultySheet = utils.json_to_sheet(difficultyData);
+    utils.book_append_sheet(wb, difficultySheet, 'Difficulty Levels');
+    
+    // Add sample topics reference sheet
+    const topicsData = [
+      { topic: 'Programming', description: 'Software development, coding, algorithms' },
+      { topic: 'Mathematics', description: 'Algebra, calculus, statistics' },
+      { topic: 'Science', description: 'Physics, chemistry, biology' },
+      { topic: 'Technology', description: 'IT concepts, software, hardware' },
+      { topic: 'Business', description: 'Management, finance, marketing' },
+      { topic: 'Geography', description: 'Countries, capitals, locations' },
+      { topic: 'History', description: 'Historical events, dates, figures' },
+      { topic: 'Literature', description: 'Books, authors, literary concepts' }
+    ];
+    
+    const topicsSheet = utils.json_to_sheet(topicsData);
+    utils.book_append_sheet(wb, topicsSheet, 'Sample Topics');
+    
+    // Add comprehensive instructions sheet
+    const instructionsData = [
+      { field: 'question_text', description: 'The question text (required)', format: 'Plain text', example: 'What is the capital of France?' },
+      { field: 'question_type', description: 'Type of question (required)', format: 'MCQ or MSQ', example: 'MCQ' },
+      { field: 'option_1', description: 'First answer option (required)', format: 'Plain text', example: 'London' },
+      { field: 'option_2', description: 'Second answer option (required)', format: 'Plain text', example: 'Berlin' },
+      { field: 'option_3', description: 'Third answer option (optional)', format: 'Plain text', example: 'Paris' },
+      { field: 'option_4', description: 'Fourth answer option (optional)', format: 'Plain text', example: 'Madrid' },
+      { field: 'option_5', description: 'Fifth answer option (optional)', format: 'Plain text', example: 'Rome' },
+      { field: 'option_6', description: 'Sixth answer option (optional)', format: 'Plain text', example: 'Vienna' },
+      { field: 'correct_answer', description: 'Correct answer(s) for the question', format: 'For MCQ: single option (option_1). For MSQ: comma-separated (option_1,option_3)', example: 'option_3' },
+      { field: 'topic', description: 'Subject/topic of the question (optional)', format: 'Plain text', example: 'Geography' },
+      { field: 'difficulty', description: 'Difficulty level (optional)', format: 'easy, medium, or hard', example: 'easy' },
+      { field: '', description: '', format: '', example: '' },
+      { field: 'ALTERNATIVE FORMAT', description: 'You can also use JSON format (see "Questions (JSON Format)" sheet)', format: '', example: '' },
+      { field: 'options_json', description: 'Options in JSON format', format: 'JSON array with id and text', example: '[{"id":"opt1","text":"Option 1"}]' },
+      { field: 'correct_answer_json', description: 'Correct answer(s) in JSON format', format: 'For MCQ: string. For MSQ: array', example: 'opt1 or ["opt1","opt2"]' }
+    ];
+    
+    const instructionsSheet = utils.json_to_sheet(instructionsData);
+    utils.book_append_sheet(wb, instructionsSheet, 'Instructions');
+    
+    // Generate Excel file
+    const excelBuffer = write(wb, { bookType: 'xlsx', type: 'buffer' });
+    
+    // Return the Excel file
+    return new NextResponse(excelBuffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="question_banks_upload_template.xlsx"'
+      }
+    });
+    
+  } catch (error) {
+    console.error('API Error generating question bank template:', error);
+    let errorMessage = 'Internal Server Error';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+
+    return new NextResponse(JSON.stringify({ error: 'An unexpected error occurred while generating the template', details: errorMessage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}

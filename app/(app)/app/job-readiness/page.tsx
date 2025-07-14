@@ -1,13 +1,190 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { JobReadinessLayout } from "@/components/job-readiness/JobReadinessLayout"
 import { ModuleNavigation } from "@/components/job-readiness/ModuleNavigation"
+import { TierDisplay } from "@/components/job-readiness/TierDisplay"
+import { PerformantAnimatedCard } from "@/components/ui/performant-animated-card"
+import { useJobReadinessProgress } from "@/hooks/useJobReadinessProgress"
+import { Target } from "lucide-react"
 
 export default function JobReadinessPage() {
+  const { data: progress } = useJobReadinessProgress()
+  
   return (
     <JobReadinessLayout
-      title="Job Readiness Program"
-      description="Progress through our comprehensive program designed to prepare you for your career journey. Complete each module to earn stars and advance through Bronze, Silver, and Gold tiers."
+      title="Job Readiness"
+      description="Complete modules, earn progress, and advance tiers"
     >
-      <ModuleNavigation />
+      <div className="space-y-8">
+        {/* Module Navigation */}
+        <ModuleNavigation />
+        
+        {/* Star System Explanation */}
+        <PerformantAnimatedCard variant="subtle" className="p-6">
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-center">How the Star System Works</h3>
+            
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="flex justify-center gap-1 mb-4">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <div key={index} className="relative w-8 h-8">
+                      <div 
+                        className="w-8 h-8 transition-all duration-300"
+                        style={{
+                          background: progress?.currentTier === 'BRONZE' 
+                            ? '#f97316' 
+                            : progress?.currentTier === 'SILVER'
+                              ? '#6b7280'
+                              : '#eab308',
+                          WebkitMask: 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTUuMDkgOC4yNkwyMiA5TDE3IDEzLjc0TDE4LjE4IDIyTDEyIDE4LjVMNS44MiAyMkw3IDEzLjc0TDIgOUw4LjkxIDguMjZMMTIgMloiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgo8L3N2Zz4=") center/contain no-repeat',
+                          maskComposite: 'intersect',
+                          filter: 'drop-shadow(0 0 4px currentColor) brightness(1.2)'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  All learners progress through the same 5-star system by completing modules sequentially
+                </p>
+              </div>
+              
+              <div className="grid md:grid-cols-5 gap-4 text-center text-sm">
+                <div className="space-y-2">
+                  <div className="relative w-6 h-6 mx-auto">
+                    <div 
+                      className="w-6 h-6"
+                      style={{
+                        background: progress?.currentTier === 'BRONZE' 
+                          ? '#f97316' 
+                          : progress?.currentTier === 'SILVER'
+                            ? '#6b7280'
+                            : '#eab308',
+                        WebkitMask: 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTUuMDkgOC4yNkwyMiA5TDE3IDEzLjc0TDE4LjE4IDIyTDEyIDE4LjVMNS44MiAyMkw3IDEzLjc0TDIgOUw4LjkxIDguMjZMMTIgMloiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgo8L3N2Zz4=") center/contain no-repeat',
+                        filter: 'brightness(1.2)'
+                      }}
+                    />
+                  </div>
+                  <div className="font-medium">Star 1</div>
+                  <p className="text-muted-foreground">Complete Assessments</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="relative w-6 h-6 mx-auto">
+                    <div 
+                      className="w-6 h-6"
+                      style={{
+                        background: progress?.currentTier === 'BRONZE' 
+                          ? '#f97316' 
+                          : progress?.currentTier === 'SILVER'
+                            ? '#6b7280'
+                            : '#eab308',
+                        WebkitMask: 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTUuMDkgOC4yNkwyMiA5TDE3IDEzLjc0TDE4LjE4IDIyTDEyIDE4LjVMNS44MiAyMkw3IDEzLjc0TDIgOUw4LjkxIDguMjZMMTIgMloiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgo8L3N2Zz4=") center/contain no-repeat',
+                        filter: 'brightness(1.2)'
+                      }}
+                    />
+                  </div>
+                  <div className="font-medium">Star 2</div>
+                  <p className="text-muted-foreground">Complete Courses</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="relative w-6 h-6 mx-auto">
+                    <div 
+                      className="w-6 h-6"
+                      style={{
+                        background: progress?.currentTier === 'BRONZE' 
+                          ? '#f97316' 
+                          : progress?.currentTier === 'SILVER'
+                            ? '#6b7280'
+                            : '#eab308',
+                        WebkitMask: 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTUuMDkgOC4yNkwyMiA5TDE3IDEzLjc0TDE4LjE4IDIyTDEyIDE4LjVMNS44MiAyMkw3IDEzLjc0TDIgOUw4LjkxIDguMjZMMTIgMloiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgo8L3N2Zz4=") center/contain no-repeat',
+                        filter: 'brightness(1.2)'
+                      }}
+                    />
+                  </div>
+                  <div className="font-medium">Star 3</div>
+                  <p className="text-muted-foreground">Expert Sessions</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="relative w-6 h-6 mx-auto">
+                    <div 
+                      className="w-6 h-6"
+                      style={{
+                        background: progress?.currentTier === 'BRONZE' 
+                          ? '#f97316' 
+                          : progress?.currentTier === 'SILVER'
+                            ? '#6b7280'
+                            : '#eab308',
+                        WebkitMask: 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTUuMDkgOC4yNkwyMiA5TDE3IDEzLjc0TDE4LjE4IDIyTDEyIDE4LjVMNS44MiAyMkw3IDEzLjc0TDIgOUw4LjkxIDguMjZMMTIgMloiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgo8L3N2Zz4=") center/contain no-repeat',
+                        filter: 'brightness(1.2)'
+                      }}
+                    />
+                  </div>
+                  <div className="font-medium">Star 4</div>
+                  <p className="text-muted-foreground">Real-world Projects</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="relative w-6 h-6 mx-auto">
+                    <div 
+                      className="w-6 h-6"
+                      style={{
+                        background: progress?.currentTier === 'BRONZE' 
+                          ? '#f97316' 
+                          : progress?.currentTier === 'SILVER'
+                            ? '#6b7280'
+                            : '#eab308',
+                        WebkitMask: 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTUuMDkgOC4yNkwyMiA5TDE3IDEzLjc0TDE4LjE4IDIyTDEyIDE4LjVMNS44MiAyMkw3IDEzLjc0TDIgOUw4LjkxIDguMjZMMTIgMloiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgo8L3N2Zz4=") center/contain no-repeat',
+                        filter: 'brightness(1.2)'
+                      }}
+                    />
+                  </div>
+                  <div className="font-medium">Star 5</div>
+                  <p className="text-muted-foreground">Interview Simulation</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
+              <div className="space-y-2">
+                <p className="text-sm text-blue-800 dark:text-blue-200 text-center font-medium">
+                  <strong>Tier System (Bronze/Silver/Gold)</strong>
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 text-center leading-relaxed">
+                  Your tier is determined by your assessment performance and only affects content difficulty. 
+                  All learners can earn the same 5 stars regardless of their tier - Bronze, Silver, and Gold 
+                  learners all follow the same progression path but with content tailored to their skill level.
+                </p>
+              </div>
+            </div>
+          </div>
+        </PerformantAnimatedCard>
+        
+        {/* Tier Display Section */}
+        <PerformantAnimatedCard variant="glass">
+          <div className="p-2">
+            <TierDisplay />
+          </div>
+        </PerformantAnimatedCard>
+        
+        {/* Information Section */}
+        <PerformantAnimatedCard variant="subtle" className="text-center p-6">
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Your Learning Path</h2>
+            </div>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Every completed module brings you closer to your career goals. 
+              Track your progress and showcase your growing expertise.
+            </p>
+          </div>
+        </PerformantAnimatedCard>
+      </div>
     </JobReadinessLayout>
   )
 } 

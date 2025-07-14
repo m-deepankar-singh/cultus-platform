@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { QuestionForm } from './question-form';
 
-const ROW_HEIGHT = 65; // Height of each row in pixels
+const ROW_HEIGHT = 60; // Height of each row in pixels
 const TABLE_HEIGHT = 600; // Height of the virtual table
 
 interface RowData {
@@ -76,7 +76,7 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
   }
 
   return (
-    <div className="grid gap-6 px-6 py-4 border-b hover:bg-muted/50 transition-colors" style={{...style, gridTemplateColumns: "2fr 0.5fr 0.7fr 0.8fr 0.7fr"}}>
+    <div className="grid gap-4 px-6 py-3 border-b hover:bg-muted/50 transition-colors" style={{...style, gridTemplateColumns: "3fr 120px 120px 140px 100px"}}>
       <div className="space-y-1">
         <p className="text-sm font-medium line-clamp-3">{question.question_text}</p>
         <div className="flex gap-1 flex-wrap">
@@ -87,15 +87,15 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
           )}
         </div>
       </div>
-      <div>
-        <Badge variant="outline">
+      <div className="flex items-center">
+        <Badge variant="outline" className="text-xs">
           {question.question_type}
         </Badge>
       </div>
-      <div>
+      <div className="flex items-center">
         <Badge 
           variant="outline"
-          className={
+          className={`text-xs ${
             question.difficulty === 'easy'
               ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800'
               : question.difficulty === 'medium'
@@ -103,18 +103,19 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
               : question.difficulty === 'hard'
               ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800'
               : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
-          }
+          }`}
         >
           {question.difficulty || 'N/A'}
         </Badge>
       </div>
-      <div className="text-sm text-muted-foreground">
+      <div className="flex items-center text-sm text-muted-foreground">
         {formatDistanceToNow(new Date(question.created_at), { addSuffix: true })}
       </div>
-      <div className="flex justify-end space-x-2">
+      <div className="flex justify-end items-center space-x-1">
         <Button
           variant="ghost"
           size="sm"
+          className="h-8 w-8 p-0"
           onClick={() => onEditQuestion(question)}
         >
           <Edit className="h-4 w-4" />
@@ -122,6 +123,7 @@ const QuestionBankRow = React.memo(({ index, style, data }: {
         <Button
           variant="ghost"
           size="sm"
+          className="h-8 w-8 p-0"
           onClick={() => onDeleteQuestion(question.id)}
         >
           <Trash2 className="h-4 w-4" />
@@ -201,6 +203,31 @@ export function VirtualizedQuestionBanksTable() {
     }
     hasMountedRef.current = true;
   }, [filters]);
+
+  // Listen for bulk upload completion event
+  useEffect(() => {
+    const handleBulkUpload = () => {
+      // Invalidate question bank queries to refresh the data
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          query.queryKey[0] === 'admin' && query.queryKey[1] === 'question-banks' 
+      });
+      
+      // Reset infinite loader to start fresh
+      if (infiniteLoaderRef.current) {
+        infiniteLoaderRef.current.resetloadMoreItemsCache();
+      }
+      
+      // Show success message
+      toast({
+        title: "Questions refreshed",
+        description: "The question list has been updated with your bulk upload.",
+      });
+    };
+
+    document.addEventListener('questionsBulkUploaded', handleBulkUpload);
+    return () => document.removeEventListener('questionsBulkUploaded', handleBulkUpload);
+  }, [queryClient, toast]);
   
   // Calculate item count for infinite loader
   const itemCount = hasNextPage ? questions.length + 1 : questions.length;
@@ -280,12 +307,7 @@ export function VirtualizedQuestionBanksTable() {
   return (
     <>
       <Card className="border-0 shadow-none bg-transparent">
-        <div className="p-6 space-y-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Question Banks</h1>
-            <p className="text-muted-foreground">Manage your question banks for courses and assessments.</p>
-          </div>
-          
+        <div className="px-6 pt-2 pb-6 space-y-4">
           {/* Search and Filter Controls */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
@@ -306,9 +328,6 @@ export function VirtualizedQuestionBanksTable() {
               >
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 Filters
-              </Button>
-              <Button onClick={() => setShowCreateForm(true)}>
-                Create Question
               </Button>
             </div>
             
@@ -335,7 +354,7 @@ export function VirtualizedQuestionBanksTable() {
           {/* Table Container */}
           <div className="rounded-md border">
             {/* Table Header */}
-            <div className="grid gap-6 px-6 py-4 font-medium bg-muted/50 border-b text-sm" style={{gridTemplateColumns: "2fr 0.5fr 0.7fr 0.8fr 0.7fr"}}>
+            <div className="grid gap-4 px-6 py-3 font-medium bg-muted/50 border-b text-sm" style={{gridTemplateColumns: "3fr 120px 120px 140px 100px"}}>
               <div>Question</div>
               <div>Type</div>
               <div>Difficulty</div>
@@ -348,7 +367,7 @@ export function VirtualizedQuestionBanksTable() {
               <div className="p-8 text-center">
                 <div className="animate-pulse space-y-2">
                   {Array.from({ length: 10 }).map((_, i) => (
-                    <Skeleton key={i} className="h-[65px] w-full" />
+                    <Skeleton key={i} className="h-[60px] w-full" />
                   ))}
                 </div>
               </div>

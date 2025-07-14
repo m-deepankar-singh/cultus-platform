@@ -1,22 +1,51 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card'
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring'
 import { useAssessmentList } from '@/hooks/useAssessmentList'
-import { Medal, Trophy, Star, Target, Clock, CheckCircle } from 'lucide-react'
+import { Medal, Trophy, Star, Target, Clock, CheckCircle, Crown, Award } from 'lucide-react'
 import { useJobReadinessProgress } from '@/hooks/useJobReadinessProgress'
+import { cn } from '@/lib/utils'
 
-const tierColors = {
-  BRONZE: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  SILVER: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300', 
-  GOLD: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-}
-
-const tierIcons = {
-  BRONZE: <Medal className="h-4 w-4 text-orange-600 dark:text-orange-400" />,
-  SILVER: <Trophy className="h-4 w-4 text-gray-600 dark:text-gray-400" />,
-  GOLD: <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+const tierConfigs = {
+  BRONZE: {
+    name: 'Bronze',
+    colors: {
+      bg: 'bg-orange-100 dark:bg-orange-900/30',
+      text: 'text-orange-800 dark:text-orange-300',
+      accent: 'text-orange-600 dark:text-orange-400',
+      ring: 'danger' as const,
+      gradient: 'from-orange-400 to-orange-600'
+    },
+    icon: Medal,
+    description: 'Entry level',
+  },
+  SILVER: {
+    name: 'Silver',
+    colors: {
+      bg: 'bg-gray-100 dark:bg-gray-900/30',
+      text: 'text-gray-800 dark:text-gray-300',
+      accent: 'text-gray-600 dark:text-gray-400',
+      ring: 'primary' as const,
+      gradient: 'from-gray-400 to-gray-600'
+    },
+    icon: Trophy,
+    description: 'Intermediate',
+  },
+  GOLD: {
+    name: 'Gold',
+    colors: {
+      bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+      text: 'text-yellow-800 dark:text-yellow-300',
+      accent: 'text-yellow-600 dark:text-yellow-400',
+      ring: 'warning' as const,
+      gradient: 'from-yellow-400 to-yellow-600'
+    },
+    icon: Crown,
+    description: 'Advanced',
+  }
 }
 
 interface TierDisplayProps {
@@ -28,21 +57,31 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
   const fallbackProductId = progress?.products[0]?.id
   const productId = providedProductId || fallbackProductId
   const { data: assessmentData } = useAssessmentList(productId || '')
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (!assessmentData) {
     return (
-      <Card className="animate-pulse">
-        <CardHeader>
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+      <PerformantAnimatedCard variant="glass" className="animate-pulse">
+        <div className="p-8 space-y-6">
+          <div className="text-center space-y-4">
+            <div className="h-8 bg-muted rounded w-1/3 mx-auto"></div>
+            <div className="h-4 bg-muted rounded w-2/3 mx-auto"></div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-3">
+                <div className="h-16 w-16 bg-muted rounded-full mx-auto"></div>
+                <div className="h-4 bg-muted rounded"></div>
+                <div className="h-3 bg-muted rounded w-3/4 mx-auto"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
@@ -63,160 +102,194 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
     silver: { min_score: 61, max_score: 80 },
     gold: { min_score: 81, max_score: 100 }
   }
+  
+  const currentTierConfig = current_tier ? tierConfigs[current_tier as keyof typeof tierConfigs] : null
 
   return (
-    <Card className="border-gray-200 dark:border-gray-700">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-          Tier System
-        </CardTitle>
-        <CardDescription>
-          Complete all assessment modules to determine your tier level and unlock appropriate content
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Current Status Display */}
-          {all_assessments_complete && current_tier ? (
-            // All assessments completed - show current tier
-            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Current Tier:</span>
-              <Badge className={tierColors[current_tier as keyof typeof tierColors]}>
-                <span className="flex items-center gap-1">
-                  {tierIcons[current_tier as keyof typeof tierIcons]}
-                  {current_tier}
-                </span>
-              </Badge>
-            </div>
-          ) : (
-            // Assessments incomplete - show "No Tier Yet" state
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <span className="font-medium text-amber-700 dark:text-amber-300">Current Tier:</span>
-                <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600">
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    No Tier Yet
-                  </span>
-                </Badge>
-              </div>
+    <div className="space-y-8">
+      {/* Enhanced Header */}
+      <div className="text-center space-y-4">
+        <div className="flex items-center justify-center gap-3">
+          <Target className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-semibold">Tier System</h2>
+        </div>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Your tier is determined by assessment scores and affects content difficulty, not star progression
+        </p>
+      </div>
 
-              {/* Assessment Completion Progress */}
-              {hasAssessments && (
-                <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-blue-900 dark:text-blue-100">
-                        Assessment Progress
-                      </h4>
-                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                        {completed_assessments_count}/{total_assessments_count} completed
-                      </span>
-                    </div>
-                    
-                    <Progress 
-                      value={progressPercentage} 
-                      className="h-2"
-                    />
-                    
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      Complete all {total_assessments_count} assessment modules to unlock your tier and earn your first star.
-                    </p>
+      {/* Current Tier Status */}
+      {all_assessments_complete && current_tier && (
+        <PerformantAnimatedCard 
+          variant="glass" 
+          className={cn(
+            "relative overflow-hidden",
+            currentTierConfig?.colors.bg
+          )}
+        >
+          <div className="p-8 text-center space-y-6">
+            <div className="space-y-4">
+              <div className="relative inline-block">
+                <OptimizedProgressRing
+                  value={100}
+                  size={120}
+                  strokeWidth={6}
+                  showValue={false}
+                  color={currentTierConfig?.colors.ring || 'primary'}
+                  delay={300}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className={cn(
+                    "p-4 rounded-full",
+                    currentTierConfig?.colors.bg
+                  )}>
+                    {currentTierConfig && (
+                      <currentTierConfig.icon className={cn("w-12 h-12", currentTierConfig.colors.text)} />
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Tier Criteria - Show as goals when no tier assigned */}
-          <div className="grid md:grid-cols-3 gap-4">
-            {Object.entries(safeTierCriteria).map(([tier, criteria]) => {
-              const tierName = tier.toUpperCase() as keyof typeof tierColors
-              const isCurrentTier = all_assessments_complete && current_tier === tierName
+              </div>
               
-              return (
-                <Card 
-                  key={tier} 
-                  className={`transition-all ${
-                    isCurrentTier 
-                      ? 'ring-2 ring-blue-500 dark:ring-blue-400 border-blue-200 dark:border-blue-600' 
-                      : 'border-gray-200 dark:border-gray-700'
-                  }`}
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      {tierIcons[tierName]}
-                      <span className="capitalize">{tier}</span>
-                      {isCurrentTier && (
-                        <Badge variant="secondary" className="text-xs">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Achieved
-                        </Badge>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2">
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Score Range:
+              <div className="space-y-2">
+                <h3 className="text-3xl font-bold">
+                  {currentTierConfig?.name} Tier
+                </h3>
+                <p className={cn("text-lg", currentTierConfig?.colors.text)}>
+                  Content difficulty: {currentTierConfig?.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        </PerformantAnimatedCard>
+      )}
+
+      {/* Enhanced Tier Goals Display */}
+      <div className="space-y-6">
+        <h3 className="text-xl font-semibold text-center">Tier Requirements</h3>
+        
+        <CardGrid columns={3} gap="lg">
+          {Object.entries(safeTierCriteria).map(([tier, criteria], index) => {
+            const tierName = tier.toUpperCase() as keyof typeof tierConfigs
+            const tierConfig = tierConfigs[tierName]
+            const isCurrentTier = all_assessments_complete && current_tier === tierName
+            const isAchieved = isCurrentTier
+            
+            return (
+              <PerformantAnimatedCard
+                key={tier}
+                variant="glass"
+                staggerIndex={index}
+                className={cn(
+                  "relative overflow-hidden",
+                  isCurrentTier && "ring-2 ring-primary/50",
+                  tierConfig.colors.bg
+                )}
+              >
+                
+                <div className="p-8 text-center space-y-6">
+                  {/* Tier Icon with Progress Ring - Centered */}
+                  <div className="flex justify-center">
+                    <div className="relative inline-block">
+                      <OptimizedProgressRing
+                        value={isAchieved ? 100 : 0}
+                        size={80}
+                        strokeWidth={4}
+                        showValue={false}
+                        color={tierConfig.colors.ring}
+                        delay={600 + index * 200}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className={cn(
+                          "p-3 rounded-full transition-all duration-300",
+                          isAchieved 
+                            ? `bg-gradient-to-br ${tierConfig.colors.gradient} shadow-lg`
+                            : "bg-muted"
+                        )}>
+                          <tierConfig.icon className={cn(
+                            "w-6 h-6 transition-all duration-300",
+                            isAchieved ? "text-white" : "text-muted-foreground"
+                          )} />
+                        </div>
                       </div>
-                      <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {criteria.min_score}% - {criteria.max_score}%
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {tier === 'bronze' && 'Entry level - Build foundational skills'}
-                        {tier === 'silver' && 'Intermediate - Advance your knowledge'}
-                        {tier === 'gold' && 'Advanced - Master complex concepts'}
-                      </div>
-                      {!all_assessments_complete && (
-                        <div className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                          Goal: Complete all assessments to determine eligibility
+                      
+                      {isAchieved && (
+                        <div className="absolute -top-2 -right-2">
+                          <CheckCircle className="w-6 h-6 text-success bg-background rounded-full" />
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className={cn(
+                      "text-lg font-semibold flex items-center justify-center gap-2",
+                      tierConfig.colors.text
+                    )}>
+                      <span className="capitalize">{tier}</span>
+                      {isAchieved && (
+                        <Badge variant="secondary" className="text-xs">
+                          Achieved
+                        </Badge>
+                      )}
+                    </h4>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        Score Range: {criteria.min_score}% - {criteria.max_score}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Content difficulty: {tierConfig.description}
+                      </p>
+                    </div>
+                    
+                    {!all_assessments_complete && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        Complete assessments to determine your tier
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </PerformantAnimatedCard>
+            )
+          })}
+        </CardGrid>
+      </div>
+
+      {/* Help Section */}
+      {!all_assessments_complete && hasAssessments && (
+        <PerformantAnimatedCard variant="subtle" className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <Target className="h-6 w-6 text-primary mt-1" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium text-lg">How Tier Assignment Works</h4>
+              <p className="text-sm text-muted-foreground">
+                Your tier is determined by your assessment performance and sets the difficulty level for all program content. 
+                All learners follow the same 5-star progression path regardless of their tier - Bronze, Silver, and Gold 
+                learners just experience content tailored to their skill level.
+              </p>
+            </div>
           </div>
+        </PerformantAnimatedCard>
+      )}
 
-          {/* Help Information */}
-          {!all_assessments_complete && hasAssessments && (
-            <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-              <div className="flex items-start gap-3">
-                <Target className="h-5 w-5 text-gray-600 dark:text-gray-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-                    How Tier Assignment Works
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Your final tier will be determined by your average performance across <strong>all assessment modules</strong>. 
-                    This ensures a comprehensive evaluation of your skills before unlocking advanced content.
-                  </p>
-                </div>
-              </div>
+      {/* Initial State - No Assessments */}
+      {!hasAssessments && (
+        <PerformantAnimatedCard variant="glass" className="p-8 text-center">
+          <div className="space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <Target className="h-8 w-8 text-primary" />
             </div>
-          )}
-
-          {/* Initial State - No Assessments */}
-          {!hasAssessments && (
-            <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-              <div className="flex items-start gap-3">
-                <Target className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                    Ready to Get Started?
-                  </h4>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    Assessment modules will be available soon to determine your tier level and begin your Job Readiness journey.
-                  </p>
-                </div>
-              </div>
+            <div>
+              <h4 className="font-medium text-lg mb-2">Ready to Get Started?</h4>
+              <p className="text-sm text-muted-foreground">
+                Take assessments to determine your tier level and begin your Job Readiness journey with content matched to your skill level.
+              </p>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        </PerformantAnimatedCard>
+      )}
+    </div>
   )
 } 

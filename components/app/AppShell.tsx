@@ -26,10 +26,37 @@ export function AppShell({ children }: AppShellProps) {
 		setMounted(true);
 	}, []);
 	
-	const shellContent = (
+	// Before mount, render without theme-dependent content
+	if (!mounted) {
+		return (
+			<div className="flex h-screen flex-col overflow-hidden">
+				{!isLoginPage && <AppHeader />}
+				{/* Background element - fallback for SSR */}
+				{!isLoginPage && (
+				<div className="fixed inset-0 -z-10">
+					<div className="relative w-full h-full bg-muted/40">
+						<div className="w-full h-full" />
+					</div>
+				</div>
+				)}
+				{/* Main content area - always scrollable */}
+				<main className={`flex-1 overflow-auto min-h-0 ${!isLoginPage ? 'p-4 md:p-8 bg-transparent' : ''}`}>
+					<div className={`${!isLoginPage ? 'relative z-10' : ''}`}>
+						<AdvancedPageTransition>
+							{children}
+						</AdvancedPageTransition>
+					</div>
+				</main>
+				{/* Toast notifications */}
+				<Toaster />
+			</div>
+		);
+	}
+
+	return (
 		<div className="flex h-screen flex-col overflow-hidden">
 			{!isLoginPage && <AppHeader />}
-			{/* Background element - subtle patterns in light mode */}
+			{/* Background element - theme-aware after mount */}
 			{!isLoginPage && (
 			<div className="fixed inset-0 -z-10">
 				{theme === "dark" ? (
@@ -53,10 +80,4 @@ export function AppShell({ children }: AppShellProps) {
 			<Toaster />
 		</div>
 	);
-
-	if (!mounted) {
-		return shellContent;
-	}
-	
-	return shellContent;
 } 

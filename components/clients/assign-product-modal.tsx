@@ -19,12 +19,14 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { useToast } from "@/components/ui/use-toast"
-import { Package, CheckIcon } from "lucide-react"
+import { Package, CheckIcon, AlertTriangle } from "lucide-react"
+import { isJobReadinessProduct } from "@/lib/utils/product-utils"
 
 interface Product {
   id: string
   name: string
   description: string | null
+  type?: string
 }
 
 interface PaginatedResponse {
@@ -58,7 +60,22 @@ export function AssignProductModal({
   const [products, setProducts] = useState<Product[]>([])
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [hasExistingJobReadiness, setHasExistingJobReadiness] = useState(false)
   const { toast } = useToast()
+
+  // Check if client already has job readiness products
+  const checkExistingJobReadiness = async () => {
+    try {
+      const response = await fetch(`/api/staff/clients/${clientId}/products`)
+      if (response.ok) {
+        const existingProducts: Product[] = await response.json()
+        const hasJobReadiness = existingProducts.some(product => isJobReadinessProduct(product))
+        setHasExistingJobReadiness(hasJobReadiness)
+      }
+    } catch (error) {
+      console.error("Failed to check existing products:", error)
+    }
+  }
 
   // Fetch all available products
   const fetchProducts = async () => {
@@ -126,6 +143,23 @@ export function AssignProductModal({
           // Handle specific permission errors
           const errorMessage = errorData.error || "You don't have permission to assign products to this client."
           throw new Error(errorMessage)
+        } else if (response.status === 409) {
+          // Handle job readiness conflicts with detailed error message
+          const errorMessage = errorData.error || "Product assignment conflict occurred."
+          
+          // Show special toast for job readiness conflicts
+          if (errorMessage.toLowerCase().includes('job readiness')) {
+            toast({
+              title: "Job Readiness Product Conflict",
+              description: errorMessage + (errorData.existing_job_readiness_product 
+                ? ` (Current: ${errorData.existing_job_readiness_product.name})`
+                : ''),
+              variant: "destructive",
+            })
+            return
+          }
+          
+          throw new Error(errorMessage)
         } else {
           throw new Error(`Error: ${response.status}${errorData.error ? ` - ${errorData.error}` : ''}`)
         }
@@ -175,12 +209,13 @@ export function AssignProductModal({
     setFilteredProducts(filtered)
   }
 
-  // Fetch products when modal opens
+  // Fetch products and check existing job readiness when modal opens
   useEffect(() => {
     if (open) {
+      checkExistingJobReadiness()
       fetchProducts()
     }
-  }, [open, existingProductIds])
+  }, [open, existingProductIds, clientId])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -192,6 +227,18 @@ export function AssignProductModal({
           </DialogDescription>
         </DialogHeader>
 
+        {hasExistingJobReadiness && (
+          <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/30 rounded-md">
+            <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Job Readiness Limit Reached</span>
+            </div>
+            <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
+              This client already has a job readiness product assigned. Only one job readiness product can be assigned per client.
+            </p>
+          </div>
+        )}
+        
         <div className="py-4">
           <Command className="rounded-lg border shadow-md">
             <CommandInput 
@@ -212,33 +259,57 @@ export function AssignProductModal({
                       : "No matching products found."}
                   </div>
                 ) : (
-                  filteredProducts.map((product) => (
-                    <CommandItem
-                      key={product.id}
-                      onSelect={() => setSelectedProductId(product.id)}
-                      className="flex items-center gap-2 px-4 py-3"
-                    >
-                      <div className={`mr-2 flex h-8 w-8 items-center justify-center rounded-full ${
-                        selectedProductId === product.id 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-primary/10 text-primary"
-                      }`}>
-                        {selectedProductId === product.id ? (
-                          <CheckIcon className="h-4 w-4" />
-                        ) : (
-                          <Package className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{product.name}</span>
-                        {product.description && (
-                          <span className="text-xs text-muted-foreground">
-                            {product.description}
-                          </span>
-                        )}
-                      </div>
-                    </CommandItem>
-                  ))
+                  filteredProducts.map((product) => {
+                    const isJobReadiness = isJobReadinessProduct(product)
+                    const isDisabled = isJobReadiness && hasExistingJobReadiness
+                    
+                    return (
+                      <CommandItem
+                        key={product.id}
+                        onSelect={() => !isDisabled && setSelectedProductId(product.id)}
+                        className={`flex items-center gap-2 px-4 py-3 ${
+                          isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        disabled={isDisabled}
+                      >
+                        <div className={`mr-2 flex h-8 w-8 items-center justify-center rounded-full ${
+                          selectedProductId === product.id 
+                            ? "bg-primary text-primary-foreground" 
+                            : isDisabled
+                            ? "bg-destructive/10 dark:bg-destructive/20 text-destructive"
+                            : "bg-primary/10 text-primary"
+                        }`}>
+                          {selectedProductId === product.id ? (
+                            <CheckIcon className="h-4 w-4" />
+                          ) : isDisabled ? (
+                            <AlertTriangle className="h-4 w-4" />
+                          ) : (
+                            <Package className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="flex flex-col flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{product.name}</span>
+                            {isJobReadiness && (
+                              <span className="text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 px-1.5 py-0.5 rounded-full">
+                                Job Readiness
+                              </span>
+                            )}
+                          </div>
+                          {product.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {product.description}
+                            </span>
+                          )}
+                          {isDisabled && (
+                            <span className="text-xs text-destructive mt-1">
+                              Client already has a job readiness product assigned
+                            </span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    )
+                  })
                 )}
               </CommandGroup>
             </CommandList>

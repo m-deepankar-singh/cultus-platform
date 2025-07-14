@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Plus, Package, Trash2 } from "lucide-react"
 import { AssignProductModal } from "@/components/clients/assign-product-modal"
 import { useToast } from "@/components/ui/use-toast"
+import { isJobReadinessProduct } from "@/lib/utils/product-utils"
 
 interface Product {
   id: string
   name: string
   description: string | null
+  type?: string
   created_at: string
   updated_at: string
   created_by: string | null
@@ -111,32 +113,45 @@ export function AssignedProducts({ clientId, clientName }: AssignedProductsProps
           </p>
         ) : (
           <div className="space-y-4">
-            {products.map((product) => (
-              <div 
-                key={product.id} 
-                className="flex items-center justify-between rounded-md border p-4 hover:bg-accent/50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                    <Package className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">{product.name}</h3>
-                    {product.description && (
-                      <p className="text-sm text-muted-foreground">{product.description}</p>
-                    )}
-                  </div>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => handleUnassignProduct(product.id, product.name)}
+            {products.map((product) => {
+              const isJobReadiness = isJobReadinessProduct(product)
+              
+              return (
+                <div 
+                  key={product.id} 
+                  className="flex items-center justify-between rounded-md border p-4 hover:bg-accent/50"
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      isJobReadiness ? "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300" : "bg-primary/10 text-primary"
+                    }`}>
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{product.name}</h3>
+                        {isJobReadiness && (
+                          <span className="text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 px-1.5 py-0.5 rounded-full">
+                            Job Readiness
+                          </span>
+                        )}
+                      </div>
+                      {product.description && (
+                        <p className="text-sm text-muted-foreground">{product.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => handleUnassignProduct(product.id, product.name)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )
+            })}
           </div>
         )}
       </CardContent>

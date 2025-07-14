@@ -7,22 +7,27 @@ import { AuthAwareNavButtons } from '@/components/navigation/auth-aware-nav-butt
 export default function HomePage() {
   return (
     <main>
-        {/* Container for top-right navigation buttons */}
-      <div className="absolute top-4 right-4 z-20 flex gap-4 items-center">
-        <ThemeToggle />
-        <AuthAwareNavButtons />
-      </div>
-
-      {/* Logo overlay */}
-      <div className="absolute top-8 left-8 z-20">
+        {/* Responsive Header */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 md:p-6 lg:p-8">
+        <div className="flex items-center justify-between">
+          {/* Logo - responsive sizing with proper aspect ratio */}
+          <div className="flex-shrink-0">
             <Image 
-          src="/Cultus-white (1).png"
+              src="/Cultus-white (1).png"
               alt="Cultus Logo" 
-          width={150}
-          height={75}
-          priority
-          className="dark:opacity-100 opacity-80"
-        />
+              width={120}
+              height={60}
+              priority
+              className="dark:opacity-100 opacity-80 w-20 h-10 sm:w-24 sm:h-12 md:w-32 md:h-16 lg:w-36 lg:h-18 object-contain"
+            />
+          </div>
+          
+          {/* Navigation buttons - responsive gap and sizing */}
+          <div className="flex gap-2 sm:gap-3 md:gap-4 items-center">
+            <ThemeToggle />
+            <AuthAwareNavButtons />
+          </div>
+        </div>
       </div>
 
       <HomePageClient title="Cultus Learning" />

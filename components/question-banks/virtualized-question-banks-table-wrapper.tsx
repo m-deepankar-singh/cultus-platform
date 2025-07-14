@@ -1,10 +1,16 @@
 import { Card } from "@/components/ui/card"
 import { VirtualizedQuestionBanksTable } from "./virtualized-question-banks-table"
+import { QuestionBankHeader } from "./question-bank-header"
 
 // Server Component to manage the virtualized question banks table
 export async function VirtualizedQuestionBanksTableWrapper() {
   // No initial data fetching needed - the virtualized table will handle everything via TanStack Query
-  return <VirtualizedQuestionBanksTable />
+  return (
+    <div className="space-y-6">
+      <QuestionBankHeader />
+      <VirtualizedQuestionBanksTable />
+    </div>
+  )
 }
 
 // Placeholder component for loading state

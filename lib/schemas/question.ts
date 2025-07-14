@@ -94,4 +94,51 @@ export const QuestionBankQuerySchema = z.object({
     // Add pagination parameters
     page: z.string().optional(),
     pageSize: z.string().optional(),
-}); 
+});
+
+// --- Bulk Upload Schemas ---
+
+// Schema for validating individual question options in bulk upload
+export const BulkQuestionOptionSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1, { message: "Option text is required" })
+});
+
+// Base schema for bulk question validation (more lenient than API schemas)
+const BaseBulkQuestionSchema = z.object({
+  question_text: z.string().min(5, { message: "Question text must be at least 5 characters" }),
+  question_type: z.enum(['MCQ', 'MSQ'], { message: "Question type must be MCQ or MSQ" }),
+  options: z.array(BulkQuestionOptionSchema).min(2, { message: "At least 2 options are required" }).max(6, { message: "Maximum 6 options allowed" }),
+  topic: z.string().optional().nullable(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional().nullable(),
+});
+
+// MCQ bulk upload schema
+const BulkMCQSchema = BaseBulkQuestionSchema.extend({
+  question_type: z.literal('MCQ'),
+  correct_answer: z.string({ required_error: 'Correct answer is required for MCQ' }),
+});
+
+// MSQ bulk upload schema
+const BulkMSQSchema = BaseBulkQuestionSchema.extend({
+  question_type: z.literal('MSQ'),
+  correct_answer: z.object({
+    answers: z.array(z.string()).min(1, { message: "At least one correct answer is required for MSQ" })
+  }),
+});
+
+// Union schema for bulk question validation
+export const BulkQuestionSchema = z.discriminatedUnion('question_type', [
+  BulkMCQSchema,
+  BulkMSQSchema,
+]);
+
+// Schema for bulk upload payload
+export const BulkUploadPayloadSchema = z.object({
+  questions: z.array(z.any()) // Raw data from Excel, will be parsed and validated
+});
+
+// Type exports for bulk upload
+export type BulkQuestionType = z.infer<typeof BulkQuestionSchema>;
+export type BulkQuestionOptionType = z.infer<typeof BulkQuestionOptionSchema>;
+export type BulkUploadPayloadType = z.infer<typeof BulkUploadPayloadSchema>; 
