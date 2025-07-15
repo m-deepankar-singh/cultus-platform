@@ -81,101 +81,101 @@ export function AppHeader() {
       className="sticky top-0 z-50 w-full border-b-2 border-primary/20 backdrop-blur-xl bg-background/80 dark:bg-black/40 shadow-lg dark:shadow-primary/10"
       staggerIndex={0}
     >
-      <div className="max-w-5xl mx-auto flex h-14 items-center justify-between px-4">
-        <div className="md:hidden header-element">
-          <Sheet>
-            <SheetTrigger asChild>
-              <AnimatedButton 
-                variant="ghost" 
-                size="icon"
-                className="rounded-xl hover:bg-primary/10 transition-all duration-300"
-              >
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </AnimatedButton>
-            </SheetTrigger>
-            <SheetContent 
-              side="left" 
-              className="w-[280px] sm:w-[320px] bg-background/95 dark:bg-black/95 backdrop-blur-xl border-r-2 border-primary/20"
-            >
-              <div className="mt-8">
-                <PerformantAnimatedCard
-                  variant="glass"
-                  className="p-6 mb-6"
+      <div className="max-w-7xl mx-auto flex h-12 items-center justify-between px-6">
+        {/* Left side - Mobile menu + Logo */}
+        <div className="flex items-center gap-4">
+          <div className="md:hidden header-element">
+            <Sheet>
+              <SheetTrigger asChild>
+                <AnimatedButton 
+                  variant="ghost" 
+                  size="icon"
+                  className="rounded-xl hover:bg-primary/10 transition-all duration-300"
                 >
-                  <h2 className="text-xl font-bold gradient-text mb-2">Navigation</h2>
-                  <p className="text-sm text-muted-foreground">Choose your learning path</p>
-                </PerformantAnimatedCard>
-                
-                <nav className="space-y-3">
-                  {routes.map((route, index) => (
-                    <PerformantAnimatedCard
-                      key={route.href}
-                      variant="subtle"
-                      hoverEffect="lift"
-                      staggerIndex={index}
-                      className={cn(
-                        "transition-all duration-300",
-                        route.active && "border-2 border-primary/50 bg-primary/10"
-                      )}
-                    >
-                      <Link
-                        href={route.href}
-                        className="flex items-center gap-3 p-4 w-full"
-                      >
-                        <div className={cn(
-                          "p-2 rounded-lg transition-all duration-300",
-                          route.active 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-muted text-muted-foreground"
-                        )}>
-                          <route.icon className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1">
-                          <span className={cn(
-                            "font-medium transition-colors",
-                            route.active ? "text-primary" : "text-foreground"
-                          )}>
-                            {route.label}
-                          </span>
-                        </div>
-                        {route.active && (
-                          <OptimizedProgressRing
-                            value={100}
-                            size={20}
-                            color="primary"
-                            showValue={false}
-                          />
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle menu</span>
+                </AnimatedButton>
+              </SheetTrigger>
+              <SheetContent 
+                side="left" 
+                className="w-[280px] sm:w-[320px] bg-background/95 dark:bg-black/95 backdrop-blur-xl border-r-2 border-primary/20"
+              >
+                <div className="mt-8">
+                  <PerformantAnimatedCard
+                    variant="glass"
+                    className="p-6 mb-6"
+                  >
+                    <h2 className="text-xl font-bold gradient-text mb-2">Navigation</h2>
+                    <p className="text-sm text-muted-foreground">Choose your learning path</p>
+                  </PerformantAnimatedCard>
+                  
+                  <nav className="space-y-3">
+                    {routes.map((route, index) => (
+                      <PerformantAnimatedCard
+                        key={route.href}
+                        variant="subtle"
+                        hoverEffect="lift"
+                        staggerIndex={index}
+                        className={cn(
+                          "transition-all duration-300",
+                          route.active && "border-2 border-primary/50 bg-primary/10"
                         )}
-                      </Link>
-                    </PerformantAnimatedCard>
-                  ))}
-                </nav>
-              </div>
-            </SheetContent>
-          </Sheet>
+                      >
+                        <Link
+                          href={route.href}
+                          className="flex items-center gap-3 p-4 w-full"
+                        >
+                          <div className={cn(
+                            "p-2 rounded-lg transition-all duration-300",
+                            route.active 
+                              ? "bg-primary text-primary-foreground" 
+                              : "bg-muted text-muted-foreground"
+                          )}>
+                            <route.icon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1">
+                            <span className={cn(
+                              "font-medium transition-colors",
+                              route.active ? "text-primary" : "text-foreground"
+                            )}>
+                              {route.label}
+                            </span>
+                          </div>
+                          {route.active && (
+                            <OptimizedProgressRing
+                              value={100}
+                              size={20}
+                              color="primary"
+                              showValue={false}
+                            />
+                          )}
+                        </Link>
+                      </PerformantAnimatedCard>
+                    ))}
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+          
+          <Link href="/app/dashboard" className="header-element">
+            <Image
+              src="/Cultus-white (1).png"
+              alt="Cultus Platform"
+              width={100}
+              height={32}
+              className="object-contain filter brightness-0 invert dark:filter-none"
+              priority
+            />
+          </Link>
         </div>
-        <Link href="/app/dashboard" className="header-element">
-          <Image
-            src="/Cultus-white (1).png"
-            alt="Cultus Platform"
-            width={100}
-            height={32}
-            className="object-contain filter brightness-0 invert dark:filter-none"
-            priority
-          />
-        </Link>
-        <nav className="hidden md:flex items-center gap-3 header-element">
+
+        {/* Center - Navigation */}
+        <nav className="hidden md:flex items-center gap-3 header-element absolute left-1/2 transform -translate-x-1/2">
           {routes.map((route, index) => (
-            <PerformantAnimatedCard
+            <div
               key={route.href}
-              variant={route.active ? "glass" : "subtle"}
-              hoverEffect="lift"
-              staggerIndex={index + 1}
-              className={cn(
-                "transition-all duration-300",
-                route.active && "border-2 border-primary/50 bg-primary/10"
-              )}
+              className="transition-all duration-300"
             >
               <Link
                 href={route.href}
@@ -207,9 +207,11 @@ export function AppHeader() {
                   />
                 )}
               </Link>
-            </PerformantAnimatedCard>
+            </div>
           ))}
         </nav>
+        
+        {/* Right side - Theme toggle + User menu */}
         <div className="flex items-center gap-2 header-element">
           <PerformantAnimatedCard
             variant="glass"
