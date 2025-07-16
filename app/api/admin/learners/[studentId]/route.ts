@@ -4,6 +4,7 @@ import { UserRole } from '@/lib/schemas/user';
 import { z } from 'zod';
 import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * GET /api/admin/learners/[studentId]
@@ -261,7 +262,7 @@ export async function PATCH(
 /**
  * DELETE /api/admin/learners/[studentId]
  * 
- * Deletes a learner (both auth user and student record)
+ * Deactivates a learner (soft delete - sets is_active to false)
  * This can only be done by an Admin
  */
 export async function DELETE(
@@ -299,41 +300,29 @@ export async function DELETE(
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
     
-    // 4. Delete student data (Note: auth user deletion requires admin privileges)
+    // 4. Deactivate student (soft delete)
     try {
-      // First delete the student record
-      const { error: deleteStudentError } = await supabase
+      // Set the student as inactive instead of deleting
+      const { error: deactivateError } = await supabase
         .from('students')
-        .delete()
+        .update({ 
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', studentId);
       
-      if (deleteStudentError) {
+      if (deactivateError) {
         return NextResponse.json({
-          error: "Failed to delete student record",
-          details: deleteStudentError.message
+          error: "Failed to deactivate student",
+          details: deactivateError.message
         }, { status: 500 });
       }
       
-      // Delete all progress data associated with the student
-      // For student_module_progress
-      const { error: deleteProgressError } = await supabase
-        .from('student_module_progress')
-        .delete()
-        .eq('student_id', studentId);
-      
-      if (deleteProgressError) {
-        // Consider whether this should be a hard failure
-      }
-      
-      // Note: Auth user deletion would require service role or admin client
-      // For now, we'll just delete the student record
-      // To delete auth user, you would need admin privileges
-      
-      return NextResponse.json({ message: "Student successfully deleted" });
+      return NextResponse.json({ message: "Student successfully deactivated" });
     } catch (txError) {
       return NextResponse.json({
-        error: "Failed to delete student",
-        details: txError instanceof Error ? txError.message : 'Unknown error during deletion'
+        error: "Failed to deactivate student",
+        details: txError instanceof Error ? txError.message : 'Unknown error during deactivation'
       }, { status: 500 });
     }
   } catch (error) {

@@ -192,8 +192,8 @@ export function useUpdateLearner() {
 }
 
 /**
- * Mutation hook for deleting a learner
- * Includes optimistic removal from the UI
+ * Mutation hook for deactivating a learner
+ * Includes optimistic updates to show deactivated status
  */
 export function useDeleteLearner() {
   const queryClient = useQueryClient();
@@ -206,7 +206,7 @@ export function useDeleteLearner() {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete learner');
+        throw new Error(errorData.error || 'Failed to deactivate learner');
       }
       
       return response.json();
@@ -220,7 +220,7 @@ export function useDeleteLearner() {
         predicate: (query) => query.queryKey[0] === 'admin' && query.queryKey[1] === 'learners'
       });
       
-      // Optimistically remove the learner from all queries
+      // Optimistically update the learner to show deactivated status
       queryClient.setQueriesData(
         { predicate: (query) => query.queryKey[0] === 'admin' && query.queryKey[1] === 'learners' },
         (old: any) => {
@@ -230,11 +230,11 @@ export function useDeleteLearner() {
               ...old,
               pages: old.pages.map((page: any) => ({
                 ...page,
-                data: page.data.filter((learner: Learner) => learner.id !== id),
-                metadata: {
-                  ...page.metadata,
-                  totalCount: page.metadata.totalCount - 1
-                }
+                data: page.data.map((learner: Learner) => 
+                  learner.id === id 
+                    ? { ...learner, is_active: false, updated_at: new Date().toISOString() }
+                    : learner
+                )
               }))
             };
           }
@@ -253,14 +253,98 @@ export function useDeleteLearner() {
       
       toast({
         title: "Error",
-        description: `Failed to delete learner: ${error.message}`,
+        description: `Failed to deactivate learner: ${error.message}`,
         variant: "destructive",
       });
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Learner deleted successfully",
+        description: "Learner deactivated successfully",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === 'admin' && query.queryKey[1] === 'learners'
+      });
+    },
+  });
+}
+
+/**
+ * Mutation hook for reactivating a learner
+ * Includes optimistic updates to show activated status
+ */
+export function useReactivateLearner() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/admin/learners/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: true }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to reactivate learner');
+      }
+      
+      return response.json();
+    },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ 
+        predicate: (query) => query.queryKey[0] === 'admin' && query.queryKey[1] === 'learners'
+      });
+      
+      const previousData = queryClient.getQueriesData({ 
+        predicate: (query) => query.queryKey[0] === 'admin' && query.queryKey[1] === 'learners'
+      });
+      
+      // Optimistically update the learner to show activated status
+      queryClient.setQueriesData(
+        { predicate: (query) => query.queryKey[0] === 'admin' && query.queryKey[1] === 'learners' },
+        (old: any) => {
+          if (!old) return old;
+          if (old.pages) {
+            return {
+              ...old,
+              pages: old.pages.map((page: any) => ({
+                ...page,
+                data: page.data.map((learner: Learner) => 
+                  learner.id === id 
+                    ? { ...learner, is_active: true, updated_at: new Date().toISOString() }
+                    : learner
+                )
+              }))
+            };
+          }
+          return old;
+        }
+      );
+      
+      return { previousData };
+    },
+    onError: (error, id, context) => {
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      
+      toast({
+        title: "Error",
+        description: `Failed to reactivate learner: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Learner reactivated successfully",
       });
     },
     onSettled: () => {

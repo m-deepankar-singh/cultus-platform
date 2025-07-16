@@ -35,6 +35,7 @@ import { EditLearnerDialog } from "./edit-learner-dialog"
 import { DataPagination } from "@/components/ui/data-pagination"
 import { BulkUploadDialog } from "./bulk-upload-dialog"
 import { ExportLearnersButton } from "./export-learners-button"
+import { useDeleteLearner, useReactivateLearner } from "@/hooks/mutations/admin/useLearnerMutations"
 interface LearnersTableClientProps {
   initialLearners: Learner[]
   clientOptions: Array<{ id: string; name: string }>
@@ -83,12 +84,13 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
   // State for delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [learnerToDelete, setLearnerToDelete] = useState<Learner | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   
   // Debounced search term
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   
   const { toast } = useToast()
+  const deleteLearnerMutation = useDeleteLearner()
+  const reactivateLearnerMutation = useReactivateLearner()
 
   // Debounce search term to avoid too many API calls
   useEffect(() => {
@@ -231,39 +233,27 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
     setLearnerToDelete(learner)
     setDeleteDialogOpen(true)
   }
+
+  // Handle reactivate learner
+  const handleReactivateLearner = (learner: Learner) => {
+    reactivateLearnerMutation.mutate(learner.id, {
+      onSuccess: () => {
+        fetchLearners() // Refresh the data
+      }
+    })
+  }
   
   // Confirm delete learner
   const confirmDeleteLearner = async () => {
     if (!learnerToDelete) return
     
-    setIsDeleting(true)
-    
     try {
-      const response = await fetch(`/api/admin/learners/${learnerToDelete.id}`, {
-        method: "DELETE",
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to delete learner")
-      }
-      
-      toast({
-        title: "Learner deleted",
-        description: `${learnerToDelete.full_name} has been deleted successfully.`,
-      })
-      
-      fetchLearners() // Refresh the data
-    } catch (error) {
-      toast({
-        title: "Failed to delete learner",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setIsDeleting(false)
+      await deleteLearnerMutation.mutateAsync(learnerToDelete.id)
       setDeleteDialogOpen(false)
       setLearnerToDelete(null)
+      fetchLearners() // Refresh the data
+    } catch (error) {
+      // Error handling is done by the mutation hook
     }
   }
 
@@ -437,12 +427,21 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
                           <DropdownMenuItem onClick={() => handleEditLearner(learner)}>
                             Edit learner
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteLearner(learner)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            Delete learner
-                          </DropdownMenuItem>
+                          {learner.is_active ? (
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteLearner(learner)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Deactivate learner
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              onClick={() => handleReactivateLearner(learner)}
+                              className="text-green-600 focus:text-green-600"
+                            >
+                              Reactivate learner
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -485,21 +484,21 @@ export function LearnersTableClient({ initialLearners, clientOptions }: Learners
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Deactivate learner?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the learner{' '}
-              <span className="font-semibold">{learnerToDelete?.full_name}</span> and their data.
-              This action cannot be undone.
+              This will deactivate the learner{' '}
+              <span className="font-semibold">{learnerToDelete?.full_name}</span> and prevent them from logging in.
+              Their data will be preserved and they can be reactivated later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteLearnerMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeleteLearner}
-              disabled={isDeleting}
+              disabled={deleteLearnerMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {deleteLearnerMutation.isPending ? "Deactivating..." : "Deactivate"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

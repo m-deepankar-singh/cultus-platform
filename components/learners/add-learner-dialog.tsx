@@ -79,6 +79,7 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [clients, setClients] = useState<Client[]>(initialClients)
   const [isLoadingClients, setIsLoadingClients] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const { toast } = useToast()
   
   // Add debugging log when clients prop changes
@@ -148,6 +149,14 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
     },
   })
 
+  // Clear email error when user types in email field
+  const handleEmailChange = (value: string) => {
+    if (emailError) {
+      setEmailError(null)
+    }
+    form.setValue('email', value)
+  }
+
   async function onSubmit(values: FormValues) {
     setIsSubmitting(true)
     try {
@@ -173,6 +182,7 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
       // Store the password and show success dialog
       setTempPassword(password)
       form.reset()
+      setEmailError(null) // Clear any email errors on success
       setOpen(false)
       setSuccessOpen(true)
       
@@ -185,10 +195,32 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
       onLearnerAdded()
     } catch (error) {
       console.error("Error adding learner:", error)
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to add learner. Please try again."
+      let errorTitle = "Error"
+      
+      if (error instanceof Error) {
+        // Check for specific error messages
+        if (error.message.includes("learner with this email already exists")) {
+          errorTitle = "Email Already Exists"
+          errorMessage = "A learner with this email address already exists. Please use a different email address."
+          // Set field-level error for better UX
+          setEmailError("This email address is already in use")
+          // Also set form error for the email field
+          form.setError('email', {
+            type: 'manual',
+            message: 'This email address is already in use'
+          })
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add learner. Please try again.",
+        title: errorTitle,
+        description: errorMessage,
       })
     } finally {
       setIsSubmitting(false)
@@ -199,9 +231,13 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
     <>
       <Dialog open={open} onOpenChange={(isOpen) => {
         setOpen(isOpen)
-        if (isOpen && (!Array.isArray(clients) || clients.length === 0)) {
-          // Force fetch clients when opening the dialog if we don't have them
-          fetchClients()
+        if (isOpen) {
+          // Clear email error when opening dialog
+          setEmailError(null)
+          if (!Array.isArray(clients) || clients.length === 0) {
+            // Force fetch clients when opening the dialog if we don't have them
+            fetchClients()
+          }
         }
       }}>
         <DialogTrigger asChild>
@@ -240,9 +276,21 @@ export function AddLearnerDialog({ clients: initialClients, onLearnerAdded }: Ad
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="johndoe@example.com" type="email" {...field} />
+                    <Input 
+                      placeholder="johndoe@example.com" 
+                      type="email" 
+                      {...field}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      className={emailError ? "border-destructive focus:border-destructive" : ""}
+                    />
                   </FormControl>
                   <FormMessage />
+                  {emailError && (
+                    <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                      <span className="text-xs">⚠️</span>
+                      {emailError}
+                    </p>
+                  )}
                 </FormItem>
               )}
             />

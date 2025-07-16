@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import InfiniteLoader from 'react-window-infinite-loader';
 import { useLearnersInfinite, flattenLearnersPages, getTotalLearnersCount, type Learner, type LearnersFilters } from '@/hooks/queries/admin/useLearners';
-import { useDeleteLearner } from '@/hooks/mutations/admin/useLearnerMutations';
+import { useDeleteLearner, useReactivateLearner } from '@/hooks/mutations/admin/useLearnerMutations';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ interface RowData {
   learners: Learner[];
   onEditLearner: (learner: Learner) => void;
   onDeleteLearner: (learner: Learner) => void;
+  onReactivateLearner: (learner: Learner) => void;
   columnVisibility: ColumnVisibility;
 }
 
@@ -77,7 +78,7 @@ const LearnerRow = React.memo(({
   style: React.CSSProperties; 
   data: RowData 
 }) => {
-  const { learners, onEditLearner, onDeleteLearner, columnVisibility } = data;
+  const { learners, onEditLearner, onDeleteLearner, onReactivateLearner, columnVisibility } = data;
   const learner = learners[index];
   
   if (!learner) {
@@ -149,12 +150,21 @@ const LearnerRow = React.memo(({
                   <DropdownMenuItem onClick={() => onEditLearner(learner)}>
                     Edit learner
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => onDeleteLearner(learner)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    Delete learner
-                  </DropdownMenuItem>
+                  {learner.is_active ? (
+                    <DropdownMenuItem 
+                      onClick={() => onDeleteLearner(learner)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      Deactivate learner
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem 
+                      onClick={() => onReactivateLearner(learner)}
+                      className="text-green-600 focus:text-green-600"
+                    >
+                      Reactivate learner
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -196,6 +206,7 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const deleteLearnerMutation = useDeleteLearner();
+  const reactivateLearnerMutation = useReactivateLearner();
   
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
@@ -275,6 +286,10 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
     setLearnerToDelete(learner);
     setDeleteDialogOpen(true);
   }, []);
+
+  const handleReactivateLearner = useCallback((learner: Learner) => {
+    reactivateLearnerMutation.mutate(learner.id);
+  }, [reactivateLearnerMutation]);
   
   const handleLearnerUpdated = useCallback(() => {
     // Invalidate and refetch data
@@ -306,8 +321,9 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
     learners,
     onEditLearner: handleEditLearner,
     onDeleteLearner: handleDeleteLearner,
+    onReactivateLearner: handleReactivateLearner,
     columnVisibility,
-  }), [learners, handleEditLearner, handleDeleteLearner, columnVisibility]);
+  }), [learners, handleEditLearner, handleDeleteLearner, handleReactivateLearner, columnVisibility]);
   
   if (isError) {
     return (
@@ -569,15 +585,15 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
         />
       )}
       
-      {/* Delete Confirmation Dialog */}
+      {/* Deactivate Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Deactivate learner?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the learner{' '}
-              <span className="font-semibold">{learnerToDelete?.full_name}</span> and their data.
-              This action cannot be undone.
+              This will deactivate the learner{' '}
+              <span className="font-semibold">{learnerToDelete?.full_name}</span> and prevent them from logging in.
+              Their data will be preserved and they can be reactivated later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -587,7 +603,7 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
               disabled={deleteLearnerMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteLearnerMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteLearnerMutation.isPending ? "Deactivating..." : "Deactivate"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

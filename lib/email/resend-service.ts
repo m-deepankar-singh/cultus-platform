@@ -147,86 +147,120 @@ The Cultus Team`;
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to Cultus Platform</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+<body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 40px auto; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2);">
     
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #4a6cf7 0%, #667eea 100%); padding: 40px 30px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">
-        Welcome to Cultus Platform!
-      </h1>
-      <p style="color: #e2e8f0; margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">
-        Your journey to career readiness begins now
-      </p>
+    <!-- Header with glassmorphism effect -->
+    <div style="background: linear-gradient(135deg, rgba(74, 108, 247, 0.1) 0%, rgba(99, 102, 241, 0.1) 50%, rgba(139, 92, 246, 0.1) 100%); padding: 48px 40px; text-align: center; position: relative; overflow: hidden;">
+      <!-- Decorative elements -->
+      <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(74, 108, 247, 0.05) 0%, transparent 70%); animation: pulse 4s ease-in-out infinite;"></div>
+      <div style="position: relative; z-index: 1;">
+        <h1 style="color: #1e293b; margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(135deg, #4a6cf7 0%, #667eea 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+          Welcome to Cultus Platform!
+        </h1>
+        <p style="color: #64748b; margin: 12px 0 0 0; font-size: 18px; font-weight: 500; opacity: 0.9;">
+          Your journey to career readiness begins now ✨
+        </p>
+      </div>
     </div>
     
-    <!-- Content -->
-    <div style="padding: 40px 30px;">
-      <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-        Your account has been successfully created! Please use the credentials below to access your personalized learning dashboard.
+    <!-- Content with enhanced spacing -->
+    <div style="padding: 48px 40px;">
+      <p style="color: #475569; font-size: 17px; line-height: 1.7; margin: 0 0 32px 0; font-weight: 400;">
+        Your account has been successfully created! Please use the credentials below to access your personalized learning dashboard and start your upskilling journey.
       </p>
       
-      <!-- Credentials Box -->
-      <div style="background-color: #f8fafc; border: 2px solid #e5e7eb; border-radius: 12px; padding: 24px; margin: 24px 0;">
-        <h3 style="color: #1f2937; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">
+      <!-- Enhanced Credentials Box with glassmorphism -->
+      <div style="background: rgba(248, 250, 252, 0.8); backdrop-filter: blur(8px); border: 2px solid rgba(226, 232, 240, 0.5); border-radius: 16px; padding: 32px; margin: 32px 0; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);">
+        <h3 style="color: #1e293b; margin: 0 0 24px 0; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
           🔐 Your Login Credentials
         </h3>
-        <div style="background-color: #ffffff; border-radius: 8px; padding: 16px; border-left: 4px solid #4a6cf7;">
-          <p style="margin: 0 0 12px 0; color: #374151; font-size: 14px;">
-            <strong style="color: #1f2937;">Email:</strong><br>
-            <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 15px; color: #4a6cf7; font-weight: 500;">${learnerEmail}</span>
+        <div style="background: rgba(255, 255, 255, 0.9); border-radius: 12px; padding: 24px; border-left: 4px solid #4a6cf7; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);">
+          <p style="margin: 0 0 20px 0; color: #475569; font-size: 15px;">
+            <strong style="color: #1e293b; font-weight: 600;">Email Address:</strong><br>
+            <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 16px; color: #4a6cf7; font-weight: 600; background: rgba(74, 108, 247, 0.1); padding: 8px 12px; border-radius: 8px; display: inline-block; margin-top: 8px;">${learnerEmail}</span>
           </p>
-          <p style="margin: 0; color: #374151; font-size: 14px;">
-            <strong style="color: #1f2937;">Temporary Password:</strong><br>
-            <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 15px; color: #dc2626; font-weight: 500; background-color: #fef2f2; padding: 4px 8px; border-radius: 4px; border: 1px solid #fecaca;">${temporaryPassword}</span>
+          <p style="margin: 0; color: #475569; font-size: 15px;">
+            <strong style="color: #1e293b; font-weight: 600;">Temporary Password:</strong><br>
+            <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 16px; color: #dc2626; font-weight: 600; background: rgba(220, 38, 38, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(220, 38, 38, 0.2); display: inline-block; margin-top: 8px;">${temporaryPassword}</span>
           </p>
         </div>
       </div>
       
-      <!-- Action Button -->
-      <div style="text-align: center; margin: 32px 0;">
+      <!-- Enhanced Action Button -->
+      <div style="text-align: center; margin: 40px 0;">
         <a href="${loginUrl}" 
-           style="display: inline-block; background: linear-gradient(135deg, #4a6cf7 0%, #667eea 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(74, 108, 247, 0.3); transition: transform 0.2s ease;">
+           style="display: inline-block; background: linear-gradient(135deg, #4a6cf7 0%, #667eea 50%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 8px 25px rgba(74, 108, 247, 0.3); transition: all 0.3s ease; transform: translateY(0);">
           🚀 Access Your Dashboard
         </a>
-      </div>
-      
-      <!-- Security Notice -->
-      <div style="background-color: #fffbeb; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 24px 0;">
-        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.5;">
-          <strong>🔒 Important Security Notice:</strong><br>
-          Please log in and change your password immediately for security. Your temporary password will expire in 7 days.
+        <p style="color: #64748b; font-size: 14px; margin: 16px 0 0 0; font-style: italic;">
+          Click the button above to get started with your learning journey
         </p>
       </div>
       
-      <!-- Support Section -->
-      <div style="border-top: 1px solid #e5e7eb; padding-top: 24px; margin-top: 32px;">
-        <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
-          Need help getting started? Our support team is here to assist you every step of the way.
+      <!-- Enhanced Security Notice -->
+      <div style="background: rgba(255, 251, 235, 0.8); backdrop-filter: blur(4px); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 24px; margin: 32px 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);">
+        <p style="margin: 0; color: #92400e; font-size: 15px; line-height: 1.6; font-weight: 500;">
+          <strong style="color: #78350f; font-weight: 600;">🔒 Important Security Notice:</strong><br>
+          Please log in and change your password immediately for security. Your temporary password will expire in 7 days for your protection.
         </p>
-        <p style="color: #374151; font-size: 16px; margin: 0;">
+      </div>
+      
+      <!-- Enhanced Support Section -->
+      <div style="border-top: 1px solid rgba(226, 232, 240, 0.8); padding-top: 32px; margin-top: 40px;">
+        <p style="color: #64748b; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0; font-weight: 400;">
+          Need help getting started? Our support team is here to assist you every step of the way. We're committed to your success! 💪
+        </p>
+        <p style="color: #475569; font-size: 17px; margin: 0; font-weight: 500;">
           Best regards,<br>
-          <strong style="color: #4a6cf7;">The Cultus Team</strong>
+          <strong style="background: linear-gradient(135deg, #4a6cf7 0%, #667eea 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600;">The Cultus Team</strong>
         </p>
       </div>
     </div>
     
-    <!-- Footer -->
-    <div style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.4;">
-        This email was sent to ${learnerEmail} because an account was created for you on Cultus Platform.<br>
-        If you have any questions, please contact our support team.
+    <!-- Enhanced Footer -->
+    <div style="background: rgba(248, 250, 252, 0.6); backdrop-filter: blur(4px); padding: 24px 40px; text-align: center; border-top: 1px solid rgba(226, 232, 240, 0.8);">
+      <p style="color: #64748b; font-size: 13px; margin: 0; line-height: 1.5; font-weight: 400;">
+        This email was sent to <strong style="color: #475569;">${learnerEmail}</strong> because an account was created for you on Cultus Platform.<br>
+        If you have any questions, please don't hesitate to contact our support team.
       </p>
     </div>
   </div>
   
-  <!-- Mobile Responsive Styles -->
+  <!-- Enhanced Mobile Responsive Styles -->
   <style>
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.8; }
+    }
+    
     @media only screen and (max-width: 600px) {
-      .container { width: 100% !important; }
-      .content { padding: 20px !important; }
-      .header { padding: 30px 20px !important; }
-      .button { padding: 12px 24px !important; font-size: 14px !important; }
+      body { margin: 0 !important; }
+      .container { 
+        width: 100% !important; 
+        margin: 20px auto !important;
+        border-radius: 12px !important;
+      }
+      .content { 
+        padding: 32px 24px !important; 
+      }
+      .header { 
+        padding: 40px 24px !important; 
+      }
+      .button { 
+        padding: 14px 32px !important; 
+        font-size: 15px !important; 
+      }
+      .credentials-box {
+        padding: 24px !important;
+        margin: 24px 0 !important;
+      }
+      h1 {
+        font-size: 26px !important;
+      }
+      .gradient-text {
+        font-size: 22px !important;
+      }
     }
   </style>
 </body>
