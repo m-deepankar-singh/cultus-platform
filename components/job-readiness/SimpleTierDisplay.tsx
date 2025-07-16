@@ -161,7 +161,7 @@ export function SimpleTierDisplay({
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {Object.entries(safeTierCriteria).map(([tier, criteria]) => {
-            const tierName = tier.toUpperCase() as keyof typeof tierConfigs
+            const tierName = tier.toUpperCase() as 'BRONZE' | 'SILVER' | 'GOLD'
             const tierConfig = tierConfigs.find(t => t.key === tierName)
             if (!tierConfig) return null
             

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Play, CheckCircle2, Clock, Calendar, Target, RotateCcw } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
+import { type ProgressMilestone } from "@/lib/constants/progress-milestones"
 
 // Phase 5: Enhanced Components Integration
 import { MilestoneProgressIndicator } from './expert-sessions'
@@ -17,7 +18,7 @@ interface ExpertSessionProgress {
   completion_percentage: number
   is_completed: boolean
   completed_at: string | null
-  last_milestone_reached: number
+  last_milestone_reached?: ProgressMilestone
   can_resume: boolean
   resume_from_milestone: number
   resume_position_seconds: number

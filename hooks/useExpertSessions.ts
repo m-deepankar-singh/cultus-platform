@@ -1,10 +1,16 @@
 import { useQuery } from "@tanstack/react-query"
+import { type ProgressMilestone } from "@/lib/constants/progress-milestones"
 
 interface ExpertSessionProgress {
   watch_time_seconds: number
   completion_percentage: number
   is_completed: boolean
   completed_at: string | null
+  last_milestone_reached?: ProgressMilestone
+  can_resume: boolean
+  resume_from_milestone: number
+  resume_position_seconds: number
+  milestones_unlocked: number[]
 }
 
 interface ExpertSession {
