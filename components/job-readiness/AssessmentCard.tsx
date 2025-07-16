@@ -1,10 +1,12 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring'
+import { AnimatedButton } from '@/components/ui/animated-button'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Users, Trophy, CheckCircle2, Lock, Play, RotateCcw, Eye } from 'lucide-react'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 interface Assessment {
   id: string
@@ -27,6 +29,7 @@ interface AssessmentCardProps {
   assessment: Assessment
   current_tier?: string | null
   current_star_level?: string | null
+  staggerIndex?: number
 }
 
 const tierColors = {
@@ -35,7 +38,7 @@ const tierColors = {
   GOLD: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
 }
 
-export function AssessmentCard({ assessment }: AssessmentCardProps) {
+export function AssessmentCard({ assessment, staggerIndex = 0 }: AssessmentCardProps) {
   const {
     id,
     name,
@@ -69,109 +72,164 @@ export function AssessmentCard({ assessment }: AssessmentCardProps) {
   const getActionButton = () => {
     if (!is_unlocked) {
       return (
-        <Button disabled variant="outline" className="w-full">
+        <AnimatedButton disabled variant="outline" className="w-full opacity-50">
           <Lock className="h-4 w-4 mr-2" />
           Locked
-        </Button>
+        </AnimatedButton>
       )
     }
 
     if (is_completed) {
       return (
         <div className="flex gap-2">
-          <Button asChild variant="outline" className="flex-1">
+          <AnimatedButton asChild variant="outline" className="flex-1">
             <Link href={`/app/job-readiness/assessments/${id}/results`}>
               <Eye className="h-4 w-4 mr-2" />
               View Results
             </Link>
-          </Button>
-          <Button asChild variant="outline" size="icon">
+          </AnimatedButton>
+          <AnimatedButton asChild variant="outline" size="icon">
             <Link href={`/app/job-readiness/assessments/${id}`}>
               <RotateCcw className="h-4 w-4" />
             </Link>
-          </Button>
+          </AnimatedButton>
         </div>
       )
     }
 
     return (
-      <Button asChild className="w-full">
+      <AnimatedButton asChild className="w-full bg-gradient-to-r from-primary to-accent">
         <Link href={`/app/job-readiness/assessments/${id}`}>
           <Play className="h-4 w-4 mr-2" />
           Start Assessment
         </Link>
-      </Button>
+      </AnimatedButton>
     )
   }
 
+  const getCardVariant = () => {
+    if (is_completed) return 'glass'
+    if (!is_unlocked) return 'subtle'
+    return 'glass'
+  }
+
+  const getHoverEffect = () => {
+    if (!is_unlocked) return 'none'
+    return 'lift'
+  }
+
+  const getProgressValue = () => {
+    if (is_completed) return 100
+    if (!is_unlocked) return 0
+    return 0
+  }
+
+  const getProgressColor = () => {
+    if (is_completed) return 'success'
+    if (!is_unlocked) return 'warning'
+    return 'primary'
+  }
+
   return (
-    <Card className={`transition-all hover:shadow-md ${
-      is_completed 
-        ? 'border-green-200 dark:border-green-800' 
-        : is_unlocked 
-          ? 'border-blue-200 dark:border-blue-600' 
-          : 'border-gray-200 dark:border-gray-700 opacity-75'
-    }`}>
-      <CardHeader className="pb-4">
+    <PerformantAnimatedCard 
+      variant={getCardVariant()}
+      hoverEffect={getHoverEffect()}
+      staggerIndex={staggerIndex}
+      className={cn(
+        "dashboard-card group h-full transform-gpu",
+        is_completed && "border-success/20 bg-success/5",
+        is_unlocked && !is_completed && "border-primary/20 bg-primary/5",
+        !is_unlocked && "border-muted/50 bg-muted/5 opacity-75"
+      )}
+    >
+      <div className="space-y-6">
+        {/* Header with Progress Ring */}
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              {getStatusIcon()}
-              {name}
-            </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge className={getStatusColor()}>
-                {getStatusText()}
-              </Badge>
-              {is_tier_determining && (
-                <Badge variant="secondary" className="text-xs">
-                  <Trophy className="h-3 w-3 mr-1" />
-                  Tier Determining
+          <div className="flex items-start gap-4 flex-1">
+            {/* Progress Ring */}
+            <div className="flex-shrink-0 pt-1">
+              <OptimizedProgressRing
+                value={getProgressValue()}
+                size={50}
+                strokeWidth={3}
+                showValue={false}
+                color={getProgressColor()}
+                delay={400 + staggerIndex * 100}
+              />
+            </div>
+            
+            {/* Content */}
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center gap-2">
+                {getStatusIcon()}
+                <h3 className="text-xl font-semibold line-clamp-1">{name}</h3>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={getStatusColor()}>
+                  {getStatusText()}
                 </Badge>
-              )}
-              {tier_achieved && (
-                <Badge className={tierColors[tier_achieved as keyof typeof tierColors]}>
-                  {tier_achieved} Achieved
-                </Badge>
-              )}
+                {is_tier_determining && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Trophy className="h-3 w-3 mr-1" />
+                    Tier Determining
+                  </Badge>
+                )}
+                {tier_achieved && (
+                  <Badge className={tierColors[tier_achieved as keyof typeof tierColors]}>
+                    {tier_achieved} Achieved
+                  </Badge>
+                )}
+              </div>
+              
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {is_tier_determining 
+                  ? 'This assessment determines your tier level and unlocks appropriate content for your skill level.'
+                  : 'Standard assessment to evaluate your knowledge and progress.'
+                }
+              </p>
             </div>
           </div>
+          
+          {/* Score Display */}
           {last_score !== null && (
-            <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="text-right flex-shrink-0 ml-4">
+              <div className="text-3xl font-bold gradient-text">
                 {last_score}%
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-muted-foreground">
                 Last Score
               </div>
             </div>
           )}
         </div>
-        <CardDescription>
-          {is_tier_determining 
-            ? 'This assessment determines your tier level and unlocks appropriate content for your skill level.'
-            : 'Standard assessment to evaluate your knowledge and progress.'
-          }
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
+
         {/* Assessment Details */}
-        <div className="grid grid-cols-2 gap-4 py-3 border-t border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <Users className="h-4 w-4" />
-            <span>{questions_count} Questions</span>
+        <div className="grid grid-cols-2 gap-6 py-4 border-t border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-primary/10 border border-primary/20">
+              <Users className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <div className="text-sm font-medium">{questions_count}</div>
+              <div className="text-xs text-muted-foreground">Questions</div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <Clock className="h-4 w-4" />
-            <span>{configuration.duration_minutes} mins</span>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-accent/10 border border-accent/20">
+              <Clock className="h-4 w-4 text-accent" />
+            </div>
+            <div>
+              <div className="text-sm font-medium">{configuration.duration_minutes}</div>
+              <div className="text-xs text-muted-foreground">Minutes</div>
+            </div>
           </div>
         </div>
 
         {/* Pass Threshold */}
-        <div className="text-sm">
-          <span className="text-gray-600 dark:text-gray-400">Passing threshold: </span>
-          <span className="font-medium text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-muted/50">
+          <span className="text-sm text-muted-foreground">Passing threshold:</span>
+          <span className="font-semibold text-foreground">
             {configuration.pass_threshold}%
           </span>
         </div>
@@ -183,15 +241,20 @@ export function AssessmentCard({ assessment }: AssessmentCardProps) {
 
         {/* Completion Message */}
         {is_completed && last_score !== null && (
-          <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-            <div className="text-sm text-green-700 dark:text-green-300">
+          <div className={cn(
+            "text-center p-4 rounded-lg border",
+            last_score >= configuration.pass_threshold
+              ? "bg-success/10 border-success/20 text-success"
+              : "bg-warning/10 border-warning/20 text-warning"
+          )}>
+            <div className="text-sm font-medium">
               {last_score >= configuration.pass_threshold 
                 ? '🎉 Congratulations! You passed this assessment.' 
                 : '💪 Keep practicing! You can retake this assessment.'}
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </PerformantAnimatedCard>
   )
 } 

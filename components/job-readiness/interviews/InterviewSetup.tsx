@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card';
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring';
+import { AnimatedButton } from '@/components/ui/animated-button';
+import { AdaptiveParticles } from '@/components/ui/floating-particles';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
@@ -14,9 +17,12 @@ import {
   Volume2,
   Loader2,
   Camera,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScreenRecorder } from '@/lib/ai/screen-recorder';
+import gsap from 'gsap';
 
 interface InterviewSetupProps {
   onSetupComplete?: () => void;
@@ -59,12 +65,31 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
   const [setupStep, setSetupStep] = useState<'permissions' | 'devices' | 'testing' | 'ready'>('permissions');
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
+
+  // GSAP animation setup
+  useEffect(() => {
+    setMounted(true);
+    
+    // Animate cards on mount
+    gsap.fromTo(
+      ".dashboard-card",
+      { y: 30, opacity: 0 },
+      { 
+        y: 0, 
+        opacity: 1, 
+        stagger: 0.1, 
+        duration: 0.6, 
+        ease: "power2.out"
+      }
+    );
+  }, []);
 
   // Check browser compatibility
   useEffect(() => {
@@ -273,280 +298,444 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
 
   const renderSystemCheck = (check: 'checking' | 'success' | 'error', label: string) => {
     const icon = check === 'checking' 
-      ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+      ? <Loader2 className="h-4 w-4 animate-spin text-blue-500 dark:text-blue-400" />
       : check === 'success'
-      ? <CheckCircle className="h-4 w-4 text-green-500" />
-      : <XCircle className="h-4 w-4 text-red-500" />;
+      ? <CheckCircle className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+      : <XCircle className="h-4 w-4 text-red-500 dark:text-red-400" />;
     
     const color = check === 'checking' 
-      ? 'text-blue-600'
+      ? 'text-blue-600 dark:text-blue-400'
       : check === 'success'
-      ? 'text-green-600'
-      : 'text-red-600';
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : 'text-red-600 dark:text-red-400';
     
     return (
-      <div className={cn("flex items-center space-x-2", color)}>
-        {icon}
-        <span className="text-sm">{label}</span>
+      <div className={cn("flex items-center space-x-3 p-3 rounded-lg bg-gradient-to-r backdrop-blur-sm border transition-all duration-300", 
+        check === 'checking' && "from-blue-50/50 to-sky-50/50 dark:from-blue-900/20 dark:to-sky-900/20 border-blue-200/50 dark:border-blue-700/50",
+        check === 'success' && "from-emerald-50/50 to-green-50/50 dark:from-emerald-900/20 dark:to-green-900/20 border-emerald-200/50 dark:border-emerald-700/50",
+        check === 'error' && "from-red-50/50 to-rose-50/50 dark:from-red-900/20 dark:to-rose-900/20 border-red-200/50 dark:border-red-700/50"
+      )}>
+        <div className="flex-shrink-0">
+          {icon}
+        </div>
+        <span className={cn("text-sm font-medium", color)}>{label}</span>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="relative min-h-screen">
+      {/* Background Effects */}
+      <AdaptiveParticles />
+      
+      <div className="relative max-w-4xl mx-auto p-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Interview Setup</h1>
-          <p className="text-gray-600">Let's make sure everything is working properly for your interview</p>
+        <div className="text-center mb-8 space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">Interview Setup</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Let's make sure everything is working properly for your interview</p>
         </div>
         
         {/* Progress indicator */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex space-x-4">
-            {['permissions', 'devices', 'testing', 'ready'].map((step, index) => (
-              <div key={step} className="flex items-center">
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold",
-                  setupStep === step 
-                    ? "bg-blue-600 text-white"
-                    : index < ['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep)
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-300 text-gray-600"
-                )}>
-                  {index + 1}
-                </div>
-                {index < 3 && (
-                  <div className={cn(
-                    "w-12 h-1 mx-2",
-                    index < ['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep)
-                      ? "bg-green-600"
-                      : "bg-gray-300"
-                  )} />
-                )}
-              </div>
-            ))}
+        <PerformantAnimatedCard 
+          variant="glass"
+          className="dashboard-card mb-8 p-6"
+          staggerIndex={0}
+        >
+          <div className="flex items-center justify-center">
+            <div className="flex space-x-4">
+              {['permissions', 'devices', 'testing', 'ready'].map((step, index) => {
+                const currentIndex = ['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep);
+                const isActive = setupStep === step;
+                const isCompleted = index < currentIndex;
+                
+                return (
+                  <div key={step} className="flex items-center">
+                    <div className="relative">
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 backdrop-blur-sm border-2",
+                        isActive && "bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-blue-400 dark:border-blue-500 shadow-lg",
+                        isCompleted && "bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-400 dark:border-emerald-500",
+                        !isActive && !isCompleted && "bg-neutral-200/50 dark:bg-neutral-700/50 text-neutral-600 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600"
+                      )}>
+                        {isCompleted ? (
+                          <CheckCircle className="h-5 w-5" />
+                        ) : (
+                          <span>{index + 1}</span>
+                        )}
+                      </div>
+                      {isActive && (
+                        <OptimizedProgressRing
+                          value={100}
+                          size={44}
+                          strokeWidth={2}
+                          showValue={false}
+                          color="primary"
+                          delay={200}
+                          className="absolute inset-0 transform -translate-x-1 -translate-y-1"
+                        />
+                      )}
+                    </div>
+                    {index < 3 && (
+                      <div className={cn(
+                        "w-12 h-1 mx-2 rounded-full transition-all duration-500",
+                        index < currentIndex
+                          ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                          : "bg-neutral-300 dark:bg-neutral-600"
+                      )} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+          <div className="mt-4 text-center">
+            <p className="text-sm text-muted-foreground font-medium">
+              Step {['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep) + 1} of 4: {setupStep.charAt(0).toUpperCase() + setupStep.slice(1)}
+            </p>
+          </div>
+        </PerformantAnimatedCard>
 
         {/* Step 1: Permissions */}
         {setupStep === 'permissions' && (
-          <Card className="p-8 text-center">
-            <Monitor className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-4">Screen Recording & Microphone Access</h2>
-            <p className="text-gray-600 mb-6">
-              We need access to your screen and microphone to conduct the interview.
-              Your privacy is important - the recording stays on your device until you submit.
-            </p>
-            
-            {/* System checks */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold mb-3">System Requirements</h3>
-              <div className="space-y-2">
-                {renderSystemCheck(systemChecks.browser, 'Browser Compatibility')}
-                {renderSystemCheck(systemChecks.screen, 'Screen Recording Access')}
-                {renderSystemCheck(systemChecks.microphone, 'Microphone Access')}
-                {renderSystemCheck(systemChecks.speakers, 'Speaker Access')}
-              </div>
-            </div>
-            
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <div className="flex items-start space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
-                  <p className="text-red-700 text-sm">{error}</p>
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="lift"
+            staggerIndex={1}
+            className="dashboard-card p-8 text-center"
+          >
+            <div className="space-y-6">
+              {/* Icon and Title */}
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50 w-fit mx-auto">
+                  <Monitor className="h-16 w-16 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">Screen Recording & Microphone Access</h2>
+                  <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                    We need access to your screen and microphone to conduct the interview.
+                    Your privacy is important - the recording stays on your device until you submit.
+                  </p>
                 </div>
               </div>
-            )}
-            
-            <div className="space-y-3">
-              <Button 
-                onClick={requestPermissions}
-                disabled={systemChecks.browser === 'error'}
-                size="lg"
-                className="w-full"
-              >
-                Grant Permissions
-              </Button>
               
-              {onBack && (
-                <Button variant="outline" onClick={onBack} className="w-full">
-                  Back
-                </Button>
+              {/* System checks */}
+              <PerformantAnimatedCard variant="subtle" className="p-6 bg-gradient-to-r from-neutral-50/50 to-neutral-100/50 dark:from-neutral-800/50 dark:to-neutral-900/50 backdrop-blur-sm">
+                <h3 className="font-semibold mb-4 text-lg text-foreground">System Requirements</h3>
+                <div className="space-y-3">
+                  {renderSystemCheck(systemChecks.browser, 'Browser Compatibility')}
+                  {renderSystemCheck(systemChecks.screen, 'Screen Recording Access')}
+                  {renderSystemCheck(systemChecks.microphone, 'Microphone Access')}
+                  {renderSystemCheck(systemChecks.speakers, 'Speaker Access')}
+                </div>
+              </PerformantAnimatedCard>
+              
+              {error && (
+                <PerformantAnimatedCard variant="subtle" className="p-4 bg-gradient-to-r from-red-50/50 to-rose-50/50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200/50 dark:border-red-700/50 backdrop-blur-sm">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+                  </div>
+                </PerformantAnimatedCard>
               )}
+              
+              <div className="space-y-3 pt-4">
+                <AnimatedButton 
+                  onClick={requestPermissions}
+                  disabled={systemChecks.browser === 'error'}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium"
+                >
+                  Grant Permissions
+                </AnimatedButton>
+                
+                {onBack && (
+                  <AnimatedButton variant="outline" onClick={onBack} className="w-full">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </AnimatedButton>
+                )}
+              </div>
             </div>
-          </Card>
+          </PerformantAnimatedCard>
         )}
 
         {/* Step 2: Device Selection */}
         {setupStep === 'devices' && (
-          <div className="grid md:grid-cols-2 gap-6">
+          <CardGrid columns={2} gap="lg">
             {/* Screen recording preview */}
-            <Card className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center">
-                <Monitor className="h-5 w-5 mr-2" />
-                Screen Recording Setup
-              </h3>
-              <div className="relative bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
-                <div className="text-center text-gray-600">
-                  <Monitor className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm">Screen recording permissions granted</p>
-                  <p className="text-xs text-gray-500">Recording will start during interview</p>
+            <PerformantAnimatedCard 
+              variant="glass" 
+              hoverEffect="lift"
+              staggerIndex={1}
+              className="dashboard-card p-6"
+            >
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center text-foreground">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 mr-3">
+                    <Monitor className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  Screen Recording Setup
+                </h3>
+                
+                <div className="relative bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-900 rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 backdrop-blur-sm" style={{ aspectRatio: '16/9' }}>
+                  <div className="absolute inset-0 flex items-center justify-center text-center">
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 w-fit mx-auto">
+                        <Monitor className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Screen recording permissions granted</p>
+                        <p className="text-xs text-muted-foreground">Recording will start during interview</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>What will be recorded:</strong>
-                </p>
-                <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                  <li>• Your screen activity</li>
-                  <li>• System audio (only available when sharing a browser tab)</li>
-                  <li>• Your microphone input</li>
-                </ul>
-              </div>
+                
+                <PerformantAnimatedCard variant="subtle" className="p-4 bg-gradient-to-r from-blue-50/50 to-sky-50/50 dark:from-blue-900/20 dark:to-sky-900/20 border border-blue-200/50 dark:border-blue-700/50">
+                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                    What will be recorded:
+                  </p>
+                  <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"></div>
+                      Your screen activity
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"></div>
+                      System audio (only available when sharing a browser tab)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"></div>
+                      Your microphone input
+                    </li>
+                  </ul>
+                </PerformantAnimatedCard>
 
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
-                <p className="text-xs text-amber-800">
-                  <strong>⚠️ Important:</strong> System audio is only captured when sharing a <strong>browser tab</strong>, not when sharing your entire screen or application windows.
-                </p>
+                <PerformantAnimatedCard variant="subtle" className="p-3 bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200/50 dark:border-amber-700/50">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      <strong>Important:</strong> System audio is only captured when sharing a <strong>browser tab</strong>, not when sharing your entire screen or application windows.
+                    </p>
+                  </div>
+                </PerformantAnimatedCard>
               </div>
-            </Card>
+            </PerformantAnimatedCard>
 
             {/* Audio controls */}
-            <Card className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center">
-                <Mic className="h-5 w-5 mr-2" />
-                Audio Setup
-              </h3>
-              
-              {/* Microphone */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Microphone</label>
-                <Select value={selectedMicrophone} onValueChange={setSelectedMicrophone}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select microphone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {devices.filter(d => d.kind === 'audioinput').map(device => (
-                      <SelectItem key={device.deviceId} value={device.deviceId}>
-                        {device.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Audio level indicator */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Microphone Level</label>
-                <div className="bg-gray-200 rounded-full h-4 overflow-hidden">
-                  <div 
-                    className="bg-green-500 h-full transition-all duration-100"
-                    style={{ width: `${Math.min(audioLevel * 2, 100)}%` }}
-                  />
+            <PerformantAnimatedCard 
+              variant="glass" 
+              hoverEffect="lift"
+              staggerIndex={2}
+              className="dashboard-card p-6"
+            >
+              <div className="space-y-6">
+                <h3 className="font-semibold text-lg flex items-center text-foreground">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 mr-3">
+                    <Mic className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  Audio Setup
+                </h3>
+                
+                {/* Microphone */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-foreground">Microphone</label>
+                  <Select value={selectedMicrophone} onValueChange={setSelectedMicrophone}>
+                    <SelectTrigger className="bg-background/50 backdrop-blur-sm border border-border/50">
+                      <SelectValue placeholder="Select microphone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {devices.filter(d => d.kind === 'audioinput').map(device => (
+                        <SelectItem key={device.deviceId} value={device.deviceId}>
+                          {device.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Speak to test your microphone</p>
+                
+                {/* Audio level indicator */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-foreground">Microphone Level</label>
+                  <div className="relative">
+                    <div className="bg-gradient-to-r from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 rounded-full h-4 overflow-hidden border border-neutral-300 dark:border-neutral-600">
+                      <div 
+                        className="bg-gradient-to-r from-emerald-500 to-green-600 h-full transition-all duration-150 ease-out"
+                        style={{ 
+                          width: `${mounted ? Math.min(audioLevel * 2, 100) : 0}%`,
+                          transitionDelay: audioLevel > 10 ? '0ms' : '100ms'
+                        }}
+                      />
+                    </div>
+                    <div className="absolute right-2 top-0 transform translate-y-1">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full transition-all duration-200",
+                        audioLevel > 30 ? "bg-emerald-500 dark:bg-emerald-400 animate-pulse" : "bg-neutral-400 dark:bg-neutral-600"
+                      )} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Speak to test your microphone</p>
+                </div>
+                
+                {/* Speakers */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-foreground">Speakers</label>
+                  <Select value={selectedSpeakers} onValueChange={setSelectedSpeakers}>
+                    <SelectTrigger className="bg-background/50 backdrop-blur-sm border border-border/50">
+                      <SelectValue placeholder="Select speakers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {devices.filter(d => d.kind === 'audiooutput').map(device => (
+                        <SelectItem key={device.deviceId} value={device.deviceId}>
+                          {device.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <AnimatedButton 
+                  onClick={testSpeakers} 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full border-border/50 bg-background/50 backdrop-blur-sm hover:bg-accent/50"
+                >
+                  <Volume2 className="h-4 w-4 mr-2" />
+                  Test Speakers
+                </AnimatedButton>
               </div>
-              
-              {/* Speakers */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Speakers</label>
-                <Select value={selectedSpeakers} onValueChange={setSelectedSpeakers}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select speakers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {devices.filter(d => d.kind === 'audiooutput').map(device => (
-                      <SelectItem key={device.deviceId} value={device.deviceId}>
-                        {device.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Button onClick={testSpeakers} variant="outline" size="sm" className="w-full">
-                <Volume2 className="h-4 w-4 mr-2" />
-                Test Speakers
-              </Button>
-            </Card>
-          </div>
+            </PerformantAnimatedCard>
+          </CardGrid>
         )}
 
         {/* Step 3: Testing */}
         {setupStep === 'testing' && (
-          <Card className="p-8 text-center">
-            <Loader2 className="h-16 w-16 text-blue-600 mx-auto mb-4 animate-spin" />
-            <h2 className="text-2xl font-bold mb-4">Running System Tests</h2>
-            <p className="text-gray-600 mb-6">
-              We're testing your audio and video setup to ensure the best interview experience.
-            </p>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                <span className="text-sm">Testing audio quality...</span>
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="glow"
+            staggerIndex={1}
+            className="dashboard-card p-8 text-center"
+          >
+            <div className="space-y-6">
+              {/* Loading indicator with progress ring */}
+              <div className="relative mx-auto w-fit">
+                <OptimizedProgressRing
+                  value={75}
+                  size={120}
+                  strokeWidth={4}
+                  showValue={false}
+                  color="primary"
+                  delay={200}
+                  className="animate-pulse"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                </div>
               </div>
-              <div className="flex items-center justify-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                <span className="text-sm">Verifying video stream...</span>
+              
+              <div className="space-y-2">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground">Running System Tests</h2>
+                <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                  We're testing your audio and video setup to ensure the best interview experience.
+                </p>
               </div>
-              <div className="flex items-center justify-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                <span className="text-sm">Checking connection stability...</span>
-              </div>
+              
+              <PerformantAnimatedCard variant="subtle" className="p-6 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200/50 dark:border-blue-700/50">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center space-x-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-500 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Testing audio quality...</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-500 dark:text-blue-400" style={{ animationDelay: '0.2s' }} />
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Verifying video stream...</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-500 dark:text-blue-400" style={{ animationDelay: '0.4s' }} />
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Checking connection stability...</span>
+                  </div>
+                </div>
+              </PerformantAnimatedCard>
             </div>
-          </Card>
+          </PerformantAnimatedCard>
         )}
 
         {/* Step 4: Ready */}
         {setupStep === 'ready' && (
-          <Card className="p-8 text-center">
-            <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-4">Setup Complete!</h2>
-            <p className="text-gray-600 mb-6">
-              Your screen recording and audio are working perfectly. You're ready to start your interview.
-            </p>
-            
-            <div className="bg-green-50 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-green-800 mb-2">Setup Summary</h3>
-              <div className="text-sm text-green-700 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Screen Recording:</span>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    Ready
-                  </Badge>
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="lift"
+            staggerIndex={1}
+            className="dashboard-card p-8 text-center"
+          >
+            <div className="space-y-6">
+              {/* Success indicator */}
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 w-fit mx-auto backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50">
+                  <CheckCircle className="h-16 w-16 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>Microphone:</span>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    Ready
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Speakers:</span>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    Ready
-                  </Badge>
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">Setup Complete!</h2>
+                  <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                    Your screen recording and audio are working perfectly. You're ready to start your interview.
+                  </p>
                 </div>
               </div>
-            </div>
-            
-            <div className="space-y-3">
-              <Button onClick={completeSetup} size="lg" className="w-full">
-                Continue to Interview
-              </Button>
               
-              <Button 
-                variant="outline" 
-                onClick={() => setSetupStep('devices')} 
-                className="w-full"
-              >
-                Adjust Settings
-              </Button>
+              {/* Setup Summary */}
+              <PerformantAnimatedCard variant="subtle" className="p-6 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200/50 dark:border-emerald-700/50">
+                <h3 className="font-semibold text-emerald-800 dark:text-emerald-200 mb-4 text-lg">Setup Summary</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: 'Screen Recording', icon: Monitor },
+                    { label: 'Microphone', icon: Mic },
+                    { label: 'Speakers', icon: Volume2 }
+                  ].map(({ label, icon: Icon }, index) => (
+                    <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-emerald-100/50 to-green-100/50 dark:from-emerald-800/30 dark:to-green-800/30 backdrop-blur-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-emerald-500/20 dark:bg-emerald-400/10">
+                          <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{label}:</span>
+                      </div>
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-emerald-200/50 dark:bg-emerald-800/50 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700"
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Ready
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </PerformantAnimatedCard>
+              
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-4">
+                <AnimatedButton 
+                  onClick={completeSetup} 
+                  size="lg" 
+                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-medium"
+                >
+                  <div className="flex items-center gap-2">
+                    <ArrowRight className="h-4 w-4" />
+                    Continue to Interview
+                  </div>
+                </AnimatedButton>
+                
+                <AnimatedButton 
+                  variant="outline" 
+                  onClick={() => setSetupStep('devices')} 
+                  className="w-full border-border/50 bg-background/50 backdrop-blur-sm hover:bg-accent/50"
+                >
+                  <div className="flex items-center gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Adjust Settings
+                  </div>
+                </AnimatedButton>
+              </div>
             </div>
-          </Card>
+          </PerformantAnimatedCard>
         )}
 
         {/* Navigation */}

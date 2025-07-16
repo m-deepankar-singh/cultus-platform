@@ -15,7 +15,7 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { Toaster } from 'sonner'
 
-// Phase 5: Enhanced Components Integration
+// Enhanced Components Integration
 import { 
   EnhancedExpertSessionPlayer,
   ExpertSessionProgressProvider,
@@ -26,8 +26,8 @@ import {
 import { ExpertSessionPlayer } from '@/components/job-readiness/ExpertSessionPlayer'
 import { SessionProgress } from '@/components/job-readiness/SessionProgress'
 
-// Feature flag for enhanced video player (Phase 6: Deployment)
-const USE_ENHANCED_VIDEO_PLAYER = process.env.NEXT_PUBLIC_ENHANCED_EXPERT_SESSIONS === 'true' || true // Default to true for development
+// Using real data from API - no feature flags needed
+const USE_ENHANCED_VIDEO_PLAYER = true
 
 export default function ExpertSessionViewerPage() {
   const params = useParams()
@@ -47,34 +47,8 @@ export default function ExpertSessionViewerPage() {
   // Find the current session
   const session = sessionsData?.sessions?.find(s => s.id === sessionId)
 
-  // Enhanced session data preparation for Phase 2 integration
-  const enhancedSession = useMemo(() => {
-    if (!session) return null
-    
-    // Since we're in development, simulate Phase 2 enhanced API response structure
-    // In production, this data will come from the enhanced API
-    const completionPercentage = session.student_progress.completion_percentage || 0
-    const watchTime = session.student_progress.watch_time_seconds || 0
-    
-    // Calculate simulated milestone data based on completion percentage
-    const lastMilestone = Math.floor(completionPercentage / 10) * 10
-    const milestonesUnlocked = lastMilestone > 0 
-      ? Array.from({ length: Math.floor(lastMilestone / 10) }, (_, i) => (i + 1) * 10)
-      : []
-    
-    return {
-      ...session,
-      student_progress: {
-        ...session.student_progress,
-        // Phase 2: Enhanced resume functionality (simulate for now)
-        can_resume: watchTime > 0 && !session.student_progress.is_completed,
-        resume_from_milestone: lastMilestone,
-        resume_position_seconds: watchTime,
-        milestones_unlocked: milestonesUnlocked,
-        last_milestone_reached: lastMilestone
-      }
-    }
-  }, [session])
+  // Use session data directly from API - no enhancement needed
+  const enhancedSession = session
 
   if (isLoading) {
     return (
@@ -113,7 +87,7 @@ export default function ExpertSessionViewerPage() {
     )
   }
 
-  // Enhanced progress update handler for Phase 2 integration
+  // Enhanced progress update handler
   const handleProgressUpdate = async (event: {
     sessionId: string
     currentTime: number
@@ -121,7 +95,6 @@ export default function ExpertSessionViewerPage() {
     triggerType: string
     milestone?: number
     forceCompletion?: boolean
-    // Phase 2: Additional fields
     session_started?: boolean
     session_ended?: boolean
     pause_duration?: number
@@ -162,30 +135,30 @@ export default function ExpertSessionViewerPage() {
           </Link>
         </div>
 
-        {/* Enhanced Completion Message */}
+        {/* Completion Message */}
         <div className="max-w-2xl mx-auto text-center">
           <Card>
             <CardContent className="p-8">
               <div className="space-y-6">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+                <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold text-gray-900">Session Completed!</h2>
-                  <p className="text-gray-600">
+                  <h2 className="text-2xl font-semibold text-foreground">Session Completed!</h2>
+                  <p className="text-muted-foreground">
                     You have successfully completed "<strong>{session.title}</strong>"
                   </p>
                 </div>
 
                 {/* Milestone Achievement Display */}
                 {enhancedSession.student_progress.milestones_unlocked.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-4">
                     <div className="space-y-2">
-                      <p className="text-blue-800 font-medium">Milestones Achieved</p>
+                      <p className="text-sky-800 dark:text-sky-300 font-medium">Milestones Achieved</p>
                       <div className="flex flex-wrap gap-2 justify-center">
                         {enhancedSession.student_progress.milestones_unlocked.map(milestone => (
-                          <Badge key={milestone} variant="default" className="bg-blue-600 text-white">
+                          <Badge key={milestone} variant="default" className="bg-sky-600 dark:bg-sky-500 text-white">
                             {milestone}%
                           </Badge>
                         ))}
@@ -194,23 +167,23 @@ export default function ExpertSessionViewerPage() {
                   </div>
                 )}
 
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
                   <div className="flex items-center justify-center space-x-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="text-green-800 font-medium">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-emerald-800 dark:text-emerald-300 font-medium">
                       Completed on {new Date(session.student_progress.completed_at!).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   For security and progress tracking purposes, completed expert sessions cannot be re-watched. 
                   Continue with your next learning objectives.
                 </p>
 
                 <div className="pt-4">
                   <Link href="/app/job-readiness/expert-sessions">
-                    <Button size="lg" className="w-full sm:w-auto">
+                    <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent">
                       Continue to Next Sessions
                       <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
                     </Button>
@@ -267,9 +240,9 @@ export default function ExpertSessionViewerPage() {
                   </Badge>
                 )}
                 
-                {/* Enhanced Progress Badge */}
+                {/* Resume Progress Badge */}
                 {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.can_resume && (
-                  <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50">
+                  <Badge variant="outline" className="border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-500/10 dark:text-sky-400">
                     Resume from {enhancedSession.student_progress.resume_from_milestone}%
                   </Badge>
                 )}
@@ -278,7 +251,7 @@ export default function ExpertSessionViewerPage() {
           </CardHeader>
         </Card>
 
-        {/* Enhanced Milestone Progress Display */}
+        {/* Milestone Progress Display */}
         {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.milestones_unlocked.length > 0 && (
           <Card>
             <CardHeader>
@@ -297,7 +270,7 @@ export default function ExpertSessionViewerPage() {
           </Card>
         )}
 
-        {/* Legacy Progress Component (Fallback) */}
+        {/* Progress Component (Fallback) */}
         {!USE_ENHANCED_VIDEO_PLAYER && (
           <SessionProgress session={session} />
         )}
@@ -343,7 +316,7 @@ export default function ExpertSessionViewerPage() {
              />
           </ExpertSessionProgressProvider>
         ) : (
-          // Legacy Video Player (Fallback)
+          // Video Player (Fallback)
           <ExpertSessionPlayer
             session={session}
             onProgressUpdate={(event) => {
@@ -358,7 +331,7 @@ export default function ExpertSessionViewerPage() {
           />
         )}
 
-        {/* Enhanced Session Details */}
+        {/* Session Details */}
         <Card>
           <CardHeader>
             <CardTitle>Session Details</CardTitle>
@@ -392,7 +365,7 @@ export default function ExpertSessionViewerPage() {
                 </div>
               )}
               
-              {/* Enhanced Details for Enhanced Player */}
+              {/* Additional Details for Enhanced Player */}
               {USE_ENHANCED_VIDEO_PLAYER && (
                 <>
                   {enhancedSession.student_progress.milestones_unlocked.length > 0 && (
@@ -417,22 +390,6 @@ export default function ExpertSessionViewerPage() {
           </CardContent>
         </Card>
 
-        {/* Development Info (Remove in production) */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardHeader>
-              <CardTitle className="text-yellow-800">Development Info</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-yellow-700 space-y-1">
-                <p><strong>Enhanced Player:</strong> {USE_ENHANCED_VIDEO_PLAYER ? 'Enabled' : 'Disabled'}</p>
-                <p><strong>Session ID:</strong> {sessionId}</p>
-                <p><strong>Can Resume:</strong> {enhancedSession.student_progress.can_resume ? 'Yes' : 'No'}</p>
-                <p><strong>Resume Milestone:</strong> {enhancedSession.student_progress.resume_from_milestone}%</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </JobReadinessLayout>
   )

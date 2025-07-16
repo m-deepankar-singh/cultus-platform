@@ -1,7 +1,10 @@
-import { Metadata } from 'next'
+"use client"
+
+import { useState, useEffect } from "react"
 import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayout'
 import { ProjectInterface } from '@/components/job-readiness/ProjectInterface'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card'
+import { AnimatedButton } from '@/components/ui/animated-button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Lightbulb, 
@@ -11,91 +14,126 @@ import {
   Trophy,
   Info
 } from 'lucide-react'
-
-export const metadata: Metadata = {
-  title: 'Real-World Projects | Job Readiness',
-  description: 'Complete AI-generated real-world projects tailored to your background and tier level',
-}
+import gsap from "gsap"
 
 export default function ProjectsPage() {
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+    
+    // GSAP animations for cards
+    gsap.fromTo(
+      ".dashboard-card",
+      { y: 30, opacity: 0 },
+      { 
+        y: 0, 
+        opacity: 1, 
+        stagger: 0.1, 
+        duration: 0.6, 
+        ease: "power2.out"
+      }
+    )
+  }, [])
+
   return (
     <JobReadinessLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Page Header */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Real-World Projects</h1>
-          <p className="text-muted-foreground">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">Real-World Projects</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Complete AI-generated projects tailored to your background and demonstrate your skills in real-world scenarios.
           </p>
         </div>
 
         {/* Info Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+        <CardGrid columns={3} gap="lg">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="scale"
+            staggerIndex={0}
+            className="dashboard-card border-blue-200/50 bg-blue-50/80 dark:border-blue-800/50 dark:bg-blue-950/80 backdrop-blur-sm"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
                 <Target className="h-5 w-5" />
-                Dynamic Projects
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CardDescription className="text-blue-700 dark:text-blue-300">
+                <h3 className="font-semibold text-lg">Dynamic Projects</h3>
+              </div>
+              <p className="text-blue-700 dark:text-blue-300 text-sm">
                 Each project is uniquely generated based on your background and tier level for maximum relevance.
-              </CardDescription>
-            </CardContent>
-          </Card>
+              </p>
+            </div>
+          </PerformantAnimatedCard>
 
-          <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="scale"
+            staggerIndex={1}
+            className="dashboard-card border-amber-200/50 bg-amber-50/80 dark:border-amber-800/50 dark:bg-amber-950/80 backdrop-blur-sm"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
                 <RefreshCw className="h-5 w-5" />
-                Fresh Each Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CardDescription className="text-amber-700 dark:text-amber-300">
+                <h3 className="font-semibold text-lg">Fresh Each Time</h3>
+              </div>
+              <p className="text-amber-700 dark:text-amber-300 text-sm">
                 Projects change on page refresh until you submit your work, giving you options to find the right fit.
-              </CardDescription>
-            </CardContent>
-          </Card>
+              </p>
+            </div>
+          </PerformantAnimatedCard>
 
-          <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-green-800 dark:text-green-200">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="scale"
+            staggerIndex={2}
+            className="dashboard-card border-green-200/50 bg-green-50/80 dark:border-green-800/50 dark:bg-green-950/80 backdrop-blur-sm"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                 <Trophy className="h-5 w-5" />
-                AI Feedback
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CardDescription className="text-green-700 dark:text-green-300">
+                <h3 className="font-semibold text-lg">AI Feedback</h3>
+              </div>
+              <p className="text-green-700 dark:text-green-300 text-sm">
                 Receive detailed AI-powered feedback with strengths, improvements, and actionable recommendations.
-              </CardDescription>
-            </CardContent>
-          </Card>
-        </div>
+              </p>
+            </div>
+          </PerformantAnimatedCard>
+        </CardGrid>
 
         {/* Important Notice */}
-        <Alert className="border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
-          <Lightbulb className="h-4 w-4 text-purple-600" />
-          <AlertDescription className="text-purple-800 dark:text-purple-200">
-            <strong>Project Guidelines:</strong> You need a score of 80% or higher to pass. 
-            Failed projects can be retried with a new project generation. Take your time to create quality work!
-          </AlertDescription>
-        </Alert>
+        <PerformantAnimatedCard
+          variant="glass"
+          hoverEffect="glow"
+          staggerIndex={3}
+          className="dashboard-card border-purple-200/50 bg-purple-50/80 dark:border-purple-800/50 dark:bg-purple-950/80 backdrop-blur-sm"
+        >
+          <Alert className="border-none bg-transparent">
+            <Lightbulb className="h-4 w-4 text-purple-600" />
+            <AlertDescription className="text-purple-800 dark:text-purple-200">
+              <strong>Project Guidelines:</strong> You need a score of 80% or higher to pass. 
+              Failed projects can be retried with a new project generation. Take your time to create quality work!
+            </AlertDescription>
+          </Alert>
+        </PerformantAnimatedCard>
 
         {/* Submission Types Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <PerformantAnimatedCard
+          variant="glass"
+          hoverEffect="lift"
+          staggerIndex={4}
+          className="dashboard-card"
+        >
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Submission Information
-            </CardTitle>
-            <CardDescription>
+              <h2 className="font-semibold text-lg">Submission Information</h2>
+            </div>
+            <p className="text-muted-foreground">
               How to submit your project work
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            </p>
+            
+            <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <h4 className="font-medium">Text Submissions</h4>
                 <p className="text-sm text-muted-foreground">
@@ -113,11 +151,13 @@ export default function ProjectsPage() {
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </PerformantAnimatedCard>
 
         {/* Main Project Interface */}
-        <ProjectInterface />
+        <div className="dashboard-card" style={{ '--stagger-index': 5 } as React.CSSProperties}>
+          <ProjectInterface />
+        </div>
       </div>
     </JobReadinessLayout>
   )

@@ -88,23 +88,36 @@ export function EnhancedExpertSessionPlayer({
   const [hasStartedWatching, setHasStartedWatching] = useState(false)
   
   // Enhanced milestone tracking
-  const [milestoneState, setMilestoneState] = useState<MilestoneTrackingState>({
-    lastMilestoneSaved: session.student_progress.last_milestone_reached || 0,
-    pauseStartTime: null,
-    sessionStartTime: null,
-    currentMilestone: 0,
-    milestonesUnlocked: session.student_progress.milestones_unlocked || [],
-    isSessionActive: false
+  const [milestoneState, setMilestoneState] = useState<MilestoneTrackingState>(() => {
+    const currentProgress = session.student_progress.completion_percentage || 0
+    const lastMilestone = session.student_progress.last_milestone_reached || 0
+    const unlockedMilestones = MILESTONES.filter(m => currentProgress >= m)
+    
+    console.log(`🎬 Initializing milestone state: ${currentProgress}% progress, last milestone: ${lastMilestone}`)
+    
+    return {
+      lastMilestoneSaved: lastMilestone,
+      pauseStartTime: null,
+      sessionStartTime: null,
+      currentMilestone: lastMilestone,
+      milestonesUnlocked: unlockedMilestones,
+      isSessionActive: false
+    }
   })
 
-  // Phase 2: Check if can resume from milestone
+  // Resume dialog now only shows as fallback - auto-resume handles most cases
   useEffect(() => {
-    if (session.student_progress.can_resume && 
-        session.student_progress.resume_from_milestone > 0 && 
+    const lastMilestone = session.student_progress.last_milestone_reached || 0
+    
+    // Only show dialog if there's milestone progress but auto-resume hasn't started
+    if (lastMilestone >= 10 && 
+        !session.student_progress.is_completed && 
         !hasStartedWatching) {
-      setShowResumeDialog(true)
+      // Auto-resume will handle this in handleLoadedMetadata
+      // Dialog is only shown as fallback if auto-resume fails
+      setShowResumeDialog(false)
     }
-  }, [session.student_progress.can_resume, session.student_progress.resume_from_milestone, hasStartedWatching])
+  }, [session.student_progress.last_milestone_reached, session.student_progress.is_completed, hasStartedWatching])
 
   // Enhanced progress update with session tracking
   const handleProgressUpdate = useCallback((
@@ -176,38 +189,44 @@ export function EnhancedExpertSessionPlayer({
 
     const currentPercentage = Math.floor((currentTime / duration) * 100)
     
-    for (const milestone of MILESTONES) {
-      if (currentPercentage >= milestone && 
-          milestone > milestoneState.lastMilestoneSaved &&
-          !milestoneState.milestonesUnlocked.includes(milestone)) {
-        
-        console.log(`🎯 Milestone ${milestone}% reached at ${currentTime}s`)
-        
-        setMilestoneState(prev => ({
-          ...prev,
-          lastMilestoneSaved: milestone,
-          currentMilestone: milestone,
-          milestonesUnlocked: [...prev.milestonesUnlocked, milestone].sort((a, b) => a - b)
-        }))
-        
-        // Silent milestone save - no UI interruption
-        handleProgressUpdate(currentTime, duration, 'milestone', {
-          milestone,
-          forceCompletion: milestone >= COMPLETION_THRESHOLD
-        })
-        
-        break // Only save one milestone per check
-      }
+    // Find the highest milestone that should be unlocked based on current progress
+    const milestoneToUnlock = MILESTONES.find(milestone => 
+      currentPercentage >= milestone && 
+      milestone > milestoneState.lastMilestoneSaved
+    )
+    
+    if (milestoneToUnlock) {
+      console.log(`🎯 Milestone ${milestoneToUnlock}% reached at ${currentTime}s (${currentPercentage}% progress)`)
+      
+      // Get all milestones that should be unlocked up to this point
+      const allUnlockedMilestones = MILESTONES.filter(m => currentPercentage >= m)
+      
+      setMilestoneState(prev => ({
+        ...prev,
+        lastMilestoneSaved: milestoneToUnlock,
+        currentMilestone: milestoneToUnlock,
+        milestonesUnlocked: allUnlockedMilestones
+      }))
+      
+      // Silent milestone save - no UI interruption
+      handleProgressUpdate(currentTime, duration, 'milestone', {
+        milestone: milestoneToUnlock,
+        forceCompletion: milestoneToUnlock >= COMPLETION_THRESHOLD
+      })
+      
+      console.log(`✅ Milestone ${milestoneToUnlock}% saved to backend`)
     }
-  }, [milestoneState.lastMilestoneSaved, milestoneState.milestonesUnlocked, handleProgressUpdate])
+  }, [milestoneState.lastMilestoneSaved, handleProgressUpdate])
 
-  // Resume from milestone position
+  // Resume from milestone position (fallback if auto-resume fails)
   const resumeFromMilestone = useCallback(() => {
     if (!videoRef.current) return
     
-    const resumeTime = session.student_progress.resume_position_seconds
-    videoRef.current.currentTime = resumeTime
+    // Use milestone-based resume position
+    const lastMilestone = session.student_progress.last_milestone_reached || 0
+    const resumeTime = Math.floor((lastMilestone / 100) * duration)
     
+    videoRef.current.currentTime = resumeTime
     setCurrentTime(resumeTime)
     setShowResumeDialog(false)
     setHasStartedWatching(true)
@@ -215,12 +234,12 @@ export function EnhancedExpertSessionPlayer({
     // Start session when resuming
     startVideoSession()
     
-    handleProgressUpdate(resumeTime, duration, 'milestone', {
-      resumeFromMilestone: session.student_progress.resume_from_milestone
+    handleProgressUpdate(resumeTime, duration, 'resume', {
+      resumeFromMilestone: lastMilestone
     })
     
-    toast.success(`Resumed from ${session.student_progress.resume_from_milestone}% milestone`)
-  }, [session.student_progress.resume_position_seconds, session.student_progress.resume_from_milestone, duration, handleProgressUpdate, startVideoSession])
+    toast.success(`Resumed from ${lastMilestone}% checkpoint`)
+  }, [session.student_progress.last_milestone_reached, duration, handleProgressUpdate, startVideoSession])
 
   // Start from beginning
   const startFromBeginning = useCallback(() => {
@@ -246,11 +265,38 @@ export function EnhancedExpertSessionPlayer({
       setDuration(video.duration)
       setIsLoading(false)
       
-      // Set initial time if resuming
-      if (session.student_progress.can_resume && 
-          session.student_progress.resume_position_seconds > 0) {
-        video.currentTime = session.student_progress.resume_position_seconds
-        setCurrentTime(session.student_progress.resume_position_seconds)
+      // Auto-resume from last milestone reached (efficient DB approach)
+      const lastMilestone = session.student_progress.last_milestone_reached || 0
+      
+      if (lastMilestone >= 10 && !session.student_progress.is_completed) {
+        // Calculate resume position from milestone percentage
+        const resumePosition = Math.floor((lastMilestone / 100) * video.duration)
+        
+        console.log(`🔄 Auto-resuming from ${lastMilestone}% milestone: ${resumePosition}s`)
+        video.currentTime = resumePosition
+        setCurrentTime(resumePosition)
+        setHasStartedWatching(true)
+        
+        // Don't show resume dialog since we're auto-resuming
+        setShowResumeDialog(false)
+        
+        // Start the session immediately when auto-resuming
+        setMilestoneState(prev => ({
+          ...prev,
+          sessionStartTime: Date.now(),
+          isSessionActive: true
+        }))
+        
+        // Show notification about auto-resume
+        import('sonner').then(({ toast }) => {
+          toast.success(`Resumed from ${lastMilestone}% checkpoint`, {
+            description: `Continuing from ${Math.floor(resumePosition / 60)}:${(resumePosition % 60).toString().padStart(2, '0')}`,
+            duration: 3000,
+          })
+        })
+      } else if (lastMilestone < 10) {
+        console.log(`🔄 Starting from beginning: last milestone ${lastMilestone}% < 10%`)
+        setHasStartedWatching(false)
       }
     }
 
@@ -260,6 +306,11 @@ export function EnhancedExpertSessionPlayer({
       
       // Silent milestone checking - no UI interruption
       if (!isUpdatingProgress && milestoneState.isSessionActive) {
+        // Debug logging every 10 seconds
+        if (Math.floor(current) % 10 === 0 && current > 0) {
+          const currentPercentage = Math.floor((current / video.duration) * 100)
+          console.log(`⏱️  Time update: ${Math.floor(current)}s (${currentPercentage}%), last milestone: ${milestoneState.lastMilestoneSaved}`)
+        }
         checkMilestone(current, video.duration)
       }
     }
@@ -291,10 +342,14 @@ export function EnhancedExpertSessionPlayer({
 
     const handlePause = () => {
       setIsPlaying(false)
+      
       setMilestoneState(prev => ({
         ...prev,
         pauseStartTime: Date.now()
       }))
+      
+      // No database save on pause - milestone system handles progress saving
+      console.log(`⏸️  Video paused at ${Math.floor(video.currentTime)}s - relying on milestone saves`)
     }
 
     const handleEnded = () => {
@@ -369,6 +424,43 @@ export function EnhancedExpertSessionPlayer({
     }
   }, [endVideoSession, milestoneState.isSessionActive])
 
+  // Save progress when user navigates away or closes tab (emergency backup)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Only save if significant progress would be lost (beyond last milestone)
+      const currentPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
+      const lastMilestone = milestoneState.lastMilestoneSaved || 0
+      
+      if (milestoneState.isSessionActive && 
+          currentTime > MIN_WATCH_TIME && 
+          currentPercentage > lastMilestone + 5) { // Save if 5%+ progress since last milestone
+        console.log(`🚨 Emergency save on unload: ${Math.floor(currentPercentage)}% (last milestone: ${lastMilestone}%)`)
+        handleProgressUpdate(currentTime, duration, 'unload')
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      const currentPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
+      const lastMilestone = milestoneState.lastMilestoneSaved || 0
+      
+      if (document.visibilityState === 'hidden' && 
+          milestoneState.isSessionActive && 
+          currentTime > MIN_WATCH_TIME &&
+          currentPercentage > lastMilestone + 5) { // Save if 5%+ progress since last milestone
+        console.log(`🚨 Emergency save on tab hidden: ${Math.floor(currentPercentage)}% (last milestone: ${lastMilestone}%)`)
+        handleProgressUpdate(currentTime, duration, 'navigation')
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [milestoneState.isSessionActive, currentTime, duration, handleProgressUpdate])
+
   // Enhanced control handlers
   const togglePlay = useCallback(async () => {
     if (!videoRef.current) {
@@ -384,7 +476,7 @@ export function EnhancedExpertSessionPlayer({
     
     try {
       if (isPlaying) {
-        console.log('Pausing video...')
+        console.log('Pausing video via toggle - relying on milestone saves')
         video.pause()
       } else {
         console.log('Playing video...')
@@ -410,7 +502,7 @@ export function EnhancedExpertSessionPlayer({
         })
       }
     }
-  }, [isPlaying, hasStartedWatching])
+  }, [isPlaying, hasStartedWatching, milestoneState.isSessionActive, handleProgressUpdate])
 
 
   const toggleMute = useCallback(() => {
@@ -479,12 +571,12 @@ export function EnhancedExpertSessionPlayer({
     <div className="space-y-4">
       {/* Resume Dialog */}
       {showResumeDialog && (
-        <Alert className="border-blue-200 bg-blue-50">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
+        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
+          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="space-y-3">
             <div>
-              <p className="font-medium text-blue-900">Resume from where you left off?</p>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="font-medium text-blue-900 dark:text-blue-100">Resume from where you left off?</p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                 You can resume from the {session.student_progress.resume_from_milestone}% milestone 
                 ({formatTime(session.student_progress.resume_position_seconds)})
               </p>
@@ -493,7 +585,7 @@ export function EnhancedExpertSessionPlayer({
               <Button 
                 size="sm" 
                 onClick={resumeFromMilestone}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
               >
                 Resume from {session.student_progress.resume_from_milestone}%
               </Button>
@@ -501,7 +593,7 @@ export function EnhancedExpertSessionPlayer({
                 size="sm" 
                 variant="outline" 
                 onClick={startFromBeginning}
-                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20"
               >
                 Start from beginning
               </Button>

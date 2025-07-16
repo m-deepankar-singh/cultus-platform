@@ -1,11 +1,12 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
+import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card'
 import { useCourseList } from '@/hooks/useCourseList'
 import { useJobReadinessProgress } from '@/hooks/useJobReadinessProgress'
 import { CourseCard } from './CourseCard'
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { DashboardLoadingSkeleton } from '@/components/ui/dashboard-skeleton'
 
 interface CourseListProps {
   productId?: string
@@ -18,16 +19,7 @@ export function CourseList({ productId: providedProductId }: CourseListProps = {
   const { data: courseData, isLoading: coursesLoading, error } = useCourseList(productId || '')
 
   if (progressLoading || coursesLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Loading courses...</span>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <DashboardLoadingSkeleton message="Loading your courses..." />
   }
 
   if (error) {
@@ -60,85 +52,98 @@ export function CourseList({ productId: providedProductId }: CourseListProps = {
   return (
     <div className="space-y-6">
       {/* Completion Status */}
-      <div className="text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-gray-800">
+      <PerformantAnimatedCard 
+        variant="subtle" 
+        hoverEffect="glow"
+        className="dashboard-card text-center"
+        staggerIndex={0}
+      >
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 dark:bg-green-500/10 backdrop-blur-sm border border-green-500/20">
           <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-green-700 dark:text-green-300">
             {completed_courses_count} of {total_courses_count} courses completed
           </span>
         </div>
-      </div>
+      </PerformantAnimatedCard>
 
       {/* Available Courses */}
       {pendingCourses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-foreground">
             Available Courses
           </h2>
-          <div className="grid gap-4">
-            {pendingCourses.map((course) => (
+          <CardGrid columns={1} gap="md">
+            {pendingCourses.map((course, index) => (
               <CourseCard
                 key={course.id}
                 course={course}
                 currentTier={current_tier as 'BRONZE' | 'SILVER' | 'GOLD'}
+                staggerIndex={index + 1}
               />
             ))}
-          </div>
+          </CardGrid>
         </div>
       )}
 
       {/* Completed Courses */}
       {completedCourses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-foreground">
             Completed Courses
           </h2>
-          <div className="grid gap-4">
-            {completedCourses.map((course) => (
+          <CardGrid columns={1} gap="md">
+            {completedCourses.map((course, index) => (
               <CourseCard
                 key={course.id}
                 course={course}
                 currentTier={current_tier as 'BRONZE' | 'SILVER' | 'GOLD'}
+                staggerIndex={pendingCourses.length + index + 1}
               />
             ))}
-          </div>
+          </CardGrid>
         </div>
       )}
 
       {/* Locked Courses */}
       {lockedCourses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-muted-foreground">
             Coming Soon
           </h2>
-          <div className="grid gap-4">
-            {lockedCourses.map((course) => (
+          <CardGrid columns={1} gap="md">
+            {lockedCourses.map((course, index) => (
               <CourseCard
                 key={course.id}
                 course={course}
                 currentTier={current_tier as 'BRONZE' | 'SILVER' | 'GOLD'}
+                staggerIndex={pendingCourses.length + completedCourses.length + index + 1}
               />
             ))}
-          </div>
+          </CardGrid>
         </div>
       )}
 
       {/* Empty State for Completed Users */}
       {pendingCourses.length === 0 && completedCourses.length === courses.length && (
-        <div className="text-center py-8">
-          <div className="p-6 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-            <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-2">
+        <PerformantAnimatedCard 
+          variant="glass" 
+          hoverEffect="glow"
+          className="dashboard-card text-center border-green-500/20 bg-green-500/5"
+          staggerIndex={courses.length + 1}
+        >
+          <div className="space-y-4 py-8">
+            <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400 mx-auto" />
+            <h3 className="text-xl font-semibold text-green-900 dark:text-green-100">
               All Courses Complete!
             </h3>
-            <p className="text-green-700 dark:text-green-300 mb-4">
+            <p className="text-green-700 dark:text-green-300 max-w-md mx-auto">
               You've successfully completed all available courses. Great job on your learning journey!
             </p>
             <p className="text-sm text-green-600 dark:text-green-400">
               You can now proceed to the next module in your Job Readiness program.
             </p>
           </div>
-        </div>
+        </PerformantAnimatedCard>
       )}
     </div>
   )

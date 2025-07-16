@@ -4,11 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveInterviewContext } from '../contexts/LiveInterviewContext';
 import { useInterviewSession } from '../providers/InterviewSessionProvider';
 import { InactivityWarning } from './InactivityWarning';
+import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card';
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring';
+import { AnimatedButton } from '@/components/ui/animated-button';
+import { AdaptiveParticles } from '@/components/ui/floating-particles';
+import { DashboardLoadingSkeleton } from '@/components/ui/dashboard-skeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Mic, MicOff, Monitor, MonitorOff, StopCircle, Camera, CameraOff, Volume2, VolumeX } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Monitor, MonitorOff, StopCircle, Camera, CameraOff, Volume2, VolumeX, AlertTriangle, CheckCircle, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import gsap from 'gsap';
 
 interface LiveInterviewInterfaceProps {
   onComplete?: (submissionId?: string) => void;
@@ -43,6 +49,25 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   const [cameraViewEnabled, setCameraViewEnabled] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // GSAP animation setup
+  useEffect(() => {
+    setMounted(true);
+    
+    // Animate cards on mount
+    gsap.fromTo(
+      ".dashboard-card",
+      { y: 30, opacity: 0 },
+      { 
+        y: 0, 
+        opacity: 1, 
+        stagger: 0.1, 
+        duration: 0.6, 
+        ease: "power2.out"
+      }
+    );
+  }, [sessionState]);
   
   // Video element ref for screen preview
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -203,14 +228,12 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   // Show loading state
   if (questionsLoading || sessionState === 'preparing') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Card className="p-8 max-w-md text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold mb-2">Preparing Your Interview</h2>
-          <p className="text-gray-600">
-            Generating personalized questions based on your background...
-          </p>
-        </Card>
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <DashboardLoadingSkeleton 
+          message="Generating personalized questions based on your background..." 
+          showProgress={true}
+        />
       </div>
     );
   }
@@ -218,28 +241,54 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   // Show screen share interrupted state
   if (screenShareInterrupted) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-pink-100">
-        <Card className="p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MonitorOff className="h-8 w-8 text-red-600" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2 text-red-800">Screen Sharing Stopped</h2>
-          <p className="text-red-600 mb-4">
-            Your screen sharing was interrupted during the interview. The interview has been automatically submitted for review.
-          </p>
-          <div className="space-y-2 text-sm text-red-500">
-            <p>• Interview recording saved</p>
-            <p>• Submission processed automatically</p>
-            <p>• You will receive feedback via email</p>
-          </div>
-          <Button 
-            onClick={() => window.location.href = '/app/job-readiness/interviews'} 
-            variant="outline"
-            className="mt-4 border-red-300 text-red-700 hover:bg-red-50"
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="relative flex items-center justify-center min-h-screen p-6">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="lift"
+            staggerIndex={0}
+            className="dashboard-card p-8 max-w-md text-center"
           >
-            Return to Interviews
-          </Button>
-        </Card>
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-600/20 dark:from-red-400/10 dark:to-rose-500/10 backdrop-blur-sm border border-red-200/50 dark:border-red-700/50 w-fit mx-auto">
+                <MonitorOff className="h-12 w-12 text-red-600 dark:text-red-400" />
+              </div>
+              
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-red-800 dark:text-red-200">Screen Sharing Stopped</h2>
+                <p className="text-red-600 dark:text-red-300 text-lg">
+                  Your screen sharing was interrupted during the interview. The interview has been automatically submitted for review.
+                </p>
+              </div>
+              
+              <PerformantAnimatedCard variant="subtle" className="p-4 bg-gradient-to-r from-red-50/50 to-rose-50/50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200/50 dark:border-red-700/50">
+                <div className="space-y-2 text-sm text-red-700 dark:text-red-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Interview recording saved</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Submission processed automatically</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>You will receive feedback via email</span>
+                  </div>
+                </div>
+              </PerformantAnimatedCard>
+              
+              <AnimatedButton 
+                onClick={() => window.location.href = '/app/job-readiness/interviews'} 
+                variant="outline"
+                className="w-full border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                Return to Interviews
+              </AnimatedButton>
+            </div>
+          </PerformantAnimatedCard>
+        </div>
       </div>
     );
   }
@@ -247,19 +296,57 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   // Show submitting state
   if (submitting) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
-        <Card className="p-8 max-w-md text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold mb-2">Submitting Your Interview</h2>
-          <p className="text-gray-600 mb-4">
-            Your interview is being uploaded and processed. Please wait...
-          </p>
-          <div className="space-y-2 text-sm text-gray-500">
-            <p>• Saving your video recording</p>
-            <p>• Processing interview responses</p>
-            <p>• Preparing for AI analysis</p>
-          </div>
-        </Card>
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="relative flex items-center justify-center min-h-screen p-6">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="glow"
+            staggerIndex={0}
+            className="dashboard-card p-8 max-w-md text-center"
+          >
+            <div className="space-y-6">
+              <div className="relative mx-auto w-fit">
+                <OptimizedProgressRing
+                  value={85}
+                  size={120}
+                  strokeWidth={4}
+                  showValue={false}
+                  color="success"
+                  delay={200}
+                  className="animate-pulse"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 dark:border-emerald-400"></div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-foreground">Submitting Your Interview</h2>
+                <p className="text-muted-foreground text-lg">
+                  Your interview is being uploaded and processed. Please wait...
+                </p>
+              </div>
+              
+              <PerformantAnimatedCard variant="subtle" className="p-6 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200/50 dark:border-emerald-700/50">
+                <div className="space-y-3 text-sm text-emerald-700 dark:text-emerald-300">
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600 dark:border-emerald-400"></div>
+                    <span>Saving your video recording</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600 dark:border-emerald-400" style={{ animationDelay: '0.2s' }}></div>
+                    <span>Processing interview responses</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600 dark:border-emerald-400" style={{ animationDelay: '0.4s' }}></div>
+                    <span>Preparing for AI analysis</span>
+                  </div>
+                </div>
+              </PerformantAnimatedCard>
+            </div>
+          </PerformantAnimatedCard>
+        </div>
       </div>
     );
   }
@@ -267,21 +354,37 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   // Show error state
   if (questionsError || liveError || sessionState === 'error') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-pink-100">
-        <Card className="p-8 max-w-md text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2 text-red-800">Interview Setup Failed</h2>
-          <p className="text-red-600 mb-4">
-            {questionsError || liveError || 'An unexpected error occurred'}
-          </p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="outline"
-            className="border-red-300 text-red-700 hover:bg-red-50"
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="relative flex items-center justify-center min-h-screen p-6">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="lift"
+            staggerIndex={0}
+            className="dashboard-card p-8 max-w-md text-center"
           >
-            Try Again
-          </Button>
-        </Card>
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-600/20 dark:from-red-400/10 dark:to-rose-500/10 backdrop-blur-sm border border-red-200/50 dark:border-red-700/50 w-fit mx-auto">
+                <AlertCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
+              </div>
+              
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-red-800 dark:text-red-200">Interview Setup Failed</h2>
+                <p className="text-red-600 dark:text-red-300 text-lg">
+                  {questionsError || liveError || 'An unexpected error occurred'}
+                </p>
+              </div>
+              
+              <AnimatedButton 
+                onClick={() => window.location.reload()} 
+                variant="outline"
+                className="w-full border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                Try Again
+              </AnimatedButton>
+            </div>
+          </PerformantAnimatedCard>
+        </div>
       </div>
     );
   }
@@ -289,57 +392,105 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   // Show pre-interview setup
   if (!interviewStarted && sessionState === 'ready') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
-        <Card className="p-8 max-w-lg text-center">
-          <div className="mb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Monitor className="h-8 w-8 text-green-600" />
+      <div className="relative min-h-screen">
+        <AdaptiveParticles />
+        <div className="relative flex items-center justify-center min-h-screen p-6">
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="lift"
+            staggerIndex={0}
+            className="dashboard-card p-8 max-w-lg text-center"
+          >
+            <div className="space-y-8">
+              {/* Hero Section */}
+              <div className="space-y-6">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50 w-fit mx-auto">
+                  <Monitor className="h-12 w-12 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                
+                <div className="space-y-4">
+                  <h2 className="text-3xl md:text-4xl font-bold tracking-tight gradient-text">Ready to Start Your Interview</h2>
+                  <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                    Your interview for <strong className="text-foreground">{background?.name}</strong> is ready to begin.
+                  </p>
+                </div>
+              </div>
+              
+              {/* Interview Details */}
+              <PerformantAnimatedCard 
+                variant="subtle" 
+                staggerIndex={1}
+                className="dashboard-card p-6 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200/50 dark:border-blue-700/50"
+              >
+                <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-4 text-lg">Interview Details:</h3>
+                <div className="space-y-3 text-sm">
+                  {[
+                    { icon: '⏱️', text: `Duration: 5 minutes` },
+                    { icon: '❓', text: `Questions: ${questions.length} personalized questions` },
+                    { icon: '📹', text: 'Recording: Screen and audio (camera view for monitoring)' },
+                    { icon: '🤖', text: 'AI Interviewer: Real-time conversation' }
+                  ].map(({ icon, text }, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-blue-100/50 dark:bg-blue-800/30 backdrop-blur-sm">
+                      <span className="text-base">{icon}</span>
+                      <span className="text-blue-700 dark:text-blue-300 font-medium">{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </PerformantAnimatedCard>
+              
+              {/* Action Button */}
+              <div className="space-y-4">
+                <AnimatedButton 
+                  onClick={handleStartInterview}
+                  disabled={connecting}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-medium py-6 text-lg"
+                >
+                  {connecting ? (
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Connecting...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Play className="h-5 w-5" />
+                      <span>Start Interview</span>
+                    </div>
+                  )}
+                </AnimatedButton>
+              </div>
+              
+              {/* Important Notices */}
+              <div className="space-y-3">
+                <PerformantAnimatedCard 
+                  variant="subtle" 
+                  staggerIndex={2}
+                  className="dashboard-card p-4 bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200/50 dark:border-amber-700/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-lg flex-shrink-0">📋</div>
+                    <div className="text-xs text-amber-800 dark:text-amber-200">
+                      <strong>Important:</strong> System audio is only available when sharing a <strong>browser tab</strong>. For full screen recording, your microphone will still be captured for assessment.
+                    </div>
+                  </div>
+                </PerformantAnimatedCard>
+                
+                <PerformantAnimatedCard 
+                  variant="subtle" 
+                  staggerIndex={3}
+                  className="dashboard-card p-4 bg-gradient-to-r from-red-50/50 to-rose-50/50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200/50 dark:border-red-700/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-red-800 dark:text-red-200">
+                      <strong>Critical:</strong> Do not stop screen sharing during the interview. If screen sharing ends, the interview will be automatically submitted and cannot be resumed.
+                    </div>
+                  </div>
+                </PerformantAnimatedCard>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Ready to Start Your Interview</h2>
-            <p className="text-gray-600 mb-4">
-              Your interview for <strong>{background?.name}</strong> is ready to begin.
-            </p>
-            <div className="bg-blue-50 p-4 rounded-lg mb-6">
-              <h3 className="font-semibold text-blue-800 mb-2">Interview Details:</h3>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Duration: 5 minutes</li>
-                <li>• Questions: {questions.length} personalized questions</li>
-                <li>• Recording: Screen and audio (camera view for monitoring)</li>
-                <li>• AI Interviewer: Real-time conversation</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="space-y-3">
-            <Button 
-              onClick={handleStartInterview}
-              disabled={connecting}
-              size="lg"
-              className="w-full bg-green-600 hover:bg-green-700"
-            >
-              {connecting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Connecting...
-                </>
-              ) : (
-                'Start Interview'
-              )}
-            </Button>
-            
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-4">
-              <p className="text-xs text-amber-800">
-                <strong>📋 Important:</strong> System audio is only available when sharing a <strong>browser tab</strong>. For full screen recording, your microphone will still be captured for assessment.
-              </p>
-            </div>
-            
-            <div className="bg-red-50 border border-red-200 p-3 rounded-lg mt-3">
-              <p className="text-xs text-red-800">
-                <strong>⚠️ Critical:</strong> Do not stop screen sharing during the interview. If screen sharing ends, the interview will be automatically submitted and cannot be resumed.
-              </p>
-            </div>
-          </div>
-        </Card>
+          </PerformantAnimatedCard>
+        </div>
       </div>
     );
   }

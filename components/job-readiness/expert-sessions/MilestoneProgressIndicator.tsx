@@ -20,28 +20,27 @@ export function MilestoneProgressIndicator({
   return (
     <div className={cn("relative space-y-2", className)}>
       {/* Progress Bar with Milestone Markers */}
-      <div className="relative">
+      <div className="relative pb-8">
         {/* Background Progress Bar */}
-        <div className="w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
           {/* Current Progress */}
           <div 
-            className="h-full bg-blue-500 transition-all duration-300 ease-out rounded-full"
+            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300 ease-out rounded-full"
             style={{ width: `${Math.min(currentPercentage, 100)}%` }}
           />
         </div>
         
         {/* Milestone Markers */}
-        <div className="absolute top-0 w-full h-2 flex justify-between items-center">
-          {MILESTONES.map((milestone) => {
+        <div className="absolute top-0 w-full h-2">
+          {MILESTONES.map((milestone, index) => {
             const isUnlocked = milestonesUnlocked.includes(milestone)
             const isCurrent = currentPercentage >= milestone
             
             return (
               <div
                 key={milestone}
-                className="relative flex flex-col items-center"
+                className="absolute flex flex-col items-center"
                 style={{ 
-                  position: 'absolute',
                   left: `${milestone}%`,
                   transform: 'translateX(-50%)'
                 }}
@@ -49,11 +48,11 @@ export function MilestoneProgressIndicator({
                 {/* Marker Dot */}
                 <div
                   className={cn(
-                    "w-3 h-3 rounded-full border-2 transition-all duration-200",
+                    "w-3 h-3 rounded-full border-2 transition-all duration-200 z-10",
                     "flex items-center justify-center",
                     isUnlocked || isCurrent
-                      ? "bg-green-500 border-green-400 shadow-sm" 
-                      : "bg-gray-400 border-gray-500"
+                      ? "bg-emerald-500 border-emerald-400 shadow-sm" 
+                      : "bg-muted-foreground border-muted-foreground"
                   )}
                 >
                   {(isUnlocked || isCurrent) && (
@@ -64,11 +63,11 @@ export function MilestoneProgressIndicator({
                 {/* Marker Label */}
                 <div
                   className={cn(
-                    "absolute top-4 text-xs font-medium whitespace-nowrap",
-                    "transition-colors duration-200",
+                    "absolute top-5 text-xs font-medium whitespace-nowrap text-center",
+                    "transition-colors duration-200 min-w-[2rem]",
                     isUnlocked || isCurrent
-                      ? "text-green-300"
-                      : "text-gray-400"
+                      ? "text-emerald-400 dark:text-emerald-300"
+                      : "text-muted-foreground"
                   )}
                 >
                   {milestone}%
@@ -80,24 +79,24 @@ export function MilestoneProgressIndicator({
       </div>
       
       {/* Milestone Legend */}
-      <div className="flex justify-between items-center text-xs text-gray-300 mt-6">
+      <div className="flex justify-between items-center text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-400" />
+            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
             <span>Unlocked</span>
           </div>
           <div className="flex items-center gap-1">
-            <Circle className="w-3 h-3 text-gray-400" />
+            <Circle className="w-3 h-3 text-muted-foreground" />
             <span>Locked</span>
           </div>
         </div>
         
         {/* Current Progress Info */}
         <div className="text-right">
-          <div className="text-white font-medium">
+          <div className="text-foreground font-medium">
             {Math.round(currentPercentage)}% Complete
           </div>
-          <div className="text-gray-400">
+          <div className="text-muted-foreground">
             {milestonesUnlocked.length} of {MILESTONES.length} milestones
           </div>
         </div>
@@ -117,8 +116,8 @@ export function MilestoneProgressIndicator({
                 "py-1 px-2 rounded text-xs font-medium",
                 "transition-colors duration-200",
                 isUnlocked || isCurrent
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-600 text-gray-300"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-muted text-muted-foreground"
               )}
             >
               {milestone}%

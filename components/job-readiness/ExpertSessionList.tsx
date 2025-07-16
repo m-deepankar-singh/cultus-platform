@@ -1,11 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PerformantAnimatedCard, CardGrid } from "@/components/ui/performant-animated-card"
+import { AnimatedButton } from "@/components/ui/animated-button"
+import { OptimizedProgressRing } from "@/components/ui/optimized-progress-ring"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Play, CheckCircle2, Clock, Calendar, Target, RotateCcw } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { cn } from "@/lib/utils"
 
 // Phase 5: Enhanced Components Integration
 import { MilestoneProgressIndicator } from './expert-sessions'
@@ -15,12 +17,11 @@ interface ExpertSessionProgress {
   completion_percentage: number
   is_completed: boolean
   completed_at: string | null
-  // Phase 2: Enhanced progress fields (simulated for now)
-  last_milestone_reached?: number
-  can_resume?: boolean
-  resume_from_milestone?: number
-  resume_position_seconds?: number
-  milestones_unlocked?: number[]
+  last_milestone_reached: number
+  can_resume: boolean
+  resume_from_milestone: number
+  resume_position_seconds: number
+  milestones_unlocked: number[]
 }
 
 interface ExpertSession {
@@ -37,84 +38,133 @@ interface ExpertSessionListProps {
   sessions: ExpertSession[]
 }
 
-// Feature flag for enhanced display (Phase 6: Deployment)
-const USE_ENHANCED_PROGRESS_DISPLAY = process.env.NEXT_PUBLIC_ENHANCED_EXPERT_SESSIONS === 'true' || true // Default to true for development
+// Using real data from API - no feature flags needed
 
 export function ExpertSessionList({ sessions }: ExpertSessionListProps) {
+  // Handle empty sessions array with new organized layout
   if (!sessions || sessions.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12">
-          <div className="text-center space-y-4">
-            <Play className="h-12 w-12 text-muted-foreground mx-auto" />
-            <div>
-              <h3 className="text-lg font-semibold">No Expert Sessions Available</h3>
-              <p className="text-muted-foreground">
-                Expert sessions will be available soon. Check back later!
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    sessions = []
   }
 
-  // Enhance sessions data with milestone information
-  const enhancedSessions = sessions.map(session => {
+  // Debug logging for progress display - using real data from API
+  sessions.forEach(session => {
     const completionPercentage = session.student_progress.completion_percentage || 0
-    const watchTime = session.student_progress.watch_time_seconds || 0
+    const lastMilestone = session.student_progress.last_milestone_reached || 0
     
-    // Calculate simulated milestone data based on completion percentage
-    const lastMilestone = Math.floor(completionPercentage / 10) * 10
-    const milestonesUnlocked = lastMilestone > 0 
-      ? Array.from({ length: Math.floor(lastMilestone / 10) }, (_, i) => (i + 1) * 10)
-      : []
-    
-    return {
-      ...session,
-      student_progress: {
-        ...session.student_progress,
-        // Phase 2: Enhanced resume functionality (simulate for now)
-        last_milestone_reached: lastMilestone,
-        can_resume: watchTime > 0 && !session.student_progress.is_completed,
-        resume_from_milestone: lastMilestone,
-        resume_position_seconds: watchTime,
-        milestones_unlocked: milestonesUnlocked
-      }
+    if (completionPercentage > 0) {
+      console.log(`Session ${session.id}: ${completionPercentage}% completion, last milestone: ${lastMilestone} (real data)`)
     }
   })
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Available Sessions</h2>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">
-            {sessions.length} session{sessions.length !== 1 ? 's' : ''} available
-          </Badge>
-          {USE_ENHANCED_PROGRESS_DISPLAY && (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
-              <Target className="h-3 w-3 mr-1" />
-              Enhanced Progress
-            </Badge>
-          )}
-        </div>
-      </div>
+  // Sort sessions: available sessions first, completed sessions last
+  const sortedSessions = [...sessions].sort((a, b) => {
+    const aCompleted = a.student_progress.is_completed
+    const bCompleted = b.student_progress.is_completed
+    
+    // If completion status is different, sort by completion (incomplete first)
+    if (aCompleted !== bCompleted) {
+      return aCompleted ? 1 : -1
+    }
+    
+    // If both have same completion status, sort by progress percentage (higher progress first for incomplete)
+    if (!aCompleted && !bCompleted) {
+      const aProgress = a.student_progress.completion_percentage || 0
+      const bProgress = b.student_progress.completion_percentage || 0
+      return bProgress - aProgress
+    }
+    
+    // For completed sessions, sort by completion date (most recent first)
+    if (aCompleted && bCompleted) {
+      const aDate = a.student_progress.completed_at
+      const bDate = b.student_progress.completed_at
+      if (aDate && bDate) {
+        return new Date(bDate).getTime() - new Date(aDate).getTime()
+      }
+    }
+    
+    // Fallback to original order
+    return 0
+  })
 
-      <div className="grid gap-4">
-        {enhancedSessions.map((session) => (
-          <ExpertSessionCard key={session.id} session={session} />
-        ))}
-      </div>
+  // Use sorted data
+  const enhancedSessions = sortedSessions
+
+  // Separate sessions by completion status for better organization
+  const availableSessions = enhancedSessions.filter(session => !session.student_progress.is_completed)
+  const completedSessions = enhancedSessions.filter(session => session.student_progress.is_completed)
+
+  return (
+    <div className="space-y-8">
+      {/* Available Sessions Section */}
+      {availableSessions.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold">Available Sessions</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">
+                {availableSessions.length} session{availableSessions.length !== 1 ? 's' : ''} available
+              </Badge>
+            </div>
+          </div>
+
+          <CardGrid columns={1} gap="md">
+            {availableSessions.map((session, index) => (
+              <ExpertSessionCard key={session.id} session={session} index={index} />
+            ))}
+          </CardGrid>
+        </div>
+      )}
+
+      {/* Completed Sessions Section */}
+      {completedSessions.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-medium text-muted-foreground">Completed Sessions</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {completedSessions.length} completed
+              </Badge>
+            </div>
+          </div>
+
+          <CardGrid columns={1} gap="md">
+            {completedSessions.map((session, index) => (
+              <ExpertSessionCard key={session.id} session={session} index={availableSessions.length + index} />
+            ))}
+          </CardGrid>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {availableSessions.length === 0 && completedSessions.length === 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold">Expert Sessions</h2>
+          </div>
+          <PerformantAnimatedCard variant="glass" className="dashboard-card">
+            <div className="py-12 text-center space-y-4">
+              <Play className="h-12 w-12 text-muted-foreground mx-auto" />
+              <div>
+                <h3 className="text-lg font-semibold">No Expert Sessions Available</h3>
+                <p className="text-muted-foreground">
+                  Expert sessions will be available soon. Check back later!
+                </p>
+              </div>
+            </div>
+          </PerformantAnimatedCard>
+        </div>
+      )}
     </div>
   )
 }
 
 interface ExpertSessionCardProps {
   session: ExpertSession
+  index: number
 }
 
-function ExpertSessionCard({ session }: ExpertSessionCardProps) {
+function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
   const { student_progress } = session
   const isCompleted = student_progress.is_completed
   const completionPercentage = student_progress.completion_percentage
@@ -130,7 +180,7 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
 
   const getButtonText = () => {
     if (isCompleted) return "Session Completed"
-    if (USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume) {
+    if (student_progress.can_resume) {
       return `Resume from ${student_progress.resume_from_milestone}%`
     }
     return completionPercentage > 0 ? "Continue Watching" : "Start Watching"
@@ -138,82 +188,131 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
 
   const getButtonIcon = () => {
     if (isCompleted) return CheckCircle2
-    if (USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume) return RotateCcw
+    if (student_progress.can_resume) return RotateCcw
     return Play
   }
 
   const ButtonIcon = getButtonIcon()
 
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 100) return "success"
+    if (percentage >= 50) return "warning"
+    return "primary"
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+      case 'in-progress':
+        return 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+      default:
+        return 'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+    }
+  }
+
   return (
-    <Card className={`transition-all ${isCompleted ? 'opacity-75 bg-gray-50' : 'hover:shadow-md'}`}>
-      <CardHeader>
+    <PerformantAnimatedCard 
+      variant="glass" 
+      hoverEffect="lift" 
+      staggerIndex={index}
+      className={cn(
+        "dashboard-card group h-full flex flex-col",
+        isCompleted && "opacity-75"
+      )}
+    >
+      <div className="space-y-4 p-6">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <CardTitle className={`text-xl ${isCompleted ? 'text-gray-600' : ''}`}>
+          <div className="space-y-2 flex-1">
+            <h3 className={cn(
+              "text-xl font-semibold",
+              isCompleted ? "text-muted-foreground" : "text-foreground"
+            )}>
               {session.title}
-            </CardTitle>
-            <CardDescription className="text-sm">
+            </h3>
+            <p className="text-sm text-muted-foreground line-clamp-2">
               {session.description}
-            </CardDescription>
+            </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {isCompleted ? (
-              <Badge variant="default" className="bg-green-500 text-white">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Completed
-              </Badge>
-            ) : completionPercentage > 0 ? (
-              <>
-                <Badge variant="secondary">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {completionPercentage}% watched
-                </Badge>
-                {/* Enhanced Progress Badges */}
-                {USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume && (
-                  <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50">
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    Resume {student_progress.resume_from_milestone}%
-                  </Badge>
-                )}
-              </>
-            ) : (
-              <Badge variant="outline">
-                <Play className="h-3 w-3 mr-1" />
-                Not started
-              </Badge>
+          
+          <div className="flex items-center gap-2 ml-4">
+            {completionPercentage > 0 && (
+              <OptimizedProgressRing
+                value={completionPercentage}
+                size={40}
+                strokeWidth={4}
+                color={getProgressColor(completionPercentage)}
+                showValue={false}
+                delay={300 + index * 100}
+              />
             )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Enhanced Milestone Progress Display */}
-        {USE_ENHANCED_PROGRESS_DISPLAY && student_progress.milestones_unlocked && student_progress.milestones_unlocked.length > 0 && (
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {isCompleted ? (
+            <Badge className={cn(
+              "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+              getStatusColor('completed')
+            )}>
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Completed
+            </Badge>
+          ) : completionPercentage > 0 ? (
+            <>
+              <Badge className={cn(
+                "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+                getStatusColor('in-progress')
+              )}>
+                <Clock className="h-3 w-3 mr-1" />
+                {completionPercentage}% watched
+              </Badge>
+              {student_progress.can_resume && (
+                <Badge variant="outline" className="border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-500/10 dark:text-sky-400">
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Resume {student_progress.resume_from_milestone}%
+                </Badge>
+              )}
+            </>
+          ) : (
+            <Badge className={cn(
+              "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+              getStatusColor('not-started')
+            )}>
+              <Play className="h-3 w-3 mr-1" />
+              Not started
+            </Badge>
+          )}
+        </div>
+
+        {/* Milestone Progress Display */}
+        {student_progress.milestones_unlocked && student_progress.milestones_unlocked.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-gray-700">Progress Milestones</span>
+              <Target className="h-4 w-4 text-sky-600" />
+              <span className="text-sm font-medium">Progress Milestones</span>
               <Badge variant="outline" className="text-xs">
                 {student_progress.milestones_unlocked.length}/7 reached
               </Badge>
             </div>
-                         <MilestoneProgressIndicator
-               currentPercentage={completionPercentage}
-               milestonesUnlocked={student_progress.milestones_unlocked}
-               isDisabled={true}
-             />
+            <MilestoneProgressIndicator
+              currentPercentage={completionPercentage}
+              milestonesUnlocked={student_progress.milestones_unlocked}
+              isDisabled={true}
+            />
           </div>
         )}
 
-        {/* Standard Progress Bar (Legacy/Fallback) */}
-        {(!USE_ENHANCED_PROGRESS_DISPLAY || !student_progress.milestones_unlocked?.length) && completionPercentage > 0 && (
+        {/* Standard Progress Bar (Fallback when no milestones) */}
+        {!student_progress.milestones_unlocked?.length && completionPercentage > 0 && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Progress</span>
               <span>{completionPercentage}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-muted rounded-full h-2">
               <div
-                className="bg-primary h-2 rounded-full transition-all duration-300"
+                className="h-2 bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000 ease-out"
                 style={{ width: `${completionPercentage}%` }}
               />
             </div>
@@ -243,9 +342,9 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
               Watched: {formatDuration(student_progress.watch_time_seconds)} of {formatDuration(session.video_duration)}
             </div>
             
-            {/* Enhanced Resume Information */}
-            {USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume && !isCompleted && (
-              <div className="text-blue-600 bg-blue-50 p-2 rounded text-xs">
+            {/* Resume Information */}
+            {student_progress.can_resume && !isCompleted && (
+              <div className="text-sky-600 bg-sky-50 dark:bg-sky-500/10 p-2 rounded text-xs">
                 <div className="flex items-center gap-1">
                   <RotateCcw className="h-3 w-3" />
                   <span>
@@ -257,7 +356,7 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
             )}
             
             {isCompleted && student_progress.completed_at && (
-              <div className="text-green-600">
+              <div className="text-emerald-600">
                 Completed {formatDistanceToNow(new Date(student_progress.completed_at), { addSuffix: true })}
               </div>
             )}
@@ -265,44 +364,38 @@ function ExpertSessionCard({ session }: ExpertSessionCardProps) {
         )}
 
         {/* Enhanced Action Button */}
-        <div className="pt-2">
+        <div className="pt-2 mt-auto">
           {isCompleted ? (
             <div className="space-y-2">
-              <Button 
+              <AnimatedButton 
                 className="w-full" 
                 variant="outline" 
                 disabled
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Session Completed
-              </Button>
-              <p className="text-xs text-center text-gray-500">
+              </AnimatedButton>
+              <p className="text-xs text-center text-muted-foreground">
                 Completed sessions cannot be re-watched
               </p>
             </div>
           ) : (
             <Link href={`/app/job-readiness/expert-sessions/${session.id}`}>
-              <Button 
-                className={`w-full ${USE_ENHANCED_PROGRESS_DISPLAY && student_progress.can_resume ? 'bg-blue-600 hover:bg-blue-700' : ''}`} 
-                variant="default"
+              <AnimatedButton 
+                className={cn(
+                  "w-full",
+                  student_progress.can_resume
+                    ? "bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700"
+                    : "bg-gradient-to-r from-primary to-accent"
+                )}
               >
                 <ButtonIcon className="h-4 w-4 mr-2" />
                 {getButtonText()}
-              </Button>
+              </AnimatedButton>
             </Link>
           )}
         </div>
-
-        {/* Development Info (Remove in production) */}
-        {process.env.NODE_ENV === 'development' && USE_ENHANCED_PROGRESS_DISPLAY && (
-          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
-            <div><strong>Dev Info:</strong></div>
-            <div>Milestones: [{student_progress.milestones_unlocked?.join(', ')}]</div>
-            <div>Can Resume: {student_progress.can_resume ? 'Yes' : 'No'}</div>
-            <div>Resume From: {student_progress.resume_from_milestone}%</div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </PerformantAnimatedCard>
   )
-} 
+}

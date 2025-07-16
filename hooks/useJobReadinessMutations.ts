@@ -193,35 +193,12 @@ export function useUpdateExpertSessionProgress() {
 
       // Silent milestone tracking - no notifications for seamless experience
 
-      // Only invalidate if session was just completed or major milestone reached
+      // Always invalidate expert-sessions query to ensure fresh data when navigating back
+      queryClient.invalidateQueries({ queryKey: ['job-readiness', 'expert-sessions'] })
+      
+      // Only invalidate progress query for major events to avoid excessive refetching
       if (data?.progress?.session_just_completed || data?.overall_progress?.third_star_unlocked) {
         queryClient.invalidateQueries({ queryKey: ['job-readiness', 'progress'] })
-        queryClient.invalidateQueries({ queryKey: ['job-readiness', 'expert-sessions'] })
-      } else {
-        // For regular progress updates, just update the cache without invalidating
-        // This prevents constant refetching while still keeping data fresh
-        queryClient.setQueryData(['job-readiness', 'expert-sessions'], (oldData: any) => {
-          if (!oldData) return oldData
-          
-          return {
-            ...oldData,
-            sessions: oldData.sessions?.map((session: any) => 
-              session.id === sessionId 
-                ? { 
-                    ...session, 
-                    student_progress: {
-                      ...session.student_progress,
-                      watch_time_seconds: data.progress?.watch_time_seconds || session.student_progress.watch_time_seconds,
-                      completion_percentage: data.progress?.completion_percentage || session.student_progress.completion_percentage,
-                      is_completed: data.progress?.is_completed || session.student_progress.is_completed,
-                      completed_at: data.progress?.completed_at || session.student_progress.completed_at,
-                      last_milestone_reached: data.progress?.last_milestone_reached || session.student_progress.last_milestone_reached
-                    }
-                  }
-                : session
-            )
-          }
-        })
       }
     },
     onError: (error: Error) => {

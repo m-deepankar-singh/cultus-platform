@@ -6,8 +6,8 @@ import { useJobReadinessProgress } from '@/hooks/useJobReadinessProgress'
 import { ProjectDisplay } from './ProjectDisplay'
 import { ProjectSubmissionForm } from './ProjectSubmissionForm'
 import { ProjectFeedback } from './ProjectFeedback'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
+import { AnimatedButton } from '@/components/ui/animated-button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertCircle, Lock, RefreshCw } from 'lucide-react'
 
@@ -62,31 +62,32 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
 
   if (progressLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
+      <PerformantAnimatedCard variant="glass" className="dashboard-card">
+        <div className="flex items-center justify-center py-12">
           <div className="text-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
             <p className="text-muted-foreground">Loading your progress...</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
   if (!isUnlocked) {
     return (
-      <Card className="border-muted">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-muted-foreground" />
-            Projects Module Locked
-          </CardTitle>
-          <CardDescription>
-            Complete the Expert Sessions module to unlock Real-World Projects
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert>
+      <PerformantAnimatedCard variant="glass" hoverEffect="glow" className="dashboard-card border-muted">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              <h3 className="font-semibold text-lg">Projects Module Locked</h3>
+            </div>
+            <p className="text-muted-foreground">
+              Complete the Expert Sessions module to unlock Real-World Projects
+            </p>
+          </div>
+          
+          <Alert className="border-amber-200/50 bg-amber-50/80 dark:border-amber-800/50 dark:bg-amber-950/80">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               You need {requiredStars} stars to access this module. 
@@ -94,57 +95,58 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
               Complete Expert Sessions to earn your 3rd star.
             </AlertDescription>
           </Alert>
-        </CardContent>
-      </Card>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
   if (!actualProductId) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
+      <PerformantAnimatedCard variant="glass" className="dashboard-card">
+        <div className="flex items-center justify-center py-12">
           <div className="text-center space-y-4">
             <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto" />
             <p className="text-muted-foreground">No Job Readiness product found</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
   if (projectLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
+      <PerformantAnimatedCard variant="glass" className="dashboard-card">
+        <div className="flex items-center justify-center py-12">
           <div className="text-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
             <p className="text-muted-foreground">Generating your project...</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 
   if (projectError) {
     return (
-      <Card className="border-destructive/50">
-        <CardHeader>
-          <CardTitle className="text-destructive">Error Loading Project</CardTitle>
-          <CardDescription>
-            There was an error generating your project. Please try again.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button 
+      <PerformantAnimatedCard variant="glass" hoverEffect="glow" className="dashboard-card border-destructive/50">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="font-semibold text-lg text-destructive">Error Loading Project</h3>
+            <p className="text-muted-foreground">
+              There was an error generating your project. Please try again.
+            </p>
+          </div>
+          
+          <AnimatedButton 
             onClick={() => refetchProject()} 
             variant="outline"
             className="flex items-center gap-2"
           >
             <RefreshCw className="h-4 w-4" />
             Try Again
-          </Button>
-        </CardContent>
-      </Card>
+          </AnimatedButton>
+        </div>
+      </PerformantAnimatedCard>
     )
   }
 

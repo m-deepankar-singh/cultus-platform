@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoreHorizontal, Search, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, Search, SlidersHorizontal, Eye, EyeOff } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import Link from "next/link";
 import { BulkUploadDialog } from "./bulk-upload-dialog";
@@ -47,10 +49,22 @@ interface VirtualizedLearnersTableProps {
 const ROW_HEIGHT = 65; // Height of each row in pixels
 const TABLE_HEIGHT = 600; // Height of the virtual table
 
+interface ColumnVisibility {
+  name: boolean;
+  email: boolean;
+  tempPassword: boolean;
+  phone: boolean;
+  client: boolean;
+  background: boolean;
+  status: boolean;
+  enrolled: boolean;
+}
+
 interface RowData {
   learners: Learner[];
   onEditLearner: (learner: Learner) => void;
   onDeleteLearner: (learner: Learner) => void;
+  columnVisibility: ColumnVisibility;
 }
 
 // Memoized row component for performance
@@ -63,7 +77,7 @@ const LearnerRow = React.memo(({
   style: React.CSSProperties; 
   data: RowData 
 }) => {
-  const { learners, onEditLearner, onDeleteLearner } = data;
+  const { learners, onEditLearner, onDeleteLearner, columnVisibility } = data;
   const learner = learners[index];
   
   if (!learner) {
@@ -74,59 +88,78 @@ const LearnerRow = React.memo(({
     );
   }
   
+  const visibleColumns = Object.entries(columnVisibility).filter(([_, visible]) => visible);
+  const gridCols = `grid-cols-${visibleColumns.length}`;
+  
   return (
     <div style={style} className="border-b border-border bg-card dark:bg-card/80 hover:bg-muted/25 transition-colors group">
-      <div className="grid grid-cols-8 gap-6 px-6 py-4 items-center h-full">
-        <div className="font-medium text-foreground truncate">{learner.full_name}</div>
-        <div className="text-sm text-foreground truncate">{learner.email || '—'}</div>
-        <div className="font-mono text-xs text-muted-foreground truncate">{learner.temporary_password || '—'}</div>
-        <div className="text-sm text-foreground truncate">{learner.phone_number || '—'}</div>
-        <div className="text-sm text-foreground truncate">{learner.client?.name || '—'}</div>
-        <div>
-          {learner.job_readiness_background_type ? (
-            <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-medium">
-              {learner.job_readiness_background_type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-            </span>
-          ) : (
-            <span className="text-muted-foreground text-sm">—</span>
-          )}
-        </div>
-        <div>
-          <Badge variant={learner.is_active ? "default" : "secondary"} className={learner.is_active ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900" : ""}>
-            {learner.is_active ? "Active" : "Inactive"}
-          </Badge>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {learner.created_at ? format(new Date(learner.created_at), "MMM d, yyyy") : "—"}
+      <div className={`grid ${gridCols} gap-6 px-6 py-4 items-center h-full`}>
+        {columnVisibility.name && (
+          <div className="font-medium text-foreground truncate">{learner.full_name}</div>
+        )}
+        {columnVisibility.email && (
+          <div className="text-sm text-foreground truncate">{learner.email || '—'}</div>
+        )}
+        {columnVisibility.tempPassword && (
+          <div className="font-mono text-xs text-muted-foreground truncate">{learner.temporary_password || '—'}</div>
+        )}
+        {columnVisibility.phone && (
+          <div className="text-sm text-foreground truncate">{learner.phone_number || '—'}</div>
+        )}
+        {columnVisibility.client && (
+          <div className="text-sm text-foreground truncate">{learner.client?.name || '—'}</div>
+        )}
+        {columnVisibility.background && (
+          <div>
+            {learner.job_readiness_background_type ? (
+              <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-medium">
+                {learner.job_readiness_background_type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+              </span>
+            ) : (
+              <span className="text-muted-foreground text-sm">—</span>
+            )}
           </div>
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem asChild>
-                  <Link href={`/learners/${learner.id}`}>View details</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onEditLearner(learner)}>
-                  Edit learner
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => onDeleteLearner(learner)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  Delete learner
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        )}
+        {columnVisibility.status && (
+          <div>
+            <Badge variant={learner.is_active ? "default" : "secondary"} className={learner.is_active ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900" : ""}>
+              {learner.is_active ? "Active" : "Inactive"}
+            </Badge>
           </div>
-        </div>
+        )}
+        {columnVisibility.enrolled && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {learner.created_at ? format(new Date(learner.created_at), "MMM d, yyyy") : "—"}
+            </div>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/learners/${learner.id}`}>View details</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onEditLearner(learner)}>
+                    Edit learner
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => onDeleteLearner(learner)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    Delete learner
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -140,6 +173,18 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
   const [clientFilter, setClientFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [showFilters, setShowFilters] = React.useState(false);
+  
+  // Column visibility state
+  const [columnVisibility, setColumnVisibility] = React.useState<ColumnVisibility>({
+    name: true,
+    email: true,
+    tempPassword: true,
+    phone: true,
+    client: true,
+    background: true,
+    status: true,
+    enrolled: true,
+  });
   
   // Edit/Delete states
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -261,7 +306,8 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
     learners,
     onEditLearner: handleEditLearner,
     onDeleteLearner: handleDeleteLearner,
-  }), [learners, handleEditLearner, handleDeleteLearner]);
+    columnVisibility,
+  }), [learners, handleEditLearner, handleDeleteLearner, columnVisibility]);
   
   if (isError) {
     return (
@@ -276,8 +322,8 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
     <Card className="border-0 shadow-none bg-transparent">
       {/* Search and Filter Controls */}
       <div className="p-6 border-b">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1">
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
             <Input
               type="search"
@@ -287,14 +333,123 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="h-10">
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            Filters
-          </Button>
-          <Button variant="outline" className="h-10">
-            Search
-          </Button>
-          <BulkUploadDialog onLearnersBulkUploaded={handleBulkUploadComplete} />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="h-10">
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              Filters
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-10">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Columns
+                </Button>
+              </PopoverTrigger>
+            <PopoverContent className="w-56" align="end">
+              <div className="space-y-4">
+                <div className="font-medium text-sm">Toggle columns</div>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="name"
+                      checked={columnVisibility.name}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, name: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="name" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Name
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="email"
+                      checked={columnVisibility.email}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, email: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Contact Email
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="tempPassword"
+                      checked={columnVisibility.tempPassword}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, tempPassword: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="tempPassword" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Temp Password
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="phone"
+                      checked={columnVisibility.phone}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, phone: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="phone" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Phone
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="client"
+                      checked={columnVisibility.client}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, client: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="client" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Client
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="background"
+                      checked={columnVisibility.background}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, background: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="background" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Background
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="status"
+                      checked={columnVisibility.status}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, status: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="status" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Status
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="enrolled"
+                      checked={columnVisibility.enrolled}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, enrolled: checked as boolean }))
+                      }
+                    />
+                    <label htmlFor="enrolled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Enrolled
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          </div>
         </div>
 
         {showFilters && (
@@ -339,15 +494,15 @@ export function VirtualizedLearnersTable({ clientOptions }: VirtualizedLearnersT
       {/* Table Container */}
       <div className="rounded-lg border border-border bg-card dark:bg-card/80">
         {/* Table Header */}
-        <div className="grid grid-cols-8 gap-6 px-6 py-4 font-medium bg-transparent border-b border-border text-sm text-muted-foreground">
-          <div>Name</div>
-          <div>Contact Email</div>
-          <div>Temp Password</div>
-          <div>Phone</div>
-          <div>Client</div>
-          <div>Background</div>
-          <div>Status</div>
-          <div>Enrolled</div>
+        <div className={`grid grid-cols-${Object.values(columnVisibility).filter(Boolean).length} gap-6 px-6 py-4 font-medium bg-transparent border-b border-border text-sm text-muted-foreground`}>
+          {columnVisibility.name && <div>Name</div>}
+          {columnVisibility.email && <div>Contact Email</div>}
+          {columnVisibility.tempPassword && <div>Temp Password</div>}
+          {columnVisibility.phone && <div>Phone</div>}
+          {columnVisibility.client && <div>Client</div>}
+          {columnVisibility.background && <div>Background</div>}
+          {columnVisibility.status && <div>Status</div>}
+          {columnVisibility.enrolled && <div>Enrolled</div>}
         </div>
       
       {/* Virtualized Table Body */}

@@ -27,37 +27,44 @@ export function JobReadinessLayout({
   
   return (
     <PerformanceOptimizer>
-      <div className="container mx-auto py-8 px-4 md:px-0">
-        <div className="max-w-6xl mx-auto space-y-8">
-          {/* Page Header */}
-          {(title || description) && (
-            <div className="text-center space-y-4">
-              {title && (
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
-                  {title}
-                </h1>
+      <div className="relative min-h-screen">
+        {/* Background Effects */}
+        <AdaptiveParticles />
+        
+        <div className="relative space-y-8">
+          <div className="container mx-auto py-8 px-4 md:px-0">
+            <div className="max-w-6xl mx-auto space-y-8">
+              {/* Page Header */}
+              {(title || description) && (
+                <div className="text-center space-y-4">
+                  {title && (
+                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
+                      {title}
+                    </h1>
+                  )}
+                  {description && (
+                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                      {description}
+                    </p>
+                  )}
+                </div>
               )}
-              {description && (
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  {description}
-                </p>
+
+              {/* Progress Display */}
+              {showProgress && (
+                <PerformantAnimatedCard 
+                  variant="glass"
+                  className="dashboard-card"
+                >
+                  <OverallProgressDisplay />
+                </PerformantAnimatedCard>
               )}
+
+              {/* Page Content */}
+              <div>
+                {children}
+              </div>
             </div>
-          )}
-
-          {/* Progress Display */}
-          {showProgress && (
-            <PerformantAnimatedCard 
-              variant="glass"
-              className="dashboard-card"
-            >
-              <OverallProgressDisplay />
-            </PerformantAnimatedCard>
-          )}
-
-          {/* Page Content */}
-          <div>
-            {children}
           </div>
         </div>
       </div>

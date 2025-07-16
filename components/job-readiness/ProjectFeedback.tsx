@@ -1,5 +1,5 @@
 'use client'
-
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ import {
   Info
 } from 'lucide-react'
 import Link from 'next/link'
+import { gsap } from 'gsap'
 
 interface ProjectFeedbackProps {
   submissionResult: {
@@ -62,6 +63,24 @@ export function ProjectFeedback({
   const { submission, feedback, star_level_updated, passing_threshold } = submissionResult
   const passed = submission.passed
   const score = submission.score
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+    
+    // GSAP animations for feedback cards
+    gsap.fromTo(
+      ".feedback-card",
+      { y: 30, opacity: 0 },
+      { 
+        y: 0, 
+        opacity: 1, 
+        stagger: 0.15, 
+        duration: 0.6, 
+        ease: "power2.out"
+      }
+    )
+  }, [])
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-600'
@@ -162,11 +181,25 @@ export function ProjectFeedback({
               </Alert>
             )}
             
-            <div className="bg-muted p-4 rounded-lg max-h-40 overflow-y-auto">
-              <p className="text-sm whitespace-pre-wrap font-mono">
-                {submission.submission_content?.substring(0, 500)}
-                {submission.submission_content && submission.submission_content.length > 500 && '...'}
-              </p>
+            <div className="bg-background/50 border border-border p-4 rounded-lg max-h-40 overflow-y-auto">
+              {submission.submission_content ? (
+                <p className="text-sm whitespace-pre-wrap font-mono text-foreground">
+                  {submission.submission_content.substring(0, 500)}
+                  {submission.submission_content.length > 500 && '...'}
+                </p>
+              ) : (
+                <div className="text-center py-8 space-y-2">
+                  <FileText className="h-8 w-8 text-muted-foreground mx-auto" />
+                  <p className="text-sm text-muted-foreground">
+                    Your submission was successfully processed and graded.
+                  </p>
+                  {submissionResult.storage_optimization?.optimized && (
+                    <p className="text-xs text-blue-600">
+                      Large content was optimized for storage efficiency.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             {submission.submission_content && submission.submission_content.length > 500 && (
               <p className="text-xs text-muted-foreground">

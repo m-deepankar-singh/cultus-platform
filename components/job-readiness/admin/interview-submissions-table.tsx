@@ -94,8 +94,8 @@ function QuickVerdictToggle({
   
   return (
     <div className="space-y-1">
-      <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded-md border">
-        <Label htmlFor={`verdict-${submission.id}`} className="text-xs text-red-600 font-medium">
+      <div className="flex items-center space-x-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-md border">
+        <Label htmlFor={`verdict-${submission.id}`} className="text-xs text-red-600 dark:text-red-400 font-medium">
           Reject
         </Label>
         <Switch
@@ -105,7 +105,7 @@ function QuickVerdictToggle({
           disabled={isUpdating}
           className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-400"
         />
-        <Label htmlFor={`verdict-${submission.id}`} className="text-xs text-green-600 font-medium">
+        <Label htmlFor={`verdict-${submission.id}`} className="text-xs text-green-600 dark:text-green-400 font-medium">
           Approve
         </Label>
       </div>
@@ -257,7 +257,7 @@ function AIFeedbackDisplay({ feedback }: { feedback: string | object }) {
           <h3 className="font-semibold text-lg mb-3">Areas for Improvement</h3>
           <div className="space-y-3">
             {areas_for_improvement.map((area: any, index: number) => (
-              <div key={index} className="p-3 bg-red-50 border border-red-200 rounded">
+              <div key={index} className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
                 <div className="flex items-center gap-2 mb-2">
                   <h4 className="font-medium text-sm">{area.area}</h4>
                   <Badge variant="outline" className="text-xs">
@@ -282,7 +282,7 @@ function AIFeedbackDisplay({ feedback }: { feedback: string | object }) {
           <h3 className="font-semibold text-lg mb-3">Strengths</h3>
           <div className="space-y-3">
             {strengths.map((strength: any, index: number) => (
-              <div key={index} className="p-3 bg-green-50 border border-green-200 rounded">
+              <div key={index} className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
                 <h4 className="font-medium text-sm mb-2">{strength.strength}</h4>
                 <p className="text-xs text-muted-foreground mb-2">{strength.evidence}</p>
                 <p className="text-xs text-muted-foreground">
@@ -382,15 +382,15 @@ export function InterviewSubmissionsTable({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return { variant: "secondary", color: "text-yellow-600", icon: <Clock className="h-3 w-3" /> }
+        return { variant: "warning", color: "", icon: <Clock className="h-3 w-3" /> }
       case 'analyzing':
-        return { variant: "secondary", color: "text-blue-600", icon: <Clock className="h-3 w-3" /> }
+        return { variant: "info", color: "", icon: <Clock className="h-3 w-3" /> }
       case 'analyzed':
-        return { variant: "default", color: "text-green-600", icon: <CheckCircle className="h-3 w-3" /> }
+        return { variant: "success", color: "", icon: <CheckCircle className="h-3 w-3" /> }
       case 'error':
-        return { variant: "destructive", color: "text-red-600", icon: <XCircle className="h-3 w-3" /> }
+        return { variant: "destructive", color: "", icon: <XCircle className="h-3 w-3" /> }
       default:
-        return { variant: "outline", color: "text-gray-600", icon: null }
+        return { variant: "outline", color: "", icon: null }
     }
   }
 
@@ -398,13 +398,13 @@ export function InterviewSubmissionsTable({
   const getVerdictBadge = (verdict: string) => {
     switch (verdict) {
       case 'approved':
-        return { variant: "default", color: "text-green-600", icon: <CheckCircle className="h-3 w-3" /> }
+        return { variant: "success", color: "", icon: <CheckCircle className="h-3 w-3" /> }
       case 'rejected':
-        return { variant: "destructive", color: "text-red-600", icon: <XCircle className="h-3 w-3" /> }
+        return { variant: "destructive", color: "", icon: <XCircle className="h-3 w-3" /> }
       case 'needs_review':
-        return { variant: "secondary", color: "text-orange-600", icon: <Clock className="h-3 w-3" /> }
+        return { variant: "warning", color: "", icon: <Clock className="h-3 w-3" /> }
       default:
-        return { variant: "outline", color: "text-gray-600", icon: null }
+        return { variant: "outline", color: "", icon: null }
     }
   }
 
@@ -487,7 +487,7 @@ export function InterviewSubmissionsTable({
         const badge = getStatusBadge(status)
         return (
           <div className="space-y-1">
-            <Badge variant={badge.variant as any} className={`text-xs ${badge.color} flex items-center gap-1 w-fit`}>
+            <Badge variant={badge.variant as any} className="text-xs flex items-center gap-1 w-fit">
               {badge.icon}
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </Badge>
@@ -567,12 +567,12 @@ export function InterviewSubmissionsTable({
         return (
           <div className="space-y-1">
             {needsReview ? (
-              <Badge variant="secondary" className="text-xs text-orange-600 flex items-center gap-1 w-fit">
+              <Badge variant="warning" className="text-xs flex items-center gap-1 w-fit">
                 <Clock className="h-3 w-3" />
                 Needs Review
               </Badge>
             ) : hasOverride ? (
-              <Badge variant="default" className="text-xs text-green-600 flex items-center gap-1 w-fit">
+              <Badge variant="success" className="text-xs flex items-center gap-1 w-fit">
                 <CheckCircle className="h-3 w-3" />
                 Reviewed
               </Badge>

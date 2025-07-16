@@ -1,83 +1,147 @@
+"use client"
+
+import { useState, useEffect } from 'react'
 import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayout'
 import { AssessmentList } from '@/components/job-readiness/AssessmentList'
 import { TierDisplay } from '@/components/job-readiness/TierDisplay'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
+import { AdaptiveParticles } from '@/components/ui/floating-particles'
 import { GraduationCap, Trophy } from 'lucide-react'
+import gsap from 'gsap'
 
 interface SearchParams {
   productId?: string
 }
 
-export default async function AssessmentsPage({
+export default function AssessmentsPage({
   searchParams
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  const resolvedSearchParams = await searchParams
+  const [mounted, setMounted] = useState(false)
+  const [resolvedSearchParams, setResolvedSearchParams] = useState<SearchParams>({})
+  
+  useEffect(() => {
+    setMounted(true)
+    searchParams.then(setResolvedSearchParams)
+    
+    // GSAP animations for staggered entry
+    if (mounted) {
+      gsap.fromTo(
+        ".dashboard-card",
+        { y: 30, opacity: 0 },
+        { 
+          y: 0, 
+          opacity: 1, 
+          stagger: 0.1, 
+          duration: 0.6, 
+          ease: "power2.out"
+        }
+      )
+    }
+  }, [mounted, searchParams])
+
   return (
-    <JobReadinessLayout>
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header Section */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30">
-              <GraduationCap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+    <div className="relative min-h-screen">
+      {/* Background particles */}
+      <AdaptiveParticles />
+      
+      <JobReadinessLayout>
+        <div className="relative space-y-8">
+          {/* Hero Section */}
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="p-3 rounded-full bg-primary/10 border border-primary/20">
+                <GraduationCap className="h-8 w-8 text-primary" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
+                Standard Assessments
+              </h1>
+              <div className="p-3 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                <Trophy className="h-8 w-8 text-yellow-500" />
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Standard Assessments
-            </h1>
-            <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-              <Trophy className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
-            </div>
+            
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Complete tier-determining assessments to establish your skill level and unlock your learning path. 
+              Your performance will determine your initial tier: Bronze, Silver, or Gold.
+            </p>
           </div>
-          
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Complete tier-determining assessments to establish your skill level and unlock your learning path. 
-            Your performance will determine your initial tier: Bronze, Silver, or Gold.
-          </p>
-        </div>
 
-        {/* Tier Information */}
-        <TierDisplay productId={resolvedSearchParams.productId} />
-
-        {/* Assessment Information Card */}
-        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-              <GraduationCap className="h-5 w-5" />
-              About These Assessments
-            </CardTitle>
-            <CardDescription className="text-blue-700 dark:text-blue-300">
-              These assessments are designed to evaluate your current skill level and place you in the appropriate tier.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-blue-800 dark:text-blue-200">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-semibold mb-2">Assessment Features:</h4>
-                <ul className="space-y-1 text-sm">
-                  <li>• Tier-determining questions</li>
-                  <li>• Multiple choice format</li>
-                  <li>• Timed assessments</li>
-                  <li>• Immediate results</li>
-                </ul>
+          {/* Assessment Information Card */}
+          <PerformantAnimatedCard 
+            variant="glass" 
+            hoverEffect="lift"
+            className="dashboard-card border-primary/20 bg-primary/5"
+            staggerIndex={0}
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-primary" />
+                <h3 className="text-xl font-semibold">About These Assessments</h3>
               </div>
-              <div>
-                <h4 className="font-semibold mb-2">What to Expect:</h4>
-                <ul className="space-y-1 text-sm">
-                  <li>• Questions tailored to your background</li>
-                  <li>• 60-90 minute time limits</li>
-                  <li>• Passing threshold: 60%</li>
-                  <li>• Earn your first star upon completion</li>
-                </ul>
+              <p className="text-muted-foreground">
+                These assessments are designed to evaluate your current skill level and place you in the appropriate tier.
+              </p>
+              
+              <div className="grid md:grid-cols-2 gap-6 pt-4">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-primary">Assessment Features:</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                      Tier-determining questions
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                      Multiple choice format
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                      Timed assessments
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                      Immediate results
+                    </li>
+                  </ul>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-primary">What to Expect:</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                      Questions tailored to your background
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                      60-90 minute time limits
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                      Passing threshold: 60%
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                      Earn your first star upon completion
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </PerformantAnimatedCard>
 
-        {/* Assessment List */}
-        <AssessmentList productId={resolvedSearchParams.productId} />
-      </div>
-    </JobReadinessLayout>
+          {/* Assessment List */}
+          <div className="dashboard-card">
+            <AssessmentList productId={resolvedSearchParams.productId} />
+          </div>
+
+          {/* Tier Information */}
+          <div className="dashboard-card">
+            <TierDisplay productId={resolvedSearchParams.productId} />
+          </div>
+        </div>
+      </JobReadinessLayout>
+    </div>
   )
 } 

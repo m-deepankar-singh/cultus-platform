@@ -1,7 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
+import { AnimatedButton } from '@/components/ui/animated-button'
+import { OptimizedProgressRing } from '@/components/ui/optimized-progress-ring'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, Clock, CheckCircle, Play, Lock } from 'lucide-react'
 import Link from 'next/link'
@@ -35,21 +36,28 @@ interface Course {
 interface CourseCardProps {
   course: Course
   currentTier: 'BRONZE' | 'SILVER' | 'GOLD'
+  staggerIndex?: number
 }
 
-const tierColors = {
-  BRONZE: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20',
-  SILVER: 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/20',
-  GOLD: 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20'
+const tierGlassColors = {
+  BRONZE: 'border-orange-500/20 bg-orange-500/5 dark:bg-orange-500/5',
+  SILVER: 'border-slate-500/20 bg-slate-500/5 dark:bg-slate-500/5',
+  GOLD: 'border-yellow-500/20 bg-yellow-500/5 dark:bg-yellow-500/5'
 }
 
 const statusColors = {
-  'NotStarted': 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-  'InProgress': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  'Completed': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+  'NotStarted': 'bg-neutral-500/20 text-neutral-700 dark:bg-neutral-500/10 dark:text-neutral-300',
+  'InProgress': 'bg-amber-500/20 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+  'Completed': 'bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
 }
 
-export function CourseCard({ course, currentTier }: CourseCardProps) {
+const getProgressColor = (isCompleted: boolean, isInProgress: boolean): "primary" | "success" | "warning" | "danger" => {
+  if (isCompleted) return "success"
+  if (isInProgress) return "warning"
+  return "primary"
+}
+
+export function CourseCard({ course, currentTier, staggerIndex = 0 }: CourseCardProps) {
   const isLocked = !course.is_unlocked
   const isCompleted = course.is_completed
   const isInProgress = course.progress?.status === 'InProgress'
@@ -61,121 +69,139 @@ export function CourseCard({ course, currentTier }: CourseCardProps) {
   const statusColor = statusColors[isCompleted ? 'Completed' : isInProgress ? 'InProgress' : 'NotStarted']
 
   return (
-    <Card className={`transition-all hover:shadow-md ${
-      isLocked 
-        ? 'opacity-60 border-gray-300 dark:border-gray-600' 
-        : isCompleted
-        ? tierColors[currentTier]
-        : 'border-gray-200 dark:border-gray-700'
-    }`}>
-      <CardHeader>
+    <PerformantAnimatedCard 
+      variant="glass" 
+      hoverEffect="lift"
+      className={`dashboard-card h-full flex flex-col ${
+        isLocked 
+          ? 'opacity-60 border-neutral-500/20 bg-neutral-500/5' 
+          : isCompleted
+          ? tierGlassColors[currentTier]
+          : 'border-blue-500/20 bg-blue-500/5'
+      }`}
+      staggerIndex={staggerIndex}
+    >
+      <div className="space-y-6 flex-1 flex flex-col">
+        {/* Header with Progress Ring */}
         <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`p-2 rounded-full ${
-                isLocked 
-                  ? 'bg-gray-200 dark:bg-gray-700' 
-                  : isCompleted 
-                  ? 'bg-green-100 dark:bg-green-900/30'
-                  : 'bg-blue-100 dark:bg-blue-900/30'
-              }`}>
-                {isLocked ? (
-                  <Lock className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                ) : isCompleted ? (
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                ) : (
-                  <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                )}
-              </div>
-              <div>
-                <CardTitle className="text-lg">{course.name}</CardTitle>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className="text-xs">
-                    Course {course.sequence}
-                  </Badge>
-                </div>
-              </div>
+          <div className="flex items-start gap-4 flex-1">
+            <div className={`p-3 rounded-full backdrop-blur-sm border ${
+              isLocked 
+                ? 'bg-neutral-500/20 border-neutral-500/20' 
+                : isCompleted 
+                ? 'bg-emerald-500/20 border-emerald-500/20'
+                : 'bg-blue-500/20 border-blue-500/20'
+            }`}>
+              {isLocked ? (
+                <Lock className="h-6 w-6 text-neutral-500" />
+              ) : isCompleted ? (
+                <CheckCircle className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              )}
             </div>
             
-            <CardDescription className="text-sm">
-              {course.description || course.configuration?.description || 'Learn essential skills through hands-on practice and examples.'}
-            </CardDescription>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg mb-2 line-clamp-1">{course.name}</h3>
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="outline" className="text-xs backdrop-blur-sm">
+                  Course {course.sequence}
+                </Badge>
+                <Badge className={statusColor}>
+                  {statusText}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {course.description || course.configuration?.description || 'Learn essential skills through hands-on practice and examples.'}
+              </p>
+            </div>
           </div>
           
-          <Badge className={statusColor}>
-            {statusText}
-          </Badge>
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="space-y-4">
-          {/* Course Info */}
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <span>{course.lessons_count} lessons</span>
-            </div>
-            {estimatedHours > 0 && (
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span>{estimatedHours}h estimated</span>
-              </div>
-            )}
-          </div>
-
-          {/* Progress Bar (only show if started) */}
+          {/* Progress Ring */}
           {progressPercentage > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Progress</span>
-                <span className="font-medium">{Math.round(progressPercentage)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    isCompleted 
-                      ? 'bg-green-500 dark:bg-green-400' 
-                      : 'bg-blue-500 dark:bg-blue-400'
-                  }`}
-                  style={{ width: `${progressPercentage}%` }}
-                />
-              </div>
+            <div className="flex-shrink-0 ml-4">
+              <OptimizedProgressRing
+                value={progressPercentage}
+                size={60}
+                color={getProgressColor(isCompleted, isInProgress)}
+                showValue={true}
+                delay={300 + staggerIndex * 100}
+              />
             </div>
           )}
-
-          {/* Action Button */}
-          <div className="pt-2">
-            {isLocked ? (
-              <Button variant="outline" disabled className="w-full">
-                <Lock className="h-4 w-4 mr-2" />
-                Locked - Complete Previous Requirements
-              </Button>
-            ) : (
-              <Link href={`/app/job-readiness/courses/${course.id}`} className="block">
-                <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
-                  {isCompleted ? (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Review Course
-                    </>
-                  ) : isInProgress ? (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Continue Learning
-                    </>
-                  ) : (
-                    <>
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      Start Course
-                    </>
-                  )}
-                </Button>
-              </Link>
-            )}
-          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Course Info */}
+        <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span>{course.lessons_count} lessons</span>
+          </div>
+          {estimatedHours > 0 && (
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>{estimatedHours}h estimated</span>
+            </div>
+          )}
+        </div>
+
+        {/* Progress Bar (alternative visual when no ring) */}
+        {progressPercentage > 0 && progressPercentage < 100 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{Math.round(progressPercentage)}%</span>
+            </div>
+            <div className="w-full bg-muted/50 rounded-full h-2 backdrop-blur-sm">
+              <div 
+                className="h-2 bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000 ease-out"
+                style={{ 
+                  width: `${progressPercentage}%`,
+                  transitionDelay: `${400 + staggerIndex * 100}ms`
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Action Button */}
+        <div className="mt-auto pt-4">
+          {isLocked ? (
+            <AnimatedButton variant="outline" disabled className="w-full">
+              <Lock className="h-4 w-4 mr-2" />
+              Locked - Complete Previous Requirements
+            </AnimatedButton>
+          ) : (
+            <Link href={`/app/job-readiness/courses/${course.id}`} className="block">
+              <AnimatedButton 
+                className={`w-full ${
+                  isCompleted 
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' 
+                    : 'bg-gradient-to-r from-primary to-accent'
+                }`}
+                variant={isCompleted ? "outline" : "default"}
+              >
+                {isCompleted ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Review Course
+                  </>
+                ) : isInProgress ? (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Continue Learning
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Start Course
+                  </>
+                )}
+              </AnimatedButton>
+            </Link>
+          )}
+        </div>
+      </div>
+    </PerformantAnimatedCard>
   )
 } 

@@ -248,28 +248,28 @@ export default function SubmissionsPage() {
         value: totalSubmissions,
         description: isInterviewTab ? "Interview submissions" : "Project submissions",
         icon: isInterviewTab ? <Video className="h-4 w-4" /> : <FileText className="h-4 w-4" />,
-        color: "text-blue-600",
+        color: "text-blue-600 dark:text-blue-400",
       },
       {
         title: "Pending Reviews",
         value: pendingReviews,
         description: isInterviewTab ? "Interviews awaiting manual review" : "No pending reviews for projects",
         icon: <Clock className="h-4 w-4" />,
-        color: "text-orange-600",
+        color: "text-orange-600 dark:text-orange-400",
       },
       {
         title: "Approved",
         value: approvedSubmissions,
         description: isInterviewTab ? "Approved by AI or admin" : "Projects that passed grading",
         icon: <CheckCircle className="h-4 w-4" />,
-        color: "text-green-600",
+        color: "text-green-600 dark:text-green-400",
       },
       {
         title: "Rejected",
         value: rejectedSubmissions,
         description: isInterviewTab ? "Rejected by AI or admin" : "Projects that failed grading",
         icon: <XCircle className="h-4 w-4" />,
-        color: "text-red-600",
+        color: "text-red-600 dark:text-red-400",
       },
     ]
 
@@ -356,7 +356,7 @@ export default function SubmissionsPage() {
             <Monitor className="h-4 w-4" />
             Interview Submissions
             {interviews.length > 0 && (
-              <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-600">
+              <span className="ml-2 rounded-full bg-blue-100 dark:bg-blue-900/20 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
                 {interviews.length}
               </span>
             )}
@@ -365,7 +365,7 @@ export default function SubmissionsPage() {
             <FolderOpen className="h-4 w-4" />
             Project Submissions
             {projects.length > 0 && (
-              <span className="ml-2 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-600">
+              <span className="ml-2 rounded-full bg-green-100 dark:bg-green-900/20 px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400">
                 {projects.length}
               </span>
             )}

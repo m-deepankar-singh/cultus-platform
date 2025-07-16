@@ -89,33 +89,33 @@ export function ProjectSubmissionsTable({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'draft':
-        return { variant: "secondary", color: "text-gray-600", icon: <FileText className="h-3 w-3" /> }
+        return { variant: "secondary", color: "", icon: <FileText className="h-3 w-3" /> }
       case 'submitted':
-        return { variant: "default", color: "text-blue-600", icon: <FileText className="h-3 w-3" /> }
+        return { variant: "info", color: "", icon: <FileText className="h-3 w-3" /> }
       case 'graded':
-        return { variant: "default", color: "text-green-600", icon: <Star className="h-3 w-3" /> }
+        return { variant: "success", color: "", icon: <Star className="h-3 w-3" /> }
       default:
-        return { variant: "outline", color: "text-gray-600", icon: null }
+        return { variant: "outline", color: "", icon: null }
     }
   }
 
   const getScoreBadge = (score: number) => {
     if (score >= 75) {
-      return { variant: "default", color: "text-green-600", bgColor: "bg-green-50" }
+      return { variant: "success", color: "", bgColor: "" }
     } else if (score >= 50) {
-      return { variant: "secondary", color: "text-yellow-600", bgColor: "bg-yellow-50" }
+      return { variant: "warning", color: "", bgColor: "" }
     } else {
-      return { variant: "destructive", color: "text-red-600", bgColor: "bg-red-50" }
+      return { variant: "destructive", color: "", bgColor: "" }
     }
   }
 
   const getSubmissionTypeDisplay = (submission: any) => {
     if (submission.submission_url) {
-      return { type: "URL", icon: <ExternalLink className="h-3 w-3" />, color: "text-blue-600" }
+      return { type: "URL", icon: <ExternalLink className="h-3 w-3" />, color: "text-blue-600 dark:text-blue-400" }
     } else if (submission.submission_content) {
-      return { type: "Text", icon: <FileText className="h-3 w-3" />, color: "text-green-600" }
+      return { type: "Text", icon: <FileText className="h-3 w-3" />, color: "text-green-600 dark:text-green-400" }
     } else {
-      return { type: "File", icon: <Download className="h-3 w-3" />, color: "text-purple-600" }
+      return { type: "File", icon: <Download className="h-3 w-3" />, color: "text-purple-600 dark:text-purple-400" }
     }
   }
 
@@ -160,7 +160,7 @@ export function ProjectSubmissionsTable({
               Background: {submission.background_type || "Unknown"}
             </div>
             {submission.task_count > 0 && (
-              <div className="text-xs text-blue-600">
+              <div className="text-xs text-blue-600 dark:text-blue-400">
                 {submission.task_count} tasks
               </div>
             )}
@@ -186,7 +186,7 @@ export function ProjectSubmissionsTable({
               </Badge>
             )}
             {submission.content_truncated && (
-              <div className="text-xs text-orange-600">
+              <div className="text-xs text-orange-600 dark:text-orange-400">
                 Content truncated
               </div>
             )}
@@ -202,7 +202,7 @@ export function ProjectSubmissionsTable({
         const badge = getStatusBadge(status)
         return (
           <div className="space-y-1">
-            <Badge variant={badge.variant as any} className={`text-xs ${badge.color} flex items-center gap-1 w-fit`}>
+            <Badge variant={badge.variant as any} className="text-xs flex items-center gap-1 w-fit">
               {badge.icon}
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </Badge>
@@ -231,9 +231,9 @@ export function ProjectSubmissionsTable({
         const badge = getScoreBadge(score)
         return (
           <div className="space-y-1">
-            <div className={`inline-flex items-center px-2 py-1 rounded text-sm font-medium ${badge.bgColor} ${badge.color}`}>
+            <Badge variant={badge.variant as any} className="text-xs w-fit">
               {score}%
-            </div>
+            </Badge>
             <div className="text-xs text-muted-foreground">
               {submission.passed ? "Passed" : "Failed"}
             </div>
