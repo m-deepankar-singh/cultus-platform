@@ -1,9 +1,12 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast, isUserActive } from '@/lib/auth/api-auth';
 // Import the actual quiz generator implementation
 import { generateQuizForLesson, transformQuestionsForClient, getFallbackQuestions } from '@/lib/ai/quiz-generator';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 // Types based on the plan and existing course content API
 interface QuizQuestionClient {
@@ -92,14 +95,14 @@ export async function GET(
     }
 
     // JWT-based authentication (replaces getUser() + student record lookup)
-    const authResult = await authenticateApiRequestSecure(['student']);
+    const authResult = await authenticateApiRequestUltraFast(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     const { user, claims, supabase } = authResult;
 
     // Check if student account is active (from JWT claims)
-    if (!claims.profile_is_active) {
+    if (!isUserActive(claims)) {
       return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
     }
 
@@ -369,7 +372,13 @@ export async function GET(
       progress: studentProgress,
     };
 
-    return NextResponse.json(responsePayload);
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responsePayload);
+    }
+
+    // Use frequent cache (30 seconds) for course content with dynamic quiz generation
+    return handleConditionalRequest(request, responsePayload, CACHE_CONFIGS.FREQUENT);
 
   } catch (e) {
     const error = e as Error;

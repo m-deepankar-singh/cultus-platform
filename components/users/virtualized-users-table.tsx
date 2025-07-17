@@ -41,7 +41,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useAuth } from "@/providers/auth-provider";
 
 interface VirtualizedUsersTableProps {
   clientOptions: Array<{ id: string; name: string }>;
@@ -174,7 +174,8 @@ export function VirtualizedUsersTable({ clientOptions }: VirtualizedUsersTablePr
   // Hooks
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { role: currentUserRole } = useCurrentUser();
+  const { profile } = useAuth();
+  const currentUserRole = profile?.role;
   const isStaffUser = currentUserRole === 'Staff';
   
   // Debounce search term

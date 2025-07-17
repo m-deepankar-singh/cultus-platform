@@ -3,10 +3,14 @@
  * 
  * SECURITY UPDATE: These utilities now use cryptographically verified JWT validation.
  * Updated to use secure functions instead of unsafe manual JWT decoding.
+ * 
+ * SECURITY FIX: Replaced deprecated getVerifiedClaimsFromSession() with 
+ * getVerifiedClaimsFromUser() to eliminate potential session data vulnerabilities.
+ * All functions now use supabase.auth.getUser() instead of getSession().
  */
 
 import { createBrowserClient } from '@supabase/ssr';
-import { getVerifiedClaimsFromSession } from './jwt-utils';
+import { getVerifiedClaimsFromUser } from './jwt-utils';
 
 // Create browser client following SSR guidelines
 function createClient() {
@@ -22,14 +26,14 @@ function createClient() {
  */
 export async function getCurrentUserRole(): Promise<string> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return 'student';
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return claims.user_role || 'student';
   } catch (error) {
     console.error('Error getting verified claims:', error);
@@ -43,14 +47,14 @@ export async function getCurrentUserRole(): Promise<string> {
  */
 export async function getCurrentUserStudentStatus(): Promise<boolean> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return false;
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return claims.is_student === true && claims.student_is_active !== false;
   } catch (error) {
     console.error('Error getting verified claims:', error);
@@ -64,14 +68,14 @@ export async function getCurrentUserStudentStatus(): Promise<boolean> {
  */
 export async function isCurrentUserAdmin(): Promise<boolean> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return false;
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return claims.user_role === 'Admin';
   } catch (error) {
     console.error('Error getting verified claims:', error);
@@ -85,14 +89,14 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
  */
 export async function isCurrentUserAdminOrStaff(): Promise<boolean> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return false;
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return ['Admin', 'Staff'].includes(claims.user_role || '');
   } catch (error) {
     console.error('Error getting verified claims:', error);
@@ -106,14 +110,14 @@ export async function isCurrentUserAdminOrStaff(): Promise<boolean> {
  */
 export async function isCurrentUserStaffLevel(): Promise<boolean> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return false;
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return ['Admin', 'Staff', 'Client Staff'].includes(claims.user_role || '');
   } catch (error) {
     console.error('Error getting verified claims:', error);
@@ -127,14 +131,14 @@ export async function isCurrentUserStaffLevel(): Promise<boolean> {
  */
 export async function getCurrentUserClientId(): Promise<string | null> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return null;
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return claims.client_id || null;
   } catch (error) {
     console.error('Error getting verified claims:', error);
@@ -152,9 +156,9 @@ export async function getCurrentUserJobReadinessInfo(): Promise<{
   isStudent: boolean;
 }> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return {
       starLevel: null,
       tier: null,
@@ -163,7 +167,7 @@ export async function getCurrentUserJobReadinessInfo(): Promise<{
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return {
       starLevel: claims.job_readiness_star_level || null,
       tier: claims.job_readiness_tier || null,
@@ -194,9 +198,9 @@ export async function getCurrentUserProfile(): Promise<{
   };
 }> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return {
       role: 'student',
       clientId: null,
@@ -210,7 +214,7 @@ export async function getCurrentUserProfile(): Promise<{
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     return {
       role: claims.user_role || 'student',
       clientId: claims.client_id || null,
@@ -243,14 +247,14 @@ export async function getCurrentUserProfile(): Promise<{
  */
 export async function hasRouteAccess(routePath: string): Promise<boolean> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return false;
   }
   
   try {
-    const claims = getVerifiedClaimsFromSession(session);
+    const claims = getVerifiedClaimsFromUser(user);
     
     // Admin-only routes
     const adminOnlyRoutes = ['/users', '/admin/users', '/modules/create'];
@@ -286,11 +290,12 @@ export async function getCurrentSession(): Promise<{
   user: any;
 }> {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const { data: { session } } = await supabase.auth.getSession();
   
   return {
     session,
-    user: session?.user || null,
+    user: user || null,
   };
 }
 

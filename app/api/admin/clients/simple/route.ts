@@ -1,15 +1,18 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 /**
  * GET /api/admin/clients/simple
  * Returns simplified client list for dropdown usage
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // JWT-based authentication
-    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff', 'Viewer']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff'], request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -28,7 +31,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });
     }
 
-    return NextResponse.json(clients || []);
+    const clientsData = clients || [];
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(clientsData);
+    }
+
+    // Use semi-static cache (5 minutes) for client lists
+    return handleConditionalRequest(request, clientsData, CACHE_CONFIGS.SEMI_STATIC);
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

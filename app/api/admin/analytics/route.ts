@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateApiRequestSecure } from "@/lib/auth/api-auth";
+import { authenticateApiRequestUltraFast } from "@/lib/auth/api-auth";
 import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 export async function GET(request: NextRequest) {
   // Log analytics access attempt
@@ -18,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff'], request);
     if ('error' in authResult) {
       securityLogger.logEvent({
         eventType: SecurityEventType.UNAUTHORIZED_ACCESS,
@@ -87,8 +90,16 @@ export async function GET(request: NextRequest) {
       }
     }, request);
 
-    // Return the consolidated analytics data
-    return NextResponse.json(analyticsData || {}, { status: 200 });
+    // Prepare response data
+    const responseData = analyticsData || {};
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responseData, { status: 200 });
+    }
+
+    // Use frequent cache (30 seconds) for analytics data
+    return handleConditionalRequest(request, responseData, CACHE_CONFIGS.FREQUENT);
 
   } catch (error) {
     console.error("Unexpected error in GET /api/admin/analytics:", error);

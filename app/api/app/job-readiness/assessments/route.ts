@@ -1,6 +1,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast, isUserActive } from '@/lib/auth/api-auth';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 // Type for assessment data from database
 interface AssessmentData {
@@ -33,7 +36,7 @@ interface AssessmentData {
 export async function GET(req: NextRequest) {
   try {
     // JWT-based authentication (replaces getUser() + student record lookup)
-    const authResult = await authenticateApiRequestSecure(['student']);
+    const authResult = await authenticateApiRequestUltraFast(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -48,7 +51,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check if student account is active (from JWT claims)
-    if (!claims.profile_is_active) {
+    if (!isUserActive(claims)) {
       return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
     }
 
@@ -215,7 +218,8 @@ export async function GET(req: NextRequest) {
     const currentTier = claims.job_readiness_tier;
     const currentStarLevel = claims.job_readiness_star_level;
 
-    return NextResponse.json({
+    // Create response data
+    const responseData = {
       success: true,
       assessments: enhancedAssessments || [],
       completion_summary: {
@@ -228,7 +232,15 @@ export async function GET(req: NextRequest) {
         star_level: currentStarLevel,
       },
       tier_configuration: tierConfig,
-    });
+    };
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responseData);
+    }
+
+    // Use semi-static cache (5 minutes) for assessment structure
+    return handleConditionalRequest(req, responseData, CACHE_CONFIGS.SEMI_STATIC);
 
   } catch (error) {
     console.error('Unexpected error in Job Readiness assessments endpoint:', error);

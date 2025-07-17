@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { calculatePaginationRange, createPaginatedResponse } from "@/lib/pagination";
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 // Module schema for validation - updated to match actual database schema
 const ModuleSchema = z.object({
@@ -24,7 +27,7 @@ const ModuleSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -142,7 +145,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Return paginated response
+    // Create paginated response
     const paginatedResponse = createPaginatedResponse(
       formattedModules || [],
       count || 0,
@@ -150,7 +153,13 @@ export async function GET(request: NextRequest) {
       pageSize
     );
 
-    return NextResponse.json(paginatedResponse);
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(paginatedResponse);
+    }
+
+    // Use semi-static cache (5 minutes) for module lists
+    return handleConditionalRequest(request, paginatedResponse, CACHE_CONFIGS.SEMI_STATIC);
   } catch (error) {
     console.error("Unexpected error in GET modules:", error);
     return NextResponse.json(
@@ -169,7 +178,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

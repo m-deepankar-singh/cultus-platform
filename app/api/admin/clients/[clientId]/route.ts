@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 /**
@@ -14,12 +14,12 @@ import { SELECTORS } from '@/lib/api/selectors';
  * ✅ Specific column selection (reduces data transfer)
  * ✅ Performance monitoring
  */
-export async function GET(request: Request, context: { params: Promise<{ clientId: string }> }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ clientId: string }> }) {
   const startTime = Date.now();
   
   try {
     // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-    const authResult = await authenticateApiRequestSecure(['Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin'], request);
     
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
@@ -78,12 +78,12 @@ export async function GET(request: Request, context: { params: Promise<{ clientI
  * ✅ Specific column selection for response
  * ✅ Performance monitoring
  */
-export async function PUT(request: Request, context: { params: Promise<{ clientId: string }> }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ clientId: string }> }) {
     const startTime = Date.now();
     
     try {
         // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-        const authResult = await authenticateApiRequestSecure(['Admin']);
+        const authResult = await authenticateApiRequestUltraFast(['Admin'], request);
         
         if ('error' in authResult) {
           return NextResponse.json({ error: authResult.error }, { status: authResult.status });
@@ -160,12 +160,12 @@ export async function PUT(request: Request, context: { params: Promise<{ clientI
  * ✅ JWT-based authentication (eliminates 1 DB query per request)
  * ✅ Performance monitoring
  */
-export async function DELETE(request: Request, context: { params: Promise<{ clientId: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ clientId: string }> }) {
     const startTime = Date.now();
     
     try {
         // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-        const authResult = await authenticateApiRequestSecure(['Admin']);
+        const authResult = await authenticateApiRequestUltraFast(['Admin'], request);
         
         if ('error' in authResult) {
           return NextResponse.json({ error: authResult.error }, { status: authResult.status });

@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { NextResponse, NextRequest } from 'next/server';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 
 /**
  * GET /api/staff/clients
@@ -10,10 +10,10 @@ import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
  * 
  * OPTIMIZED: Single RPC call replaces multiple N+1 queries
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Staff', 'Admin'], request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

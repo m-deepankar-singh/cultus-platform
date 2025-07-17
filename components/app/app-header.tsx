@@ -14,7 +14,7 @@ import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import gsap from "gsap"
 import { useLogout } from "@/hooks/use-logout"
-import { useCurrentUser } from "@/hooks/use-current-user"
+import { useAuth } from "@/providers/auth-provider"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,7 @@ export function AppHeader() {
   const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const { logout } = useLogout()
-  const { user, profile, isLoading } = useCurrentUser()
+  const { user, profile, isLoading } = useAuth()
   
   useEffect(() => {
     setMounted(true)
@@ -247,7 +247,7 @@ export function AppHeader() {
                   </div>
                   <div className="flex flex-col">
                     <span className="font-semibold">
-                      {isLoading ? "Loading..." : profile?.fullName || user?.email || "User"}
+                      {isLoading ? "Loading..." : user?.email || "User"}
                     </span>
                     <span className="text-xs text-muted-foreground">Student Portal</span>
                   </div>

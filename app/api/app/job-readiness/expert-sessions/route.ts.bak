@@ -1,0 +1,216 @@
+import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+
+interface ExpertSession {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string;
+  video_duration: number;
+  created_at: string;
+}
+
+interface SessionProgress {
+  expert_session_id: string;
+  watch_time_seconds: number;
+  completion_percentage: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  last_milestone_reached: number;
+  resume_from_milestone: number;
+  session_data: any;
+}
+
+/**
+ * GET /api/app/job-readiness/expert-sessions
+ * List all available Expert Session videos with student's progress for each
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const productId = url.searchParams.get('productId');
+
+    if (!productId) {
+      return NextResponse.json({ error: 'productId is required' }, { status: 400 });
+    }
+
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequestUltraFast(['student']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
+    // Get student data from JWT claims (no database query needed)
+    const clientId = claims.client_id;
+    if (!clientId) {
+      return NextResponse.json({ error: 'Student not properly enrolled' }, { status: 403 });
+    }
+
+    // Verify product enrollment via client_product_assignments
+    const { count } = await supabase
+      .from('client_product_assignments')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('product_id', productId);
+
+    if (count === 0) {
+      return NextResponse.json({ 
+        error: 'Invalid product ID or product is not assigned to your organization' 
+      }, { status: 400 });
+    }
+
+    // Verify product exists and is of type JOB_READINESS
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('id, type')
+      .eq('id', productId)
+      .eq('type', 'JOB_READINESS')
+      .single();
+
+    if (productError || !product) {
+      return NextResponse.json({ 
+        error: 'Invalid product ID or product is not a Job Readiness product' 
+      }, { status: 400 });
+    }
+
+    // Get all active expert sessions for the product using junction table
+    const { data: sessionData, error: sessionsError } = await supabase
+      .from('job_readiness_expert_sessions')
+      .select(`
+        id,
+        title,
+        description,
+        video_url,
+        video_duration,
+        created_at,
+        job_readiness_expert_session_products!inner (
+          product_id
+        )
+      `)
+      .eq('job_readiness_expert_session_products.product_id', productId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+
+    if (sessionsError) {
+      console.error('Error fetching expert sessions:', sessionsError);
+      return NextResponse.json({ error: 'Failed to fetch expert sessions' }, { status: 500 });
+    }
+
+    // Transform the data to remove the junction table structure
+    const expertSessions = sessionData?.map((session: any) => ({
+      id: session.id,
+      title: session.title,
+      description: session.description,
+      video_url: session.video_url,
+      video_duration: session.video_duration,
+      created_at: session.created_at
+    })) || [];
+
+    // Expert sessions are public and stored on assests.cultuslearn.com
+    // No signed URL generation needed - use direct public URLs for optimal performance
+    const sessionsWithPublicUrls = expertSessions;
+
+    // Get student's progress for all expert sessions with enhanced resume data
+    const sessionIds = sessionsWithPublicUrls?.map((session: ExpertSession) => session.id) || [];
+    const { data: progressData, error: progressError } = await supabase
+      .from('job_readiness_expert_session_progress')
+      .select(`
+        expert_session_id,
+        watch_time_seconds,
+        completion_percentage,
+        is_completed,
+        completed_at,
+        last_milestone_reached,
+        resume_from_milestone,
+        session_data
+      `)
+      .eq('student_id', user.id)
+      .in('expert_session_id', sessionIds);
+
+    if (progressError) {
+      console.error('Error fetching progress data:', progressError);
+      return NextResponse.json({ error: 'Failed to fetch progress data' }, { status: 500 });
+    }
+
+    // Create a map of progress by session ID
+    const progressMap = new Map();
+    progressData?.forEach((progress: any) => {
+      progressMap.set(progress.expert_session_id, progress);
+    });
+
+    // Combine sessions with enhanced student progress
+    const sessionsWithProgress = sessionsWithPublicUrls?.map((session: ExpertSession) => {
+      const progress = progressMap.get(session.id) || {
+        watch_time_seconds: 0,
+        completion_percentage: 0,
+        is_completed: false,
+        completed_at: null,
+        last_milestone_reached: 0,
+        resume_from_milestone: 0,
+        session_data: {}
+      };
+
+      // Phase 2: Calculate resume capabilities
+      const canResume = !progress.is_completed && progress.resume_from_milestone > 0;
+      const resumePositionSeconds = Math.floor((progress.resume_from_milestone / 100) * session.video_duration);
+      
+      // Phase 2: Extract milestones unlocked from session history
+      const milestonesUnlocked = [];
+      const milestones = [10, 25, 50, 75, 90, 95, 100];
+      for (const milestone of milestones) {
+        if (progress.last_milestone_reached >= milestone) {
+          milestonesUnlocked.push(milestone);
+        }
+      }
+
+      return {
+        id: session.id,
+        title: session.title,
+        description: session.description,
+        video_url: session.video_url,
+        video_duration: session.video_duration,
+        created_at: session.created_at,
+        student_progress: {
+          watch_time_seconds: progress.watch_time_seconds,
+          completion_percentage: progress.completion_percentage,
+          is_completed: progress.is_completed,
+          completed_at: progress.completed_at,
+          last_milestone_reached: progress.last_milestone_reached || 0,
+          
+          // Phase 2: Enhanced resume functionality
+          can_resume: canResume,
+          resume_from_milestone: progress.resume_from_milestone || 0,
+          resume_position_seconds: resumePositionSeconds,
+          milestones_unlocked: milestonesUnlocked
+        }
+      };
+    }) || [];
+
+    // Count completed sessions
+    const completedSessionsCount = sessionsWithProgress.filter(
+      (session: any) => session.student_progress.is_completed
+    ).length;
+
+    // Required sessions for 3rd star (as per requirements)
+    const requiredSessions = 5;
+    
+    return NextResponse.json({
+      sessions: sessionsWithProgress,
+      overall_progress: {
+        completed_sessions_count: completedSessionsCount,
+        required_sessions: requiredSessions,
+        progress_percentage: Math.round((completedSessionsCount / requiredSessions) * 100),
+        third_star_unlocked: completedSessionsCount >= requiredSessions
+      }
+    });
+
+  } catch (error) {
+    console.error('Unexpected error in expert-sessions GET:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+} 
+
+// POST endpoint removed - students track progress via the watch-progress endpoint
+// Completion is automatically tracked when 95% of video is watched 

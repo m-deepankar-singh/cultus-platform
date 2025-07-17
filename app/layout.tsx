@@ -6,6 +6,8 @@ import { SidebarProvider } from "@/components/sidebar-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider"
+import { AuthProvider } from "@/providers/auth-provider"
+import { initializeMonitoring } from "@/lib/monitoring/init"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,17 +22,24 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Initialize monitoring in development and production
+  if (typeof window === 'undefined') {
+    initializeMonitoring().catch(console.error);
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} bg-background`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <QueryProvider>
-          <SidebarProvider>
-            <SessionTimeoutProvider>
-              {children}
-              <Toaster />
-            </SessionTimeoutProvider>
-          </SidebarProvider>
+            <AuthProvider>
+              <SidebarProvider>
+                <SessionTimeoutProvider>
+                  {children}
+                  <Toaster />
+                </SessionTimeoutProvider>
+              </SidebarProvider>
+            </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

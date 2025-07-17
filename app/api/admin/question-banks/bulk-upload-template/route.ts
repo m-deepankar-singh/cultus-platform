@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { utils, write } from 'xlsx';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { generateETag, checkETagMatch } from '@/lib/cache/etag-utils';
+import { generateCacheHeaders, CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 /**
  * GET /api/admin/question-banks/bulk-upload-template
@@ -11,7 +14,7 @@ import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 export async function GET(request: Request) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequestSecure(['Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin']);
     if ('error' in authResult) {
       return new NextResponse(JSON.stringify({ error: authResult.error }), {
         status: authResult.status,
@@ -144,7 +147,30 @@ export async function GET(request: Request) {
     // Generate Excel file
     const excelBuffer = write(wb, { bookType: 'xlsx', type: 'buffer' });
     
-    // Return the Excel file
+    // Implement caching for the static template
+    if (cacheConfig.enabled) {
+      // Generate ETag based on template structure (this is a static template)
+      const templateVersion = 'v1.0'; // Update this when template structure changes
+      const etag = generateETag({ templateVersion, timestamp: '2025-01-17' });
+      
+      // Check if client has current version
+      if (checkETagMatch(request, etag)) {
+        return new NextResponse(null, { status: 304 });
+      }
+      
+      // Return the Excel file with cache headers
+      const cacheHeaders = generateCacheHeaders(CACHE_CONFIGS.STATIC);
+      return new NextResponse(excelBuffer, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="question_banks_upload_template.xlsx"',
+          'ETag': etag,
+          ...cacheHeaders
+        }
+      });
+    }
+    
+    // Return the Excel file without caching
     return new NextResponse(excelBuffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

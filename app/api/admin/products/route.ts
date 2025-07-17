@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import { ProductSchema } from '@/lib/schemas/product'; // Import ProductSchema
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 export async function GET(request: Request) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -65,8 +68,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch products', details: dataError.message }, { status: 500 });
     }
 
-    // Return paginated response
-    return NextResponse.json(createPaginatedResponse(products || [], count || 0, page, pageSize), { status: 200 });
+    // Create paginated response data
+    const responseData = createPaginatedResponse(products || [], count || 0, page, pageSize);
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responseData, { status: 200 });
+    }
+
+    // Use static cache (15 minutes) for product lists
+    return handleConditionalRequest(request, responseData, CACHE_CONFIGS.STATIC);
 
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/products:', error);
@@ -79,7 +90,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // 🚀 OPTIMIZED: JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useAuth } from "@/providers/auth-provider"
 
 interface User {
   id: string
@@ -24,38 +24,35 @@ interface CurrentUserResponse {
   error: Error | null
 }
 
+/**
+ * @deprecated Use useAuth() from @/providers/auth-provider instead
+ * This hook is maintained for backward compatibility
+ */
 export function useCurrentUser(): CurrentUserResponse {
-  const [user, setUser] = useState<User | null>(null)
-  const [role, setRole] = useState<string | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  useEffect(() => {
-    async function fetchUserProfile() {
-      try {
-        // Fetch the user profile data
-        const response = await fetch('/api/auth/me')
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch user data')
-        }
-        
-        const data = await response.json()
-        
-        setUser(data.user || null)
-        setRole(data.role || null)
-        setProfile(data.profile || null)
-      } catch (err) {
-        console.error('Error fetching user data:', err)
-        setError(err instanceof Error ? err : new Error('Unknown error'))
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchUserProfile()
-  }, [])
-
-  return { user, role, profile, isLoading, error }
+  const { user: authUser, profile: authProfile, isLoading } = useAuth()
+  
+  // Transform auth data to match legacy interface
+  const user = authUser ? {
+    id: authUser.id,
+    email: authUser.email || ''
+  } : null
+  
+  const profile = authProfile ? {
+    fullName: null, // This field isn't available in the new auth system
+    backgroundType: null,
+    tier: authProfile.job_readiness_tier?.toLowerCase() || null,
+    starLevel: authProfile.job_readiness_star_level || null,
+    clientId: authProfile.client_id || null,
+    isActive: authProfile.is_active
+  } : null
+  
+  const role = authProfile?.role || null
+  
+  return { 
+    user, 
+    role, 
+    profile, 
+    isLoading, 
+    error: null // The new auth system handles errors differently
+  }
 } 

@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { z } from 'zod';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast, isUserActive } from '@/lib/auth/api-auth';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 const ProductIdQuerySchema = z.object({
   productId: z.string().uuid(),
@@ -51,7 +54,7 @@ interface CourseModule {
 export async function GET(request: NextRequest) {
   try {
     // JWT-based authentication (replaces getUser() + student record lookup)
-    const authResult = await authenticateApiRequestSecure(['student']);
+    const authResult = await authenticateApiRequestUltraFast(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -71,7 +74,7 @@ export async function GET(request: NextRequest) {
     const validProductId = queryValidation.data.productId;
 
     // Check if student account is active (from JWT claims)
-    if (!claims.profile_is_active) {
+    if (!isUserActive(claims)) {
       return NextResponse.json({ error: 'Student account is inactive' }, { status: 403 });
     }
 
@@ -220,13 +223,22 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching total course count:', totalCountError);
     }
 
-    return NextResponse.json({
+    // Create response data
+    const responseData = {
       courses: enhancedCourses,
       current_tier: currentTier,
       current_star_level: currentStarLevel,
       completed_courses_count: completedCourses?.length || 0,
       total_courses_count: totalCount || 0,
-    });
+    };
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responseData);
+    }
+
+    // Use dynamic cache (1 minute) for user-specific course progress
+    return handleConditionalRequest(request, responseData, CACHE_CONFIGS.DYNAMIC);
 
   } catch (error) {
     console.error('Unexpected error in Job Readiness courses API:', error);

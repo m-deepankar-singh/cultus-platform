@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { UserIdSchema } from '@/lib/schemas/user';
 import { UserRole } from '@/lib/schemas/user';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selectors';
 
 /**
@@ -13,12 +13,12 @@ import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selector
  * Staff users can only access learners belonging to their assigned client.
  */
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Staff', 'Admin'], request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

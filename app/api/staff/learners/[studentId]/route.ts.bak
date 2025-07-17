@@ -1,0 +1,123 @@
+import { NextResponse } from 'next/server';
+import { UserIdSchema } from '@/lib/schemas/user';
+import { UserRole } from '@/lib/schemas/user';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { SELECTORS, STUDENT_MODULE_PROGRESS_SELECTORS } from '@/lib/api/selectors';
+
+/**
+ * GET /api/staff/learners/[studentId]
+ * 
+ * Retrieves detailed information for a specific learner (user with 'Student' role),
+ * including their profile and a summary of their course progress.
+ * Accessible by 'Admin' and 'Staff' roles.
+ * Staff users can only access learners belonging to their assigned client.
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ studentId: string }> }
+) {
+  try {
+    // JWT-based authentication (0 database queries)
+    const authResult = await authenticateApiRequestUltraFast(['Staff', 'Admin']);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const { user, claims, supabase } = authResult;
+
+    // Get role and client_id from JWT claims
+    const userRole = claims.user_role;
+    const sessionClientId = claims.client_id;
+
+    // Await params before validation
+    const resolvedParams = await params;
+    const { studentId: rawStudentId } = resolvedParams;
+    const validationResult = UserIdSchema.safeParse({ userId: rawStudentId });
+
+    if (!validationResult.success) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Invalid student ID format', details: validationResult.error.flatten() }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const { userId: studentId } = validationResult.data;
+
+    // 3. Fetch Learner Profile
+    const { data: learnerProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select(`${SELECTORS.LEARNER.DETAIL}, client:clients(${SELECTORS.CLIENT.DROPDOWN})`) // 📊 OPTIMIZED: Specific fields only
+      .eq('id', studentId)
+      .eq('role', 'Student' as UserRole)
+      .single();
+
+    if (profileError || !learnerProfile) {
+      const status = profileError && profileError.code !== 'PGRST116' ? 500 : 404;
+      const errorMsg = status === 404 ? 'Learner not found or is not a student' : 'Database error fetching profile';
+      if (status === 500) console.error('Learner Profile Fetch Error:', profileError);
+      return new NextResponse(JSON.stringify({ error: errorMsg }), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 4. Verify Staff Access (Crucial Step)
+    if (userRole === 'Staff') {
+      if (!sessionClientId) {
+         console.warn(`Staff user ${user.id} accessing learner ${rawStudentId} has no client_id assigned.`);
+         return new NextResponse(JSON.stringify({ error: 'Forbidden: Staff user not assigned to a client' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+         });
+      }
+      if (learnerProfile.client_id !== sessionClientId) {
+        console.warn(`Staff user ${user.id} (client: ${sessionClientId}) attempted to access learner ${studentId} (client: ${learnerProfile.client_id}).`);
+        return new NextResponse(JSON.stringify({ error: 'Forbidden: Access denied to this learner' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+    // Admins pass through this check
+
+    // 5. Fetch Progress Summary (Adapted for available tables)
+    const { data: moduleProgress, error: progressError } = await supabase
+        .from('student_module_progress')
+        .select(STUDENT_MODULE_PROGRESS_SELECTORS.SUMMARY) // 📊 OPTIMIZED: Specific fields only
+        .eq('student_id', studentId);
+
+    if (progressError) {
+        console.error('Progress Fetch Error:', progressError);
+        return new NextResponse(JSON.stringify({ error: 'Database error fetching module progress' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
+    const progressSummary = {
+        modules: moduleProgress || [],
+        // assessments: [], // Placeholder for future
+    };
+
+    // 6. Combine and Return Response
+    const learnerDetails = {
+      ...learnerProfile,
+      progressSummary,
+    };
+
+    return NextResponse.json(learnerDetails);
+
+  } catch (error) {
+    console.error('API Error:', error);
+    let errorMessage = 'Internal Server Error';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return new NextResponse(JSON.stringify({ error: 'An unexpected error occurred', details: errorMessage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}

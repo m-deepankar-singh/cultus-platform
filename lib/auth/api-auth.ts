@@ -4,11 +4,28 @@ import { getClaimsFromToken, isTokenExpired, CustomJWTClaims, getVerifiedClaimsF
 import { User } from '@supabase/supabase-js';
 import { rateLimitGuard, type RateLimitRule } from '@/lib/rate-limit';
 import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
+import { authCacheManager } from './auth-cache-manager';
+import { cachedRoleService } from './cached-role-service';
+import { validateJWTFast } from './jwt-validation-cache';
+import { cookies } from 'next/headers';
 
 export interface ApiAuthResult {
   user: User;
   claims: CustomJWTClaims;
   supabase: any;
+}
+
+/**
+ * Helper function to check if a user is active based on their role
+ * For students: checks student_is_active
+ * For admin/staff: checks profile_is_active
+ */
+export function isUserActive(claims: CustomJWTClaims): boolean {
+  if (claims.is_student) {
+    return claims.student_is_active === true;
+  } else {
+    return claims.profile_is_active === true;
+  }
 }
 
 export interface ApiAuthError {
@@ -18,12 +35,13 @@ export interface ApiAuthError {
 
 /**
  * @deprecated SECURITY WARNING: This function is unsafe and will be removed.
- * Use authenticateApiRequestSecure() instead which provides cryptographic validation.
+ * Use authenticateApiRequestUltraFast() instead which provides cryptographic validation.
  * This function relies on unsafe JWT decoding.
  * 
  * @param requiredRoles - Array of roles that are allowed to access the endpoint
  * @returns ApiAuthResult with user, claims, and supabase client OR ApiAuthError
  */
+/*
 export async function authenticateApiRequest(
   requiredRoles?: string[]
 ): Promise<ApiAuthResult | ApiAuthError> {
@@ -34,221 +52,71 @@ export async function authenticateApiRequest(
     details: {
       warning: 'DEPRECATED_FUNCTION_USED',
       function: 'authenticateApiRequest',
-      recommendation: 'Use authenticateApiRequestSecure() instead'
+      recommendation: 'Use authenticateApiRequestUltraFast() instead'
     }
   });
-  try {
-    const supabase = await createClient();
-    
-    // Get user (this works with Authorization header in API routes)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-        error: userError?.message || 'No user found',
-        function: 'authenticateApiRequest'
-      });
-      return { error: "Unauthorized", status: 401 };
-    }
-
-    // Get session to access JWT token
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError || !session?.access_token) {
-      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-        error: sessionError?.message || 'No session or access token',
-        function: 'authenticateApiRequest'
-      });
-      return { error: "Unauthorized", status: 401 };
-    }
-
-    // Check token expiration
-    if (isTokenExpired(session.access_token)) {
-      securityLogger.logAuthEvent(SecurityEventType.AUTH_TOKEN_EXPIRED, {
-        userId: user.id,
-        function: 'authenticateApiRequest'
-      });
-      return { error: "Token expired", status: 401 };
-    }
-
-    // Extract claims from JWT
-    let claims = getClaimsFromToken(session.access_token);
-
-    // If JWT claims are missing critical data (common for students), fetch from database
-    if (!claims.client_id || !claims.user_role) {
-      // Try to get student data first
-      const { data: student, error: studentError } = await supabase
-        .from('students')
-        .select('id, client_id, is_active, job_readiness_star_level, job_readiness_tier')
-        .eq('id', user.id)
-        .single();
-
-      if (student && !studentError) {
-        // User is a student - build claims from student data
-        claims = {
-          ...claims,
-          user_role: 'student',
-          client_id: student.client_id,
-          profile_is_active: student.is_active,
-          is_student: true,
-          student_is_active: student.is_active,
-          job_readiness_star_level: student.job_readiness_star_level,
-          job_readiness_tier: student.job_readiness_tier
-        };
-      } else {
-        // Try profile table for admin/staff users
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role, client_id, is_active')
-          .eq('id', user.id)
-          .single();
-
-        if (profile && !profileError) {
-          claims = {
-            ...claims,
-            user_role: profile.role,
-            client_id: profile.client_id,
-            profile_is_active: profile.is_active,
-            is_student: false
-          };
-        } else {
-          securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-            error: 'User profile not found',
-            userId: user.id,
-            function: 'authenticateApiRequest'
-          });
-          return { error: "User profile not found", status: 403 };
-        }
-      }
-    }
-
-    // Role check - handle student role specially
-    if (requiredRoles) {
-      const userRole = claims.user_role || 'student';
-      const hasRequiredRole = requiredRoles.includes(userRole) || 
-        (requiredRoles.includes('student') && claims.is_student);
-      
-      if (!hasRequiredRole) {
-        securityLogger.logAuthEvent(SecurityEventType.ROLE_VALIDATION_FAILED, {
-          userId: user.id,
-          userRole,
-          requiredRoles,
-          function: 'authenticateApiRequest'
-        });
-        return { error: "Forbidden", status: 403 };
-      }
-    }
-
-    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
-      userId: user.id,
-      userRole: claims.user_role,
-      function: 'authenticateApiRequest'
-    });
-
-    return {
-      user,
-      claims,
-      supabase
-    };
-  } catch (error) {
-    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      function: 'authenticateApiRequest'
-    });
-    console.error('Authentication error:', error);
-    return { error: "Authentication failed", status: 500 };
-  }
+  // ... rest of implementation commented out for migration
+  throw new Error('DEPRECATED: Use authenticateApiRequestUltraFast() instead');
 }
+*/
 
 /**
- * SECURE AUTHENTICATION - Use this for cryptographically verified JWT validation
- * Replaces unsafe JWT decoding with Supabase's built-in validation
- * Uses only getUser() for security - avoids getSession() which may contain unverified data
+ * @deprecated SECURITY WARNING: This function has been replaced.
+ * Use authenticateApiRequestUltraFast() instead which provides better performance.
  * 
  * @param requiredRoles - Array of roles that are allowed to access the endpoint
  * @returns ApiAuthResult with user, verified claims, and supabase client OR ApiAuthError
  */
+/*
 export async function authenticateApiRequestSecure(
   requiredRoles?: string[]
 ): Promise<ApiAuthResult | ApiAuthError> {
+  // ... implementation commented out for migration
+  throw new Error('DEPRECATED: Use authenticateApiRequestUltraFast() instead');
+}
+*/
+
+/**
+ * PHASE 2 OPTIMIZED AUTHENTICATION - Uses Redis caching and RPC functions
+ * This is the fastest authentication method with Redis-first caching
+ * 
+ * @param requiredRoles - Array of roles that are allowed to access the endpoint
+ * @returns ApiAuthResult with user, verified claims, and supabase client OR ApiAuthError
+ */
+export async function authenticateApiRequestOptimized(
+  requiredRoles?: string[]
+): Promise<ApiAuthResult | ApiAuthError> {
+  const startTime = Date.now();
+  
   try {
     const supabase = await createClient();
     
-    // Get user with automatic JWT signature validation - this is the ONLY secure method
+    // Get user with automatic JWT signature validation
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
       securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
         error: userError?.message || 'No user found',
-        function: 'authenticateApiRequestSecure'
+        function: 'authenticateApiRequestOptimized'
       });
       return { error: "Unauthorized", status: 401 };
     }
 
-    // Extract verified claims directly from the authenticated user object
-    // This is secure because user data comes from cryptographically verified source
-    let claims: CustomJWTClaims;
-    try {
-      claims = getVerifiedClaimsFromUser(user);
-    } catch (error) {
+    // Get cached auth data with Redis-first approach
+    const authData = await authCacheManager.getUserAuthData(user.id);
+    
+    if (!authData) {
       securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-        error: error instanceof Error ? error.message : 'Error extracting verified claims',
+        error: 'Failed to get auth data from cache or database',
         userId: user.id,
-        function: 'authenticateApiRequestSecure'
+        function: 'authenticateApiRequestOptimized'
       });
-      console.error('Error extracting verified claims from user metadata:', error);
-      return { error: "Invalid user metadata", status: 401 };
+      return { error: "Authentication data not found", status: 401 };
     }
 
-    // If custom claims are missing, fetch from database
-    if (!claims.client_id || !claims.user_role) {
-      // Try to get student data first
-      const { data: student, error: studentError } = await supabase
-        .from('students')
-        .select('id, client_id, is_active, job_readiness_star_level, job_readiness_tier')
-        .eq('id', user.id)
-        .single();
+    const { claims } = authData;
 
-      if (student && !studentError) {
-        // User is a student - build verified claims from database
-        claims = {
-          ...claims,
-          user_role: 'student',
-          client_id: student.client_id,
-          profile_is_active: student.is_active,
-          is_student: true,
-          student_is_active: student.is_active,
-          job_readiness_star_level: student.job_readiness_star_level,
-          job_readiness_tier: student.job_readiness_tier
-        };
-      } else {
-        // Try profile table for admin/staff users
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role, client_id, is_active')
-          .eq('id', user.id)
-          .single();
-
-        if (profile && !profileError) {
-          claims = {
-            ...claims,
-            user_role: profile.role,
-            client_id: profile.client_id,
-            profile_is_active: profile.is_active,
-            is_student: false
-          };
-        } else {
-          securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-            error: 'User profile not found',
-            userId: user.id,
-            function: 'authenticateApiRequestSecure'
-          });
-          return { error: "User profile not found", status: 403 };
-        }
-      }
-    }
-
-    // Role validation using verified claims
+    // Role validation using cached claims
     if (requiredRoles && requiredRoles.length > 0) {
       const userRole = claims.user_role;
       const hasRequiredRole = requiredRoles.includes(userRole || '') || 
@@ -259,7 +127,7 @@ export async function authenticateApiRequestSecure(
           userId: user.id,
           userRole,
           requiredRoles,
-          function: 'authenticateApiRequestSecure'
+          function: 'authenticateApiRequestOptimized'
         });
         return { 
           error: `Access denied. Required roles: ${requiredRoles.join(', ')}. User role: ${userRole}`, 
@@ -268,10 +136,13 @@ export async function authenticateApiRequestSecure(
       }
     }
 
+    const processingTime = Date.now() - startTime;
     securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
       userId: user.id,
       userRole: claims.user_role,
-      function: 'authenticateApiRequestSecure'
+      function: 'authenticateApiRequestOptimized',
+      processingTime,
+      cacheHit: authData.cached_at ? true : false
     });
 
     return {
@@ -283,9 +154,228 @@ export async function authenticateApiRequestSecure(
   } catch (error) {
     securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
       error: error instanceof Error ? error.message : 'Unknown error',
-      function: 'authenticateApiRequestSecure'
+      function: 'authenticateApiRequestOptimized'
     });
-    console.error('Authentication error:', error);
+    console.error('Optimized authentication error:', error);
+    return { error: "Internal server error", status: 500 };
+  }
+}
+
+/**
+ * PHASE 2 RPC-BASED AUTHENTICATION - Uses database RPC functions for optimal database performance
+ * This method uses consolidated RPC functions for minimal database queries
+ * 
+ * @param requiredRoles - Array of roles that are allowed to access the endpoint
+ * @returns ApiAuthResult with user, verified claims, and supabase client OR ApiAuthError
+ */
+export async function authenticateApiRequestRPC(
+  requiredRoles?: string[]
+): Promise<ApiAuthResult | ApiAuthError> {
+  const startTime = Date.now();
+  
+  try {
+    const supabase = await createClient();
+    
+    // Get user with automatic JWT signature validation
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: userError?.message || 'No user found',
+        function: 'authenticateApiRequestRPC'
+      });
+      return { error: "Unauthorized", status: 401 };
+    }
+
+    // Use RPC function for consolidated user data retrieval
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'get_user_auth_profile_cached',
+      { user_id: user.id }
+    );
+
+    if (rpcError || !rpcData || rpcData.length === 0) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: rpcError?.message || 'User profile not found via RPC',
+        userId: user.id,
+        function: 'authenticateApiRequestRPC'
+      });
+      return { error: "User profile not found", status: 403 };
+    }
+
+    const profileData = rpcData[0];
+
+    // Build claims from RPC data
+    const claims: CustomJWTClaims = {
+      user_role: profileData.user_role as 'Admin' | 'Staff' | 'Client Staff' | 'student',
+      client_id: profileData.client_id,
+      profile_is_active: profileData.profile_is_active,
+      is_student: profileData.is_student,
+      student_is_active: profileData.student_is_active,
+      job_readiness_star_level: profileData.job_readiness_star_level ? 
+        (['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'] as const)[profileData.job_readiness_star_level - 1] : 
+        undefined,
+      job_readiness_tier: profileData.job_readiness_tier as 'BRONZE' | 'SILVER' | 'GOLD' | undefined,
+    };
+
+    // Role validation using RPC claims
+    if (requiredRoles && requiredRoles.length > 0) {
+      const userRole = claims.user_role;
+      const hasRequiredRole = requiredRoles.includes(userRole || '') || 
+                            (requiredRoles.includes('student') && userRole === 'student');
+
+      if (!hasRequiredRole) {
+        securityLogger.logAuthEvent(SecurityEventType.ROLE_VALIDATION_FAILED, {
+          userId: user.id,
+          userRole,
+          requiredRoles,
+          function: 'authenticateApiRequestRPC'
+        });
+        return { 
+          error: `Access denied. Required roles: ${requiredRoles.join(', ')}. User role: ${userRole}`, 
+          status: 403 
+        };
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
+      userId: user.id,
+      userRole: claims.user_role,
+      function: 'authenticateApiRequestRPC',
+      processingTime,
+      method: 'rpc'
+    });
+
+    // Cache the result for future use
+    authCacheManager.setCachedUserAuth(user.id, user, claims).catch(console.error);
+
+    return {
+      user,
+      claims,
+      supabase
+    };
+
+  } catch (error) {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      function: 'authenticateApiRequestRPC'
+    });
+    console.error('RPC authentication error:', error);
+    return { error: "Internal server error", status: 500 };
+  }
+}
+
+/**
+ * PHASE 2 HYBRID AUTHENTICATION - Combines Redis caching with RPC fallback
+ * This is the recommended authentication method for Phase 2
+ * 
+ * @param requiredRoles - Array of roles that are allowed to access the endpoint
+ * @returns ApiAuthResult with user, verified claims, and supabase client OR ApiAuthError
+ */
+export async function authenticateApiRequestHybrid(
+  requiredRoles?: string[]
+): Promise<ApiAuthResult | ApiAuthError> {
+  const startTime = Date.now();
+  
+  try {
+    const supabase = await createClient();
+    
+    // Get user with automatic JWT signature validation
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: userError?.message || 'No user found',
+        function: 'authenticateApiRequestHybrid'
+      });
+      return { error: "Unauthorized", status: 401 };
+    }
+
+    // Try Redis cache first
+    const cachedData = await authCacheManager.getCachedUserAuth(user.id);
+    let claims: CustomJWTClaims;
+    let cacheHit = false;
+
+    if (cachedData) {
+      claims = cachedData.claims;
+      cacheHit = true;
+    } else {
+      // Cache miss - use RPC function
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'get_user_auth_profile_cached',
+        { user_id: user.id }
+      );
+
+      if (rpcError || !rpcData || rpcData.length === 0) {
+        securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+          error: rpcError?.message || 'User profile not found via RPC',
+          userId: user.id,
+          function: 'authenticateApiRequestHybrid'
+        });
+        return { error: "User profile not found", status: 403 };
+      }
+
+      const profileData = rpcData[0];
+
+      // Build claims from RPC data
+      claims = {
+        user_role: profileData.user_role as 'Admin' | 'Staff' | 'Client Staff' | 'student',
+        client_id: profileData.client_id,
+        profile_is_active: profileData.profile_is_active,
+        is_student: profileData.is_student,
+        student_is_active: profileData.student_is_active,
+        job_readiness_star_level: profileData.job_readiness_star_level ? 
+          (['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'] as const)[profileData.job_readiness_star_level - 1] : 
+          undefined,
+        job_readiness_tier: profileData.job_readiness_tier as 'BRONZE' | 'SILVER' | 'GOLD' | undefined,
+      };
+
+      // Cache the result for future use
+      authCacheManager.setCachedUserAuth(user.id, user, claims).catch(console.error);
+    }
+
+    // Role validation using hybrid claims
+    if (requiredRoles && requiredRoles.length > 0) {
+      const userRole = claims.user_role;
+      const hasRequiredRole = requiredRoles.includes(userRole || '') || 
+                            (requiredRoles.includes('student') && userRole === 'student');
+
+      if (!hasRequiredRole) {
+        securityLogger.logAuthEvent(SecurityEventType.ROLE_VALIDATION_FAILED, {
+          userId: user.id,
+          userRole,
+          requiredRoles,
+          function: 'authenticateApiRequestHybrid'
+        });
+        return { 
+          error: `Access denied. Required roles: ${requiredRoles.join(', ')}. User role: ${userRole}`, 
+          status: 403 
+        };
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
+      userId: user.id,
+      userRole: claims.user_role,
+      function: 'authenticateApiRequestHybrid',
+      processingTime,
+      cacheHit,
+      method: cacheHit ? 'redis' : 'rpc'
+    });
+
+    return {
+      user,
+      claims,
+      supabase
+    };
+
+  } catch (error) {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      function: 'authenticateApiRequestHybrid'
+    });
+    console.error('Hybrid authentication error:', error);
     return { error: "Internal server error", status: 500 };
   }
 }
@@ -300,7 +390,7 @@ export async function authenticateApiRequestWithRateLimitSecure(
 ): Promise<ApiAuthResult | ApiAuthError> {
   try {
     // First, authenticate the request
-    const authResult = await authenticateApiRequestSecure(requiredRoles);
+    const authResult = await authenticateApiRequestUltraFast(requiredRoles);
     if ('error' in authResult) {
       return authResult;
     }
@@ -357,7 +447,7 @@ export async function authenticateApiRequestWithRateLimit(
 ): Promise<ApiAuthResult | ApiAuthError> {
   try {
     // First, perform standard authentication
-    const authResult = await authenticateApiRequest(requiredRoles);
+    const authResult = await authenticateApiRequestUltraFast(requiredRoles, request);
     
     if ('error' in authResult) {
       return authResult;
@@ -405,7 +495,7 @@ export function withAuth(requiredRoles?: string[]) {
     handler: (req: NextRequest, auth: ApiAuthResult) => Promise<NextResponse>
   ) {
     return async function(req: NextRequest) {
-      const authResult = await authenticateApiRequest(requiredRoles);
+      const authResult = await authenticateApiRequestUltraFast(requiredRoles, req);
       
       if ('error' in authResult) {
         return NextResponse.json(
@@ -459,7 +549,7 @@ export function withAuthAndRateLimit(requiredRoles?: string[], rateLimitConfig?:
  * @deprecated Use authenticateApiRequest() directly for new code
  */
 export async function getUserSessionAndRoleOptimized() {
-  const authResult = await authenticateApiRequest();
+  const authResult = await authenticateApiRequestUltraFast();
   
   if ('error' in authResult) {
     return {
@@ -484,4 +574,194 @@ export async function getUserSessionAndRoleOptimized() {
     role: authResult.claims.user_role,
     error: null
   };
+}
+
+/**
+ * PHASE 2 ULTRA-FAST AUTHENTICATION - Uses JWT validation cache to bypass slow Auth server calls
+ * This is the fastest authentication method with local JWT validation and Redis caching
+ * 
+ * @param requiredRoles - Array of roles that are allowed to access the endpoint
+ * @param request - NextRequest object for security logging and endpoint tracking
+ * @returns ApiAuthResult with user, verified claims, and supabase client OR ApiAuthError
+ */
+export async function authenticateApiRequestUltraFast(
+  requiredRoles?: string[],
+  request?: NextRequest
+): Promise<ApiAuthResult | ApiAuthError> {
+  const startTime = Date.now();
+  let jwtValidationTime = 0;
+  let cacheTime = 0;
+  let supabaseCreateTime = 0;
+  
+  try {
+    // Extract JWT token from cookies - fallback to traditional method if ultra-fast fails
+    const cookieStore = await cookies();
+    
+    // Try to get the token from the session cookie
+    let token: string | undefined;
+    
+    // Look for the main auth token cookie (format: sb-<project-ref>-auth-token)
+    const authTokenCookie = cookieStore.getAll()
+      .find((cookie: { name: string; value: string }) => cookie.name.includes('auth-token'));
+    
+    if (authTokenCookie?.value) {
+      try {
+        const sessionData = JSON.parse(authTokenCookie.value);
+        token = sessionData.access_token;
+      } catch (error) {
+        // Ignore parsing errors and fallback to traditional method
+      }
+    }
+    
+    // If we couldn't extract token from cookies, fallback to traditional supabase.auth.getUser()
+    if (!token) {
+      const supabase = await createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+          error: userError?.message || 'No user found',
+          function: 'authenticateApiRequestUltraFast'
+        }, request);
+        return { error: "Unauthorized", status: 401 };
+      }
+
+      // Get session to access JWT token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.access_token) {
+        securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+          error: sessionError?.message || 'No session or access token',
+          function: 'authenticateApiRequestUltraFast'
+        }, request);
+        return { error: "Unauthorized", status: 401 };
+      }
+
+      token = session.access_token;
+    }
+
+    // Fast JWT validation using JWKS endpoint and caching
+    const jwtStart = Date.now();
+    const jwtResult = await validateJWTFast(token);
+    jwtValidationTime = Date.now() - jwtStart;
+
+    if (!jwtResult) {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+        error: 'JWT validation failed',
+        function: 'authenticateApiRequestUltraFast'
+      }, request);
+      return { error: "Unauthorized", status: 401 };
+    }
+
+    const { user, payload } = jwtResult;
+
+    // Try Redis cache first for user auth data
+    const cacheStart = Date.now();
+    const cachedData = await authCacheManager.getCachedUserAuth(user.id);
+    cacheTime = Date.now() - cacheStart;
+    
+    let claims: CustomJWTClaims;
+    let cacheHit = false;
+
+    if (cachedData) {
+      claims = cachedData.claims;
+      cacheHit = true;
+    } else {
+      // Cache miss - create Supabase client and use RPC function
+      const supabaseStart = Date.now();
+      const supabase = await createClient();
+      supabaseCreateTime = Date.now() - supabaseStart;
+      
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'get_user_auth_profile_cached',
+        { user_id: user.id }
+      );
+
+      if (rpcError || !rpcData || rpcData.length === 0) {
+        securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+          error: rpcError?.message || 'User profile not found via RPC',
+          userId: user.id,
+          function: 'get_user_auth_profile_cached',
+          rpcFunction: 'get_user_auth_profile_cached',
+          errorDetails: rpcError ? {
+            code: rpcError.code,
+            details: rpcError.details,
+            hint: rpcError.hint
+          } : undefined
+        }, request);
+        return { error: "User profile not found", status: 403 };
+      }
+
+      const profileData = rpcData[0];
+
+      // Build claims from RPC data
+      claims = {
+        user_role: profileData.user_role as 'Admin' | 'Staff' | 'Client Staff' | 'student',
+        client_id: profileData.client_id,
+        profile_is_active: profileData.profile_is_active,
+        is_student: profileData.is_student,
+        student_is_active: profileData.student_is_active,
+        job_readiness_star_level: profileData.job_readiness_star_level ? 
+          (['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'] as const)[profileData.job_readiness_star_level - 1] : 
+          undefined,
+        job_readiness_tier: profileData.job_readiness_tier as 'BRONZE' | 'SILVER' | 'GOLD' | undefined,
+      };
+
+      // Cache the result for future use
+      authCacheManager.setCachedUserAuth(user.id, user, claims).catch(console.error);
+    }
+
+    // Role validation using ultra-fast claims
+    if (requiredRoles && requiredRoles.length > 0) {
+      const userRole = claims.user_role;
+      const hasRequiredRole = requiredRoles.includes(userRole || '') || 
+                            (requiredRoles.includes('student') && userRole === 'student');
+
+      if (!hasRequiredRole) {
+        securityLogger.logAuthEvent(SecurityEventType.ROLE_VALIDATION_FAILED, {
+          userId: user.id,
+          userRole,
+          requiredRoles,
+          function: 'authenticateApiRequestUltraFast'
+        }, request);
+        return { 
+          error: `Access denied. Required roles: ${requiredRoles.join(', ')}. User role: ${userRole}`, 
+          status: 403 
+        };
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
+      userId: user.id,
+      userRole: claims.user_role,
+      function: 'authenticateApiRequestUltraFast',
+      processingTime,
+      cacheHit,
+      method: cacheHit ? 'jwt-cache-redis' : 'jwt-cache-rpc',
+      performanceBreakdown: {
+        jwtValidationTime,
+        cacheTime,
+        supabaseCreateTime,
+        totalTime: processingTime
+      }
+    }, request);
+
+    // Create supabase client only if not already created
+    const supabase = await createClient();
+
+    return {
+      user,
+      claims,
+      supabase
+    };
+
+  } catch (error) {
+    securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      function: 'authenticateApiRequestUltraFast'
+    }, request);
+    console.error('Ultra-fast authentication error:', error);
+    return { error: "Internal server error", status: 500 };
+  }
 } 

@@ -2,7 +2,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { z } from 'zod';
 import { ViewerReportQuerySchema } from '@/lib/schemas/progress';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['viewer', 'admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Viewer', 'Admin', 'Staff'], request);
     if ('error' in authResult) {
       securityLogger.logEvent({
         eventType: SecurityEventType.UNAUTHORIZED_ACCESS,

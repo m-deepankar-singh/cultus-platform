@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClientSchema } from '@/lib/schemas/client';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 import { calculatePaginationRange, createPaginatedResponse } from '@/lib/pagination';
 
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   
   try {
     // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff'], request);
     
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
@@ -152,12 +152,12 @@ export async function GET(request: NextRequest) {
  * ✅ JWT-based authentication (eliminates 1 DB query per request)
  * ✅ Specific column selection for response
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
     // 1. Authentication & Authorization (OPTIMIZED - 0 DB queries for auth)
-    const authResult = await authenticateApiRequestSecure(['Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff'], request);
     
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });

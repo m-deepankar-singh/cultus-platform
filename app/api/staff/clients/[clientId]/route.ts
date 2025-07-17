@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { ClientIdSchema, UpdateClientSchema } from '@/lib/schemas/client';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
 import { SELECTORS } from '@/lib/api/selectors';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
@@ -12,7 +12,7 @@ export async function GET(
     const { clientId } = resolvedParams;
 
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Staff', 'Admin'], request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -63,7 +63,7 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
@@ -71,7 +71,7 @@ export async function PUT(
     const { clientId } = resolvedParams;
 
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['Staff', 'Admin']);
+    const authResult = await authenticateApiRequestUltraFast(['Staff', 'Admin'], request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }

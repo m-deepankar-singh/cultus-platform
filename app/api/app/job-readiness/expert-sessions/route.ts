@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 interface ExpertSession {
   id: string;
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
     }
 
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['student']);
+    const authResult = await authenticateApiRequestUltraFast(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -196,7 +199,8 @@ export async function GET(req: NextRequest) {
     // Required sessions for 3rd star (as per requirements)
     const requiredSessions = 5;
     
-    return NextResponse.json({
+    // Create response data
+    const responseData = {
       sessions: sessionsWithProgress,
       overall_progress: {
         completed_sessions_count: completedSessionsCount,
@@ -204,7 +208,15 @@ export async function GET(req: NextRequest) {
         progress_percentage: Math.round((completedSessionsCount / requiredSessions) * 100),
         third_star_unlocked: completedSessionsCount >= requiredSessions
       }
-    });
+    };
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responseData);
+    }
+
+    // Use frequent cache (30 seconds) for video progress tracking
+    return handleConditionalRequest(req, responseData, CACHE_CONFIGS.FREQUENT);
 
   } catch (error) {
     console.error('Unexpected error in expert-sessions GET:', error);

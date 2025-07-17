@@ -1,0 +1,281 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { cacheManager } from '@/lib/cache/cache-manager';
+
+export async function POST(request: NextRequest) {
+  const authResult = await authenticateApiRequestUltraFast(['Admin']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action');
+
+    let result;
+    const timestamp = new Date().toISOString();
+
+    switch (action) {
+      case 'cleanup_expired':
+        const { data: cleanedCount, error: cleanupError } = await authResult.supabase
+          .rpc('cleanup_expired_cache');
+        
+        if (cleanupError) throw cleanupError;
+        result = { 
+          action: 'cleanup_expired', 
+          cleanedEntries: cleanedCount,
+          message: `Successfully cleaned ${cleanedCount} cache entries`
+        };
+        break;
+
+      case 'health_check':
+        const { data: healthData, error: healthError } = await authResult.supabase
+          .rpc('analyze_cache_health');
+        
+        if (healthError) throw healthError;
+        
+        const healthMetrics = healthData?.reduce((acc: any, row: any) => {
+          acc[row.metric_name] = {
+            value: row.metric_value,
+            status: row.status,
+            recommendation: row.recommendation
+          };
+          return acc;
+        }, {});
+
+        result = {
+          action: 'health_check',
+          health: healthMetrics,
+          overallStatus: determineOverallHealth(healthData),
+          timestamp
+        };
+        break;
+
+      case 'cleanup_stats':
+        const days = parseInt(searchParams.get('days') || '7');
+        const { data: statsData, error: statsError } = await authResult.supabase
+          .rpc('get_cache_cleanup_stats', { p_days: days });
+        
+        if (statsError) throw statsError;
+        result = {
+          action: 'cleanup_stats',
+          period_days: days,
+          statistics: statsData,
+          summary: generateCleanupSummary(statsData)
+        };
+        break;
+
+      case 'optimize_cache':
+        // Comprehensive cache optimization
+        const optimizationSteps = [];
+        
+        // Step 1: Clean expired entries
+        const { data: expiredCleaned } = await authResult.supabase
+          .rpc('cleanup_expired_cache');
+        optimizationSteps.push(`Cleaned ${expiredCleaned || 0} expired entries`);
+        
+        // Step 2: Remove low-performing entries
+        const lowPerformingTags = ['test', 'temp', 'debug'];
+        const invalidatedCount = await cacheManager.invalidateByTags(lowPerformingTags);
+        optimizationSteps.push(`Removed ${invalidatedCount} low-performing entries`);
+        
+        // Step 3: Get post-optimization metrics
+        const metricsAfter = await cacheManager.getCacheMetrics();
+        
+        result = {
+          action: 'optimize_cache',
+          steps: optimizationSteps,
+          metricsAfter,
+          message: 'Cache optimization completed successfully'
+        };
+        break;
+
+      case 'emergency_clear':
+        // Emergency cache clear with confirmation
+        const confirmToken = searchParams.get('confirm');
+        if (confirmToken !== 'EMERGENCY_CLEAR_CONFIRMED') {
+          return NextResponse.json({
+            error: 'Emergency clear requires confirmation token',
+            requiredToken: 'EMERGENCY_CLEAR_CONFIRMED'
+          }, { status: 400 });
+        }
+
+        const allTagsCleared = await cacheManager.invalidateByTags(['*']);
+        
+        result = {
+          action: 'emergency_clear',
+          clearedEntries: allTagsCleared,
+          message: 'Emergency cache clear completed',
+          warning: 'All cache entries have been cleared'
+        };
+        break;
+
+      case 'selective_clear':
+        const body = await request.json().catch(() => ({}));
+        const { tags, patterns, older_than_hours } = body;
+        
+        const clearResults = {
+          tagsCleared: 0,
+          patternsProcessed: 0,
+          oldEntriesRemoved: 0
+        };
+
+                 // Clear by tags
+         if (tags && Array.isArray(tags) && tags.length > 0) {
+           clearResults.tagsCleared = await cacheManager.invalidateByTags(tags);
+         }
+
+        // Clear by patterns (requires custom logic)
+        if (patterns && Array.isArray(patterns)) {
+          for (const pattern of patterns) {
+            const { data: matchingEntries } = await authResult.supabase
+              .from('query_cache')
+              .select('cache_key')
+              .like('cache_key', `%${pattern}%`);
+            
+            if (matchingEntries && matchingEntries.length > 0) {
+              const keys = matchingEntries.map((entry: any) => entry.cache_key);
+              await authResult.supabase
+                .from('query_cache')
+                .delete()
+                .in('cache_key', keys);
+              clearResults.patternsProcessed += matchingEntries.length;
+            }
+          }
+        }
+
+        // Clear old entries
+        if (older_than_hours && typeof older_than_hours === 'number') {
+          const { count } = await authResult.supabase
+            .from('query_cache')
+            .delete()
+            .lt('created_at', new Date(Date.now() - older_than_hours * 60 * 60 * 1000).toISOString());
+          clearResults.oldEntriesRemoved = count || 0;
+        }
+
+        result = {
+          action: 'selective_clear',
+          results: clearResults,
+          message: 'Selective cache clear completed'
+        };
+        break;
+
+      default:
+        throw new Error(`Unknown maintenance action: ${action}`);
+    }
+
+    return NextResponse.json({
+      success: true,
+      ...result,
+      timestamp
+    });
+  } catch (error) {
+    console.error('Cache maintenance error:', error);
+    return NextResponse.json({ 
+      error: 'Cache maintenance operation failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateApiRequestUltraFast(['Admin']);
+  if ('error' in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  try {
+    // Get current cache health status
+    const [healthData, cleanupStats, metrics] = await Promise.all([
+      authResult.supabase.rpc('analyze_cache_health'),
+      authResult.supabase.rpc('get_cache_cleanup_stats', { p_days: 7 }),
+      cacheManager.getCacheMetrics()
+    ]);
+
+    const healthMetrics = healthData.data?.reduce((acc: any, row: any) => {
+      acc[row.metric_name] = {
+        value: row.metric_value,
+        status: row.status,
+        recommendation: row.recommendation
+      };
+      return acc;
+    }, {});
+
+    return NextResponse.json({
+      health: {
+        metrics: healthMetrics,
+        overallStatus: determineOverallHealth(healthData.data),
+        lastUpdated: new Date().toISOString()
+      },
+      cleanupHistory: {
+        period: '7 days',
+        statistics: cleanupStats.data,
+        summary: generateCleanupSummary(cleanupStats.data)
+      },
+      currentMetrics: metrics,
+      availableActions: [
+        'cleanup_expired',
+        'health_check', 
+        'cleanup_stats',
+        'optimize_cache',
+        'selective_clear',
+        'emergency_clear'
+      ]
+    });
+  } catch (error) {
+    console.error('Cache maintenance status error:', error);
+    return NextResponse.json({ 
+      error: 'Failed to get maintenance status',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+function determineOverallHealth(healthData: any[]): string {
+  if (!healthData || healthData.length === 0) return 'unknown';
+  
+  const statuses = healthData.map(row => row.status);
+  
+  if (statuses.includes('warning')) return 'warning';
+  if (statuses.includes('caution')) return 'caution';
+  return 'good';
+}
+
+function generateCleanupSummary(statsData: any[]): any {
+  if (!statsData || statsData.length === 0) {
+    return {
+      totalCleanups: 0,
+      totalEntriesCleaned: 0,
+      averageEntriesPerCleanup: 0,
+      cleanupFrequency: 'No cleanup history'
+    };
+  }
+
+  const totalCleanups = statsData.reduce((sum, row) => sum + (row.cleanup_count || 0), 0);
+  const totalCleaned = statsData.reduce((sum, row) => sum + (row.total_entries_cleaned || 0), 0);
+     const avgPerCleanup = totalCleanups > 0 ? (totalCleaned / totalCleanups).toFixed(1) : '0';
+
+  return {
+    totalCleanups,
+    totalEntriesCleaned: totalCleaned,
+    averageEntriesPerCleanup: parseFloat(avgPerCleanup),
+    cleanupFrequency: `${statsData.length} days with activity in last 7 days`,
+    trend: analyzeTrend(statsData)
+  };
+}
+
+function analyzeTrend(statsData: any[]): string {
+  if (statsData.length < 2) return 'insufficient_data';
+  
+  const recent = statsData.slice(0, Math.ceil(statsData.length / 2));
+  const older = statsData.slice(Math.ceil(statsData.length / 2));
+  
+  const recentAvg = recent.reduce((sum, row) => sum + (row.total_entries_cleaned || 0), 0) / recent.length;
+  const olderAvg = older.reduce((sum, row) => sum + (row.total_entries_cleaned || 0), 0) / older.length;
+  
+  const percentChange = ((recentAvg - olderAvg) / olderAvg) * 100;
+  
+  if (percentChange > 20) return 'increasing';
+  if (percentChange < -20) return 'decreasing';
+  return 'stable';
+} 

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { handleConditionalRequest } from '@/lib/cache/etag-utils';
+import { CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 /**
  * GET /api/app/job-readiness/products
@@ -8,10 +11,10 @@ import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
  * 
  * OPTIMIZED: Single RPC call replaces multiple N+1 queries
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // JWT-based authentication (0 database queries)
-    const authResult = await authenticateApiRequestSecure(['student']);
+    const authResult = await authenticateApiRequestUltraFast(['student']);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -50,12 +53,20 @@ export async function GET() {
 
     const { student_data, products_data, interview_data } = result[0];
 
-    // Return the optimized response
-    return NextResponse.json({
+    // Create response data
+    const responseData = {
       student: student_data,
       products: products_data,
       interviewStatus: interview_data
-    });
+    };
+
+    // Skip caching if disabled
+    if (!cacheConfig.enabled) {
+      return NextResponse.json(responseData);
+    }
+
+    // Use dynamic cache (1 minute) for user-specific product data
+    return handleConditionalRequest(request, responseData, CACHE_CONFIGS.DYNAMIC);
 
   } catch (error) {
     console.error('Unexpected error in GET /api/app/job-readiness/products:', error);

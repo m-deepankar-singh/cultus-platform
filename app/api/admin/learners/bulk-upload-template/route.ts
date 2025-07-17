@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { utils, write } from 'xlsx';
-import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
+import { authenticateApiRequestUltraFast } from '@/lib/auth/api-auth';
+import { generateETag, checkETagMatch } from '@/lib/cache/etag-utils';
+import { generateCacheHeaders, CACHE_CONFIGS } from '@/lib/cache/simple-cache';
+import { cacheConfig } from '@/lib/cache/config';
 
 /**
  * GET /api/admin/learners/bulk-upload-template
@@ -11,7 +14,7 @@ import { authenticateApiRequestSecure } from '@/lib/auth/api-auth';
 export async function GET(request: Request) {
   try {
     // JWT-based authentication (0 database queries for auth)
-    const authResult = await authenticateApiRequestSecure(['Admin', 'Staff']);
+    const authResult = await authenticateApiRequestUltraFast(['Admin', 'Staff']);
     if ('error' in authResult) {
       return new NextResponse(JSON.stringify({ error: authResult.error }), {
         status: authResult.status,
@@ -103,7 +106,30 @@ export async function GET(request: Request) {
     // 4. Generate Excel file
     const excelBuffer = write(wb, { bookType: 'xlsx', type: 'buffer' });
     
-    // 5. Return the Excel file
+    // 5. Implement caching for the generated template
+    if (cacheConfig.enabled) {
+      // Generate ETag based on client data (template changes when clients change)
+      const clientsDataForETag = clients?.map((c: any) => ({ id: c.id, name: c.name })) || [];
+      const etag = generateETag(clientsDataForETag);
+      
+      // Check if client has current version
+      if (checkETagMatch(request, etag)) {
+        return new NextResponse(null, { status: 304 });
+      }
+      
+      // Return the Excel file with cache headers
+      const cacheHeaders = generateCacheHeaders(CACHE_CONFIGS.STATIC);
+      return new NextResponse(excelBuffer, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="learners_upload_template.xlsx"',
+          'ETag': etag,
+          ...cacheHeaders
+        }
+      });
+    }
+    
+    // Return the Excel file without caching
     return new NextResponse(excelBuffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
