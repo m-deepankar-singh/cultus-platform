@@ -1,5 +1,3 @@
-import { Gauge, Counter, Histogram } from 'prom-client';
-
 export interface CacheStats {
   name: string;
   size: number;
@@ -19,41 +17,19 @@ export interface CacheEntry {
   created: number;
 }
 
+// Simple metrics interface for Vercel/serverless environments
+interface CacheMetrics {
+  cache_name: string;
+  operation: string;
+  duration_ms?: number;
+  timestamp: number;
+}
+
 class CacheMonitor {
   private static instance: CacheMonitor;
   private caches = new Map<string, CacheStats>();
   private listeners: ((stats: CacheStats[]) => void)[] = [];
-
-  // Prometheus metrics
-  private readonly cacheSizeGauge = new Gauge({
-    name: 'cache_size_entries',
-    help: 'Number of entries in cache',
-    labelNames: ['cache_name']
-  });
-
-  private readonly cacheMemoryGauge = new Gauge({
-    name: 'cache_memory_bytes',
-    help: 'Memory usage of cache in bytes',
-    labelNames: ['cache_name']
-  });
-
-  private readonly cacheHitRateGauge = new Gauge({
-    name: 'cache_hit_rate',
-    help: 'Cache hit rate (0-1)',
-    labelNames: ['cache_name']
-  });
-
-  private readonly cacheOperationsCounter = new Counter({
-    name: 'cache_operations_total',
-    help: 'Total cache operations',
-    labelNames: ['cache_name', 'operation']
-  });
-
-  private readonly cacheAccessHistogram = new Histogram({
-    name: 'cache_access_duration_seconds',
-    help: 'Cache access duration',
-    labelNames: ['cache_name', 'operation']
-  });
+  private metrics: CacheMetrics[] = [];
 
   private constructor() {}
 
@@ -97,7 +73,7 @@ class CacheMonitor {
     updated.hitRate = total > 0 ? updated.hits / total : 0;
 
     this.caches.set(name, updated);
-    this.updateMetrics(updated);
+    this.recordMetric(updated.name, 'update');
     this.notifyListeners();
   }
 
@@ -106,14 +82,7 @@ class CacheMonitor {
     if (stats) {
       stats.hits++;
       this.updateCacheStats(name, stats);
-      this.cacheOperationsCounter.inc({ cache_name: name, operation: 'hit' });
-      
-      if (accessTimeMs !== undefined) {
-        this.cacheAccessHistogram.observe(
-          { cache_name: name, operation: 'hit' },
-          accessTimeMs / 1000
-        );
-      }
+      this.recordMetric(name, 'hit', accessTimeMs);
     }
   }
 
@@ -122,14 +91,7 @@ class CacheMonitor {
     if (stats) {
       stats.misses++;
       this.updateCacheStats(name, stats);
-      this.cacheOperationsCounter.inc({ cache_name: name, operation: 'miss' });
-      
-      if (accessTimeMs !== undefined) {
-        this.cacheAccessHistogram.observe(
-          { cache_name: name, operation: 'miss' },
-          accessTimeMs / 1000
-        );
-      }
+      this.recordMetric(name, 'miss', accessTimeMs);
     }
   }
 
@@ -139,7 +101,7 @@ class CacheMonitor {
       stats.size++;
       stats.memoryUsage += memoryDelta;
       this.updateCacheStats(name, stats);
-      this.cacheOperationsCounter.inc({ cache_name: name, operation: 'set' });
+      this.recordMetric(name, 'set');
     }
   }
 
@@ -149,7 +111,7 @@ class CacheMonitor {
       stats.size = Math.max(0, stats.size - 1);
       stats.memoryUsage = Math.max(0, stats.memoryUsage - memoryDelta);
       this.updateCacheStats(name, stats);
-      this.cacheOperationsCounter.inc({ cache_name: name, operation: 'delete' });
+      this.recordMetric(name, 'delete');
     }
   }
 
@@ -159,7 +121,7 @@ class CacheMonitor {
       stats.size = 0;
       stats.memoryUsage = 0;
       this.updateCacheStats(name, stats);
-      this.cacheOperationsCounter.inc({ cache_name: name, operation: 'clear' });
+      this.recordMetric(name, 'clear');
     }
   }
 
@@ -194,10 +156,20 @@ class CacheMonitor {
     };
   }
 
-  private updateMetrics(stats: CacheStats): void {
-    this.cacheSizeGauge.set({ cache_name: stats.name }, stats.size);
-    this.cacheMemoryGauge.set({ cache_name: stats.name }, stats.memoryUsage);
-    this.cacheHitRateGauge.set({ cache_name: stats.name }, stats.hitRate);
+  private recordMetric(cacheName: string, operation: string, durationMs?: number): void {
+    const metric: CacheMetrics = {
+      cache_name: cacheName,
+      operation,
+      duration_ms: durationMs,
+      timestamp: Date.now()
+    };
+    
+    this.metrics.push(metric);
+    
+    // Keep only last 1000 metrics for memory management
+    if (this.metrics.length > 1000) {
+      this.metrics = this.metrics.slice(-1000);
+    }
   }
 
   private notifyListeners(): void {
