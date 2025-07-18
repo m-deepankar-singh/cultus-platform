@@ -1,5 +1,7 @@
 import { getOptimizedMonthlyActiveLearners, getOptimizedModuleCompletionRates, getOptimizedProductPerformance, getOptimizedClientUsage, getOptimizedAnalyticsSummary } from "@/app/actions/analytics-optimized";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AnalyticsTestPage() {
   // Test MAL (Optional - can comment out if focusing on module rates)
   const malResult = await getOptimizedMonthlyActiveLearners();

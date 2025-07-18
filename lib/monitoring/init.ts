@@ -3,7 +3,7 @@ import { metricsCollector } from './metrics';
 let isInitialized = false;
 
 export async function initializeMonitoring() {
-  if (isInitialized) {
+  if (isInitialized || typeof window !== 'undefined') {
     return;
   }
 
@@ -36,7 +36,7 @@ export function isMonitoringInitialized(): boolean {
   return isInitialized;
 }
 
-// Initialize on module load in production
-if (process.env.NODE_ENV === 'production') {
+// Initialize on module load in production (server side only)
+if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
   initializeMonitoring().catch(console.error);
 }

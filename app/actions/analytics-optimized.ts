@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { validateServerActionSecurity } from '@/lib/security/server-action-security';
 
 // Re-export types from the original analytics file for compatibility
 export interface ModuleCompletionRate {
@@ -88,29 +89,21 @@ interface OptimizedAnalyticsResult {
 export async function getOptimizedAnalytics(
   params: OptimizedAnalyticsParams = {}
 ): Promise<OptimizedAnalyticsResult> {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: false, // Disable CSRF for static generation
+    allowedRoles: ['Admin', 'Staff'], // Only admins and staff can access analytics
+  });
+
+  if (!validation.success) {
+    return { error: validation.error || 'Security validation failed' };
+  }
+
   const supabase = await createClient();
   const startTime = Date.now();
   
   try {
-    // Single authentication check (not 4x like before)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return { error: 'User not authenticated.' };
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return { error: 'Could not retrieve user profile.' };
-    }
-
-    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
-      return { error: 'Unauthorized to access this data.' };
-    }
 
     // Single RPC call instead of 4 separate calls
     const { data, error: queryError } = await supabase.rpc('get_cached_analytics_data', {
@@ -294,28 +287,20 @@ export async function getAnalyticsCachePerformance(): Promise<{
   };
   error?: string;
 }> {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: false, // Disable CSRF for static generation
+    allowedRoles: ['Admin', 'Staff'], // Only admins and staff can access cache performance
+  });
+
+  if (!validation.success) {
+    return { error: validation.error || 'Security validation failed' };
+  }
+
   const supabase = await createClient();
   
   try {
-    // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return { error: 'User not authenticated.' };
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return { error: 'Could not retrieve user profile.' };
-    }
-
-    if (profile.role !== 'Admin' && profile.role !== 'Staff') {
-      return { error: 'Unauthorized to access this data.' };
-    }
 
     // Get cache performance metrics
     const { data, error: queryError } = await supabase.rpc('get_analytics_cache_performance');

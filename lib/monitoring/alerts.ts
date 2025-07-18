@@ -1,6 +1,22 @@
 import { MemoryStats, MemoryPressureLevel } from './memory-monitor';
 import { CacheStats } from './cache-monitor';
-import { Counter, Gauge } from 'prom-client';
+
+// Only import prom-client on server side
+let Counter: any;
+let Gauge: any;
+
+if (typeof window === 'undefined') {
+  try {
+    import('prom-client').then((promClient) => {
+      Counter = promClient.Counter;
+      Gauge = promClient.Gauge;
+    }).catch(error => {
+      console.warn('prom-client not available:', error);
+    });
+  } catch (error) {
+    console.warn('prom-client not available:', error);
+  }
+}
 
 export enum AlertLevel {
   INFO = 'info',
@@ -47,19 +63,25 @@ class AlertManager {
   private maxAlerts = 1000;
 
   // Prometheus metrics
-  private readonly alertsCounter = new Counter({
-    name: 'alerts_total',
-    help: 'Total number of alerts fired',
-    labelNames: ['level', 'rule']
-  });
-
-  private readonly activeAlertsGauge = new Gauge({
-    name: 'active_alerts',
-    help: 'Number of active alerts',
-    labelNames: ['level']
-  });
+  private readonly alertsCounter: any;
+  private readonly activeAlertsGauge: any;
 
   private constructor() {
+    // Initialize metrics only on server side
+    if (typeof window === 'undefined' && Counter && Gauge) {
+      this.alertsCounter = new Counter({
+        name: 'alerts_total',
+        help: 'Total number of alerts fired',
+        labelNames: ['level', 'rule']
+      });
+
+      this.activeAlertsGauge = new Gauge({
+        name: 'active_alerts',
+        help: 'Number of active alerts',
+        labelNames: ['level']
+      });
+    }
+
     this.setupDefaultRules();
     this.setupDefaultHandlers();
   }
@@ -245,7 +267,9 @@ class AlertManager {
     }
 
     // Update metrics
-    this.alertsCounter.inc({ level: alert.level, rule: rule.id });
+    if (this.alertsCounter) {
+      this.alertsCounter.inc({ level: alert.level, rule: rule.id });
+    }
     this.updateActiveAlertsMetrics();
 
     // Execute handlers
@@ -267,6 +291,8 @@ class AlertManager {
   }
 
   private updateActiveAlertsMetrics(): void {
+    if (!this.activeAlertsGauge) return;
+
     const activeAlerts = this.alerts.filter(alert => !alert.resolved);
     const counts = {
       [AlertLevel.INFO]: 0,

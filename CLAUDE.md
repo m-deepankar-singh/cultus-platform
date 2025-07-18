@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Data Fetching**: TanStack Query v5 with query options pattern
 - **AI Integration**: Google Generative AI (@google/genai)
 - **Storage**: Supabase Storage + Cloudflare R2 for dual storage strategy
-- **Deployment**: Vercel and Cloudflare Workers support
+- **Deployment**: Vercel support
 
 ## Development Commands
 

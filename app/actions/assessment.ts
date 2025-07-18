@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'; // May not be needed for save, but good practice if UI might reflect save state elsewhere
 import { SELECTORS } from '@/lib/api/selectors';
+import { validateServerActionSecurity } from '@/lib/security/server-action-security';
 
 // Schema for input data when saving assessment progress
 const AssessmentProgressSaveDataSchema = z.object({
@@ -37,6 +38,20 @@ interface SaveAssessmentActionResult {
 export async function saveAssessmentProgressAction(
   data: AssessmentProgressSaveData
 ): Promise<SaveAssessmentActionResult> {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+    allowedRoles: ['Student'], // Only students can save assessment progress
+  });
+
+  if (!validation.success) {
+    return {
+      success: false,
+      error: validation.error || 'Security validation failed',
+    };
+  }
+
   // Progress saving is disabled - assessments must be completed in one session
   return {
     success: false,
@@ -89,6 +104,20 @@ type AssessmentQuestionWithCorrectAnswer = {
 export async function submitAssessmentAction(
   data: AssessmentSubmissionData
 ): Promise<SubmitAssessmentActionResult> { 
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+    allowedRoles: ['Student'], // Only students can submit assessments
+  });
+
+  if (!validation.success) {
+    return {
+      success: false,
+      error: validation.error || 'Security validation failed',
+    };
+  }
+
   try {
     const validationResult = AssessmentSubmissionDataSchema.safeParse(data);
     if (!validationResult.success) {
@@ -100,11 +129,7 @@ export async function submitAssessmentAction(
     }
     const { moduleId, answers: submittedAnswers } = validationResult.data;
     const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return { success: false, error: 'Unauthorized' }; 
-    }
+    const user = validation.user!;
     const studentId = user.id;
 
     const { data: studentRecord, error: studentFetchError } = await supabase

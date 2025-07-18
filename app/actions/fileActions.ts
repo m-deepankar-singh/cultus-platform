@@ -4,19 +4,29 @@ import { createClient } from "@/lib/supabase/server"
 // Note: File deletion functionality temporarily disabled during S3 migration
 import { redirect } from "next/navigation"
 import { revalidateTag } from "next/cache"
+import { validateServerActionSecurity, SecurityValidationResult } from "@/lib/security/server-action-security"
 
 /**
  * Server action to delete a file from R2 and remove its record from file_uploads table
  */
 export async function deleteFileFromR2(fileUrl: string, uploadType?: string) {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+    allowedRoles: ['Admin', 'Staff', 'Client Staff'], // Users who can delete files
+  });
+
+  if (!validation.success) {
+    return { 
+      success: false, 
+      error: validation.error || 'Security validation failed' 
+    };
+  }
+
   try {
     const supabase = await createClient()
-    
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      throw new Error("Unauthorized")
-    }
+    const user = validation.user!
 
     // Note: File deletion from R2 temporarily disabled during S3 migration
     // TODO: Implement S3 file deletion in future phase
@@ -74,14 +84,22 @@ export async function trackFileUpload({
   publicUrl?: string
   uploadType: string
 }) {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+  });
+
+  if (!validation.success) {
+    return { 
+      success: false, 
+      error: validation.error || 'Security validation failed' 
+    };
+  }
+
   try {
     const supabase = await createClient()
-    
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      throw new Error("Unauthorized")
-    }
+    const user = validation.user!
 
     // Insert file upload record
     const { data, error } = await supabase
@@ -121,14 +139,22 @@ export async function trackFileUpload({
  * Server action to get file upload history for a user
  */
 export async function getUserFileUploads(uploadType?: string) {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+  });
+
+  if (!validation.success) {
+    return { 
+      success: false, 
+      error: validation.error || 'Security validation failed' 
+    };
+  }
+
   try {
     const supabase = await createClient()
-    
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      throw new Error("Unauthorized")
-    }
+    const user = validation.user!
 
     let query = supabase
       .from('file_uploads')
@@ -160,25 +186,23 @@ export async function getUserFileUploads(uploadType?: string) {
  * Server action to cleanup old file upload records
  */
 export async function cleanupOldFileRecords(daysOld = 30) {
+  // Security validation - Admin only operation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+    allowedRoles: ['Admin'], // Only admins can cleanup files
+  });
+
+  if (!validation.success) {
+    return { 
+      success: false, 
+      error: validation.error || 'Security validation failed' 
+    };
+  }
+
   try {
     const supabase = await createClient()
-    
-    // Get the current user and check if they're an admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      throw new Error("Unauthorized")
-    }
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'admin') {
-      throw new Error("Admin access required")
-    }
+    const user = validation.user!
 
     // Delete old records
     const cutoffDate = new Date()

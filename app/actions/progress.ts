@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server'; // Assuming this is the server client
 import { revalidatePath } from 'next/cache';
+import { validateServerActionSecurity } from '@/lib/security/server-action-security';
 
 // Define the schema for the input data, similar to CourseProgressUpdatePayload
 const CourseProgressUpdateSchema = z.object({
@@ -54,6 +55,20 @@ interface RawQuizQuestion {
 export async function updateCourseProgressAction(
   data: CourseProgressUpdateData
 ): Promise<ActionResult> {
+  // Security validation
+  const validation = await validateServerActionSecurity({
+    requireAuth: true,
+    requireCSRF: true,
+    allowedRoles: ['Student'], // Only students can update their own progress
+  });
+
+  if (!validation.success) {
+    return {
+      success: false,
+      error: validation.error || 'Security validation failed',
+    };
+  }
+
   try {
     // Validate input data with Zod
     const validationResult = CourseProgressUpdateSchema.safeParse(data);
@@ -81,14 +96,7 @@ export async function updateCourseProgressAction(
     } = validationResult.data;
 
     const supabase = await createClient();
-
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('User authentication error in Server Action:', userError);
-      return { success: false, error: 'Unauthorized' };
-    }
+    const user = validation.user!
 
     // Verify the module exists and is a course
     const { data: moduleData, error: moduleError } = await supabase

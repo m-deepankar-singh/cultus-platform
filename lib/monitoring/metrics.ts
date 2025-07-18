@@ -1,16 +1,36 @@
-import { register, Registry, collectDefaultMetrics } from 'prom-client';
+// Only import prom-client on server side
+let register: any;
+let Registry: any;
+let collectDefaultMetrics: any;
+
+if (typeof window === 'undefined') {
+  try {
+    import('prom-client').then((promClient) => {
+      register = promClient.register;
+      Registry = promClient.Registry;
+      collectDefaultMetrics = promClient.collectDefaultMetrics;
+    }).catch(error => {
+      console.warn('prom-client not available:', error);
+    });
+  } catch (error) {
+    console.warn('prom-client not available:', error);
+  }
+}
+
 import { memoryMonitor } from './memory-monitor';
 import { cacheMonitor } from './cache-monitor';
 import { alertManager } from './alerts';
 
 class MetricsCollector {
   private static instance: MetricsCollector;
-  private registry: Registry;
+  private registry: any;
   private isInitialized = false;
 
   private constructor() {
     this.registry = register;
-    this.setupDefaultMetrics();
+    if (typeof window === 'undefined' && register) {
+      this.setupDefaultMetrics();
+    }
   }
 
   static getInstance(): MetricsCollector {
@@ -22,12 +42,14 @@ class MetricsCollector {
 
   private setupDefaultMetrics(): void {
     // Collect default Node.js metrics
-    collectDefaultMetrics({
-      register: this.registry,
-      prefix: 'cultus_',
-      gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
-      eventLoopMonitoringPrecision: 10
-    });
+    if (collectDefaultMetrics) {
+      collectDefaultMetrics({
+        register: this.registry,
+        prefix: 'cultus_',
+        gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
+        eventLoopMonitoringPrecision: 10
+      });
+    }
   }
 
   async initialize(): Promise<void> {
@@ -61,10 +83,13 @@ class MetricsCollector {
   }
 
   async getMetrics(): Promise<string> {
+    if (typeof window !== 'undefined' || !this.registry) {
+      return 'Metrics only available on server side';
+    }
     return this.registry.metrics();
   }
 
-  getRegistry(): Registry {
+  getRegistry(): any {
     return this.registry;
   }
 

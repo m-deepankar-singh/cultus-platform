@@ -4,6 +4,8 @@ import {
   getAnalyticsCachePerformance 
 } from "@/app/actions/analytics-optimized";
 
+export const dynamic = 'force-dynamic';
+
 export default async function OptimizedAnalyticsTestPage() {
   // Test the main optimized analytics function
   const optimizedResult = await getOptimizedAnalytics();

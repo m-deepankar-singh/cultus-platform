@@ -1,5 +1,25 @@
 import { performance } from 'perf_hooks';
-import { register, Gauge, Counter, Histogram } from 'prom-client';
+
+// Only import prom-client on server side
+let register: any;
+let Gauge: any;
+let Counter: any;
+let Histogram: any;
+
+if (typeof window === 'undefined') {
+  try {
+    import('prom-client').then((promClient) => {
+      register = promClient.register;
+      Gauge = promClient.Gauge;
+      Counter = promClient.Counter;
+      Histogram = promClient.Histogram;
+    }).catch(error => {
+      console.warn('prom-client not available:', error);
+    });
+  } catch (error) {
+    console.warn('prom-client not available:', error);
+  }
+}
 
 export enum MemoryPressureLevel {
   NORMAL = 'normal',
@@ -40,35 +60,45 @@ class MemoryMonitor {
   };
 
   // Prometheus metrics
-  private readonly memoryUsageGauge = new Gauge({
-    name: 'memory_usage_bytes',
-    help: 'Current memory usage in bytes',
-    labelNames: ['type']
-  });
-
-  private readonly memoryPressureGauge = new Gauge({
-    name: 'memory_pressure_level',
-    help: 'Current memory pressure level (0=normal, 1=warning, 2=critical, 3=emergency)',
-  });
-
-  private readonly memoryEventsCounter = new Counter({
-    name: 'memory_events_total',
-    help: 'Total number of memory events',
-    labelNames: ['level']
-  });
-
-  private readonly memoryHistogram = new Histogram({
-    name: 'memory_usage_histogram',
-    help: 'Memory usage distribution',
-    buckets: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-  });
+  private readonly memoryUsageGauge: any;
+  private readonly memoryPressureGauge: any;
+  private readonly memoryEventsCounter: any;
+  private readonly memoryHistogram: any;
 
   private constructor() {
-    // Register metrics
-    register.registerMetric(this.memoryUsageGauge);
-    register.registerMetric(this.memoryPressureGauge);
-    register.registerMetric(this.memoryEventsCounter);
-    register.registerMetric(this.memoryHistogram);
+    // Initialize metrics only on server side
+    if (typeof window === 'undefined' && Gauge && Counter && Histogram) {
+      this.memoryUsageGauge = new Gauge({
+        name: 'memory_usage_bytes',
+        help: 'Current memory usage in bytes',
+        labelNames: ['type']
+      });
+
+      this.memoryPressureGauge = new Gauge({
+        name: 'memory_pressure_level',
+        help: 'Current memory pressure level (0=normal, 1=warning, 2=critical, 3=emergency)',
+      });
+
+      this.memoryEventsCounter = new Counter({
+        name: 'memory_events_total',
+        help: 'Total number of memory events',
+        labelNames: ['level']
+      });
+
+      this.memoryHistogram = new Histogram({
+        name: 'memory_usage_histogram',
+        help: 'Memory usage distribution',
+        buckets: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      });
+
+      // Register metrics
+      if (register) {
+        register.registerMetric(this.memoryUsageGauge);
+        register.registerMetric(this.memoryPressureGauge);
+        register.registerMetric(this.memoryEventsCounter);
+        register.registerMetric(this.memoryHistogram);
+      }
+    }
   }
 
   static getInstance(): MemoryMonitor {
@@ -170,22 +200,28 @@ class MemoryMonitor {
   }
 
   private updateMetrics(stats: MemoryStats): void {
-    // Update gauges
-    this.memoryUsageGauge.set({ type: 'rss' }, stats.rss);
-    this.memoryUsageGauge.set({ type: 'heap_total' }, stats.heapTotal);
-    this.memoryUsageGauge.set({ type: 'heap_used' }, stats.heapUsed);
-    this.memoryUsageGauge.set({ type: 'external' }, stats.external);
-    this.memoryUsageGauge.set({ type: 'array_buffers' }, stats.arrayBuffers);
+    // Update gauges only if available (server side)
+    if (this.memoryUsageGauge) {
+      this.memoryUsageGauge.set({ type: 'rss' }, stats.rss);
+      this.memoryUsageGauge.set({ type: 'heap_total' }, stats.heapTotal);
+      this.memoryUsageGauge.set({ type: 'heap_used' }, stats.heapUsed);
+      this.memoryUsageGauge.set({ type: 'external' }, stats.external);
+      this.memoryUsageGauge.set({ type: 'array_buffers' }, stats.arrayBuffers);
+    }
 
     // Update pressure level
-    const pressureValue = this.pressureLevelToNumber(stats.pressureLevel);
-    this.memoryPressureGauge.set(pressureValue);
+    if (this.memoryPressureGauge) {
+      const pressureValue = this.pressureLevelToNumber(stats.pressureLevel);
+      this.memoryPressureGauge.set(pressureValue);
+    }
 
     // Update histogram
-    this.memoryHistogram.observe(stats.memoryUsagePercent);
+    if (this.memoryHistogram) {
+      this.memoryHistogram.observe(stats.memoryUsagePercent);
+    }
 
     // Count events for non-normal pressure levels
-    if (stats.pressureLevel !== MemoryPressureLevel.NORMAL) {
+    if (this.memoryEventsCounter && stats.pressureLevel !== MemoryPressureLevel.NORMAL) {
       this.memoryEventsCounter.inc({ level: stats.pressureLevel });
     }
   }

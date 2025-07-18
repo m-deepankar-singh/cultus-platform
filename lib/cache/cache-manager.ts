@@ -365,7 +365,7 @@ export class DatabaseCacheManager {
     dateFrom?: string,
     dateTo?: string,
     clientId?: string,
-    duration: string = '1 hour'
+    duration: string = '5 minutes'
   ): Promise<any> {
     const cacheKey = `analytics_dashboard:${dateFrom || 'default'}:${dateTo || 'default'}:${clientId || 'all'}`;
     
