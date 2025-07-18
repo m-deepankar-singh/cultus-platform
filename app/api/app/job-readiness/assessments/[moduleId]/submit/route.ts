@@ -381,11 +381,8 @@ export async function POST(
         const completedCount = completedAssessments?.length || 0;
         const totalCount = totalAssessmentCount || 0;
         
-        console.log(`Assessment completion check: ${completedCount}/${totalCount} assessments completed for product ${productData.id}`);
-        
         // Award first star and assign tier if ALL assessments are completed
         if (completedCount === totalCount && totalCount > 0) {
-          console.log(`🌟 Student ${studentId} completed all ${totalCount} assessments. Calculating tier and awarding first star!`);
           
           // Calculate tier based on average score of all completed assessments
           let totalScore = 0;
@@ -414,8 +411,6 @@ export async function POST(
           const currentTier = claims.job_readiness_tier;
           tierChanged = currentTier !== tierAchieved;
           
-          console.log(`Calculated tier: ${tierAchieved} (average score: ${averageScore}%)`);
-          
           // Update student with both star level and tier
           const updateData: any = {
             job_readiness_star_level: 'ONE',
@@ -433,18 +428,13 @@ export async function POST(
 
           if (!updateError) {
             starLevelUnlocked = true;
-            console.log(`🎉 Successfully awarded first star and ${tierAchieved} tier for completing all assessments!`);
           } else {
             console.error('Error updating student star level and tier:', updateError);
           }
-        } else {
-          console.log(`Student ${studentId} completed ${completedCount}/${totalCount} assessments. First star and tier will be awarded when all are complete.`);
         }
       } else {
         console.error('Error checking assessment completion:', { completedCountError, totalCountError });
       }
-    } else if (currentStarLevel) {
-      console.log(`Student ${studentId} already has star level ${currentStarLevel}, skipping star awarding logic.`);
     }
 
     // 14. Generate feedback

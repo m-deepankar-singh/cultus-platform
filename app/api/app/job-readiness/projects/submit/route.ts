@@ -181,7 +181,6 @@ export async function POST(req: NextRequest) {
       storeFullContent = false;
       contentTruncated = true;
       
-      console.log(`Optimized storage for large coding project: ${contentLength} chars -> ${finalSubmissionContent.length} chars`);
     }
 
     // Use the AI project grader to evaluate the submission
@@ -308,7 +307,6 @@ export async function POST(req: NextRequest) {
       } else {
         starLevelUpdated = true;
         newStarLevel = 'FOUR';
-        console.log(`Student ${user.id} promoted to star level FOUR after passing project with score ${gradingResult.score}`);
       }
     }
 
@@ -349,8 +347,6 @@ export async function POST(req: NextRequest) {
         if (progressError) {
           console.error('Error updating project module progress:', progressError);
           // Don't fail the whole submission if we can't update module progress
-        } else {
-          console.log(`Updated project module progress for student ${user.id}, module ${projectModule.id}`);
         }
       } else {
         console.warn(`No Project module found for product ${product_id}`);

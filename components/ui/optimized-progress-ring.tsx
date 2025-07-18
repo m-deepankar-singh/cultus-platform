@@ -54,14 +54,14 @@ export function OptimizedProgressRing({
   const colorClasses = {
     primary: "text-primary",
     success: "text-green-500",
-    warning: "text-yellow-500", 
+    warning: "text-cyan-500", 
     danger: "text-red-500"
   };
 
   const backgroundColorClasses = {
     primary: "text-primary/20",
     success: "text-green-500/20",
-    warning: "text-yellow-500/20",
+    warning: "text-cyan-500/20",
     danger: "text-red-500/20"
   };
 

@@ -155,8 +155,6 @@ export async function GET(
     // 7. Return Combined List
     return NextResponse.json(combinedLessonProgress, { status: 200 });
 
-    console.log(`Validated request for student ${studentId} lessons in module ${moduleId}`);
-
   } catch (error) {
     console.error('Unexpected Error in GET /lessons:', error);
     // Add specific ZodError check if needed

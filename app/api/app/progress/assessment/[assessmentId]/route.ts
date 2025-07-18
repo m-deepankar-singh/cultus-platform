@@ -159,8 +159,6 @@ export async function POST(
       );
     }
 
-    console.log('Enrollment verified for assessment:', assessmentId);
-
     // 6. Calculate Score
     const submittedAnswers = submissionData.answers;
     // Type assertion for clarity, assuming questions array structure with id and correctAnswer
@@ -199,8 +197,6 @@ export async function POST(
 
     const scorePercentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-    console.log(`Score calculated for assessment ${assessmentId}: ${scorePercentage}% (${correctCount}/${totalQuestions})`);
-
     // 7. Upsert Attempt
     const attemptData = {
         student_id: studentId,
@@ -220,8 +216,6 @@ export async function POST(
         // Provide more context if possible, e.g., check for FK constraint issues
         return NextResponse.json({ error: 'Internal Server Error saving attempt' }, { status: 500 });
     }
-
-    console.log(`Assessment attempt recorded for student ${studentId}, assessment ${assessmentId}`);
 
     // 7b. (Optional) Update Module Progress if Assessment Score is 100%
     if (scorePercentage === 100) {
