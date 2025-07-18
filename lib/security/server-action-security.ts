@@ -103,17 +103,38 @@ export const getAuthenticatedUser = cache(async () => {
 export const getUserProfile = cache(async (userId: string) => {
   try {
     const supabase = await createClient();
+    
+    // First try to get from profiles table
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role, id')
       .eq('id', userId)
       .single();
 
-    if (profileError || !profile) {
-      return { success: false, error: 'Profile not found' };
+    if (profile && !profileError) {
+      return { success: true, profile };
     }
 
-    return { success: true, profile };
+    // If not found in profiles, check if user is a student
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, is_active')
+      .eq('id', userId)
+      .single();
+
+    if (student && !studentError) {
+      // Return student with 'Student' role
+      return { 
+        success: true, 
+        profile: { 
+          id: student.id, 
+          role: 'Student' 
+        } 
+      };
+    }
+
+    // If neither profiles nor students found, return error
+    return { success: false, error: 'Profile not found' };
   } catch (error) {
     console.error('Profile fetch error:', error);
     return { success: false, error: 'Failed to fetch profile' };

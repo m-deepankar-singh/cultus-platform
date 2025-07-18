@@ -106,8 +106,8 @@ export function studentDashboardOptions() {
         };
       });
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 30, // 30 minutes (renamed from cacheTime in v5)
+    staleTime: 1000 * 30, // 30 seconds - faster updates for progress
+    gcTime: 1000 * 60 * 10, // 10 minutes (renamed from cacheTime in v5)
   });
 }
 

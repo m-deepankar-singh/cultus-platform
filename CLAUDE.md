@@ -112,6 +112,20 @@ pnpm performance:check      # Lighthouse performance check
   - Star 3: Completed expert session
   - Star 4: Completed real-world projects
   - Star 5: Completed simulated interview
+- **Job Readiness Progression Logic**:
+  - When learner first opens job readiness, they start with 0 stars
+  - No tiers initially, only assessments are unlocked
+  - After completing an assessment, learner gets the first star
+  - A tier is assigned based on assessment score
+  - Courses unlock after first star
+  - Completing course modules earns the second star
+  - Expert sessions unlock at this stage
+  - Completing 5 expert sessions results in the third star
+  - Real-world projects become available
+  - Completing projects earns the fourth star
+  - Simulated interviews unlock
+  - Completing the interview achieves the fifth star
+  - Job readiness program is now complete
 
 ### Multi-Tenant Architecture
 - **Client-based data isolation** using RLS policies

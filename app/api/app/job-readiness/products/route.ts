@@ -65,8 +65,17 @@ export async function GET(request: Request) {
       return NextResponse.json(responseData);
     }
 
+    // Temporarily disable server-side caching for debugging
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+
     // Use dynamic cache (1 minute) for user-specific product data
-    return handleConditionalRequest(request, responseData, CACHE_CONFIGS.DYNAMIC);
+    // return handleConditionalRequest(request, responseData, CACHE_CONFIGS.DYNAMIC);
 
   } catch (error) {
     console.error('Unexpected error in GET /api/app/job-readiness/products:', error);

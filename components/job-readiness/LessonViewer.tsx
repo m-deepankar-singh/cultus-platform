@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Video, Play, Pause, Volume2, VolumeX, CheckCircle, Award, Clock } from 'lucide-react'
+import { Video, Play, Pause, Volume2, VolumeX, CheckCircle, Award, Clock, Maximize, Minimize } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { AiQuiz } from './AiQuiz'
@@ -72,8 +72,10 @@ export function LessonViewer({
   const [canCompleteVideo, setCanCompleteVideo] = useState(false)
   const [localQuizResult, setLocalQuizResult] = useState<LessonQuizResult | null>(null)
   const [localVideoCompleted, setLocalVideoCompleted] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   
   const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const router = useRouter()
   
@@ -153,6 +155,54 @@ export function LessonViewer({
       videoRef.current.muted = !isMuted
     }
   }
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return
+    
+    try {
+      if (!isFullscreen) {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen()
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await (containerRef.current as any).webkitRequestFullscreen()
+        } else if ((containerRef.current as any).msRequestFullscreen) {
+          await (containerRef.current as any).msRequestFullscreen()
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen()
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen()
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen()
+        }
+      }
+    } catch (error) {
+      console.error('Fullscreen error:', error)
+      toast({
+        title: "Fullscreen Error",
+        description: "Unable to toggle fullscreen mode.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('msfullscreenchange', handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange)
+    }
+  }, [])
 
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60)
@@ -315,7 +365,7 @@ export function LessonViewer({
 
       {/* Video Player - No Seeking Allowed */}
       <Card className="overflow-hidden">
-        <div className="relative aspect-video bg-black">
+        <div ref={containerRef} className="relative aspect-video bg-black">
           <video
             ref={videoRef}
             className="w-full h-full"
@@ -363,43 +413,59 @@ export function LessonViewer({
               </div>
 
               {/* Control buttons - No skip controls */}
-              <div className="flex items-center justify-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={togglePlay}
-                  className="text-white hover:bg-white/20"
-                >
-                  {isPlaying ? (
-                    <Pause className="h-5 w-5" />
-                  ) : (
-                    <Play className="h-5 w-5" />
-                  )}
-                </Button>
-
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-4">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={toggleMute}
+                    onClick={togglePlay}
                     className="text-white hover:bg-white/20"
                   >
-                    {isMuted ? (
-                      <VolumeX className="h-4 w-4" />
+                    {isPlaying ? (
+                      <Pause className="h-5 w-5" />
                     ) : (
-                      <Volume2 className="h-4 w-4" />
+                      <Play className="h-5 w-5" />
                     )}
                   </Button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={isMuted ? 0 : volume}
-                    onChange={handleVolumeChange}
-                    className="w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
-                  />
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleMute}
+                      className="text-white hover:bg-white/20"
+                    >
+                      {isMuted ? (
+                        <VolumeX className="h-4 w-4" />
+                      ) : (
+                        <Volume2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={isMuted ? 0 : volume}
+                      onChange={handleVolumeChange}
+                      className="w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
                 </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleFullscreen}
+                  className="text-white hover:bg-white/20"
+                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                  {isFullscreen ? (
+                    <Minimize className="h-5 w-5" />
+                  ) : (
+                    <Maximize className="h-5 w-5" />
+                  )}
+                </Button>
               </div>
             </div>
           </div>

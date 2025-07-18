@@ -239,8 +239,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(responseData);
     }
 
+    // Temporarily disable server-side caching for debugging
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+
     // Use semi-static cache (5 minutes) for assessment structure
-    return handleConditionalRequest(req, responseData, CACHE_CONFIGS.SEMI_STATIC);
+    // return handleConditionalRequest(req, responseData, CACHE_CONFIGS.SEMI_STATIC);
 
   } catch (error) {
     console.error('Unexpected error in Job Readiness assessments endpoint:', error);

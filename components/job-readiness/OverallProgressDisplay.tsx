@@ -66,57 +66,61 @@ export function OverallProgressDisplay() {
   const tierConfig = currentTier ? tierConfigs[currentTier] : null
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between w-full max-w-2xl mx-auto">
-        <h2 className="text-lg font-medium">Your Progress</h2>
+    <div className="p-4 sm:p-6">
+      <div className="w-full max-w-2xl mx-auto">
+        {/* Title - Centered */}
+        <h2 className="text-lg font-medium text-center mb-4">Your Progress</h2>
         
-        {/* Universal 5-Star System - Middle */}
-        <div className="flex items-center justify-center gap-1">
-          {Array.from({ length: 5 }, (_, index) => {
-            const starNumber = index + 1
-            const isEarned = starNumber <= currentStars
-            const starColor = tierConfig?.starColor || "text-yellow-500"
-            return (
-              <div 
-                key={index}
-                className="relative w-8 h-8"
-              >
-                <Star 
-                  className={cn(
-                    "w-8 h-8 transition-all duration-300",
-                    isEarned 
-                      ? `fill-current ${starColor} drop-shadow-lg` 
-                      : "text-muted-foreground"
-                  )}
-                  style={{
-                    filter: isEarned ? 'drop-shadow(0 0 6px currentColor) brightness(1.2)' : 'none'
-                  }}
-                />
-              </div>
-            )
-          })}
+        {/* Progress and Tier Container - Centered layout */}
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6">
+          {/* Universal 5-Star System */}
+          <div className="flex items-center justify-center gap-1">
+            {Array.from({ length: 5 }, (_, index) => {
+              const starNumber = index + 1
+              const isEarned = starNumber <= currentStars
+              const starColor = tierConfig?.starColor || "text-yellow-500"
+              return (
+                <div 
+                  key={index}
+                  className="relative w-7 h-7 sm:w-8 sm:h-8"
+                >
+                  <Star 
+                    className={cn(
+                      "w-7 h-7 sm:w-8 sm:h-8 transition-all duration-300",
+                      isEarned 
+                        ? `fill-current ${starColor} drop-shadow-lg` 
+                        : "text-muted-foreground"
+                    )}
+                    style={{
+                      filter: isEarned ? 'drop-shadow(0 0 6px currentColor) brightness(1.2)' : 'none'
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+          
+          {/* Tier Badge */}
+          {currentTier && tierConfig ? (
+            <Badge 
+              variant="secondary"
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base font-medium",
+                tierConfig.bgColor,
+                tierConfig.textColor,
+                "border"
+              )}
+            >
+              <Trophy className="h-4 w-4 sm:h-5 sm:w-5" />
+              {tierConfig.name} Tier
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base">
+              <Clock className="h-4 w-4" />
+              No Tier Yet
+            </Badge>
+          )}
         </div>
-        
-        {/* Tier Badge - Right */}
-        {currentTier && tierConfig ? (
-          <Badge 
-            variant="secondary"
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 text-base font-medium",
-              tierConfig.bgColor,
-              tierConfig.textColor,
-              "border"
-            )}
-          >
-            <Trophy className="h-5 w-5" />
-            {tierConfig.name} Tier
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="flex items-center gap-2 px-4 py-2 text-base">
-            <Clock className="h-4 w-4" />
-            No Tier Yet
-          </Badge>
-        )}
       </div>
     </div>
   )

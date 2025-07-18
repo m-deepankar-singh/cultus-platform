@@ -167,7 +167,7 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
       <div className="space-y-6">
         <h3 className="text-xl font-semibold text-center">Tier Requirements</h3>
         
-        <CardGrid columns={3} gap="lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {Object.entries(safeTierCriteria).map(([tier, criteria], index) => {
             const tierName = tier.toUpperCase() as keyof typeof tierConfigs
             const tierConfig = tierConfigs[tierName]
@@ -186,7 +186,7 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
                 )}
               >
                 
-                <div className="p-8 text-center space-y-6">
+                <div className="p-4 sm:p-6 lg:p-8 text-center space-y-4 sm:space-y-6">
                   {/* Tier Icon with Progress Ring - Centered */}
                   <div className="flex justify-center">
                     <div className="relative inline-block">
@@ -252,7 +252,7 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
               </PerformantAnimatedCard>
             )
           })}
-        </CardGrid>
+        </div>
       </div>
 
       {/* Help Section */}

@@ -23,6 +23,9 @@ export function ModuleNavigation() {
   const { data: moduleGroups, isLoading } = useJobReadinessModuleGroups()
   const [mounted, setMounted] = useState(false)
   
+  console.log('ModuleNavigation - moduleGroups:', moduleGroups)
+  console.log('ModuleNavigation - isLoading:', isLoading)
+  
   useEffect(() => {
     setMounted(true)
   }, [])

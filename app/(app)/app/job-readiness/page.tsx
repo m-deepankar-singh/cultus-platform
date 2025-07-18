@@ -29,9 +29,9 @@ export default function JobReadinessPage() {
               <div className="text-center">
                 <div className="flex justify-center gap-1 mb-4">
                   {Array.from({ length: 5 }, (_, index) => (
-                    <div key={index} className="relative w-8 h-8">
+                    <div key={index} className="relative w-6 h-6 sm:w-8 sm:h-8">
                       <div 
-                        className="w-8 h-8 transition-all duration-300"
+                        className="w-6 h-6 sm:w-8 sm:h-8 transition-all duration-300"
                         style={{
                           background: progress?.currentTier === 'BRONZE' 
                             ? '#f97316' 
@@ -51,7 +51,7 @@ export default function JobReadinessPage() {
                 </p>
               </div>
               
-              <div className="grid md:grid-cols-5 gap-4 text-center text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-center text-sm">
                 <div className="space-y-2">
                   <div className="relative w-6 h-6 mx-auto">
                     <div 

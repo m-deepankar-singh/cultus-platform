@@ -255,9 +255,22 @@ export async function POST(
         } else if (question.question_type === 'MSQ') {
           // Multiple correct answers - compare arrays
           const studentAnswers = Array.isArray(studentAnswer) ? studentAnswer.sort() : [studentAnswer].sort();
-          const correctAnswers_arr = Array.isArray(correctAnswer) ? correctAnswer.sort() : [correctAnswer].sort();
           
-          if (JSON.stringify(studentAnswers) === JSON.stringify(correctAnswers_arr)) {
+          // Handle different formats of correct answers in database
+          let correctAnswersArray: string[] = [];
+          if (Array.isArray(correctAnswer)) {
+            correctAnswersArray = correctAnswer;
+          } else if (typeof correctAnswer === 'object' && correctAnswer.answers && Array.isArray(correctAnswer.answers)) {
+            // Handle format: {"answers": ["opt_a", "opt_b"]}
+            correctAnswersArray = correctAnswer.answers;
+          } else {
+            // Handle single answer stored as string
+            correctAnswersArray = [correctAnswer];
+          }
+          
+          const sortedCorrectAnswers = correctAnswersArray.sort();
+          
+          if (JSON.stringify(studentAnswers) === JSON.stringify(sortedCorrectAnswers)) {
             correctAnswers++;
           }
         }

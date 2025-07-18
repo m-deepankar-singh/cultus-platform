@@ -248,7 +248,7 @@ export async function POST(
     let starLevelUnlocked = false;
     let newStarLevel = '';
 
-    if (courseCompleted && !existingProgress?.course_completed_at) {
+    if (courseCompleted) {
       // Check if ALL course modules for this product are now completed
       const productId = courseData.module_product_assignments?.[0]?.product_id;
       
@@ -262,8 +262,8 @@ export async function POST(
       if (!studentError && studentData) {
         const currentStarLevel = studentData.job_readiness_star_level;
         
-        // Only award second star if student doesn't already have TWO or higher
-        if (currentStarLevel !== 'TWO' && currentStarLevel !== 'THREE') {
+        // Only award second star if student currently has exactly ONE star
+        if (currentStarLevel === 'ONE') {
           // Check if ALL course modules for this product are completed
           const { data: completedCourses, error: completedCoursesError } = await supabase
             .from('modules')

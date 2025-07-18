@@ -90,15 +90,19 @@ export function useJobReadinessModuleGroups() {
       }
       const data: JobReadinessProgressResponse = await response.json()
       
+      console.log('API Response:', data)
+      
       // Get the primary product (first one with modules)
       const primaryProduct = data.products?.[0] || null
       const allModules = primaryProduct?.modules || []
       
+      console.log('Modules found:', allModules.length)
+      
       // Group modules by type
       const assessmentModules = allModules.filter(m => m.type === 'Assessment')
       const courseModules = allModules.filter(m => m.type === 'Course')
-      const expertSessionModules = allModules.filter(m => m.type === 'Expert_Session')
-      const projectModules = allModules.filter(m => m.type === 'Project')
+      const expertSessionModules = allModules.filter(m => m.type === 'expert_session')
+      const projectModules = allModules.filter(m => m.type === 'project')
       
       // Calculate star level (convert string to number)
       const starLevelMap: { [key: string]: number } = {
@@ -147,8 +151,8 @@ export function useJobReadinessModuleGroups() {
       // Helper function for interview status
       const calculateInterviewStatus = () => {
         const isUnlocked = currentStars >= 4 // Unlocked after projects (star 4)
-        const isCompleted = data.interviewStatus.isCompleted
-        const completedCount = data.interviewStatus.hasAttempted ? 1 : 0
+        const isCompleted = data.interviewStatus?.isCompleted || false
+        const completedCount = data.interviewStatus?.hasAttempted ? 1 : 0
         const totalCount = 1
         
         return { completedCount, totalCount, isUnlocked, isCompleted }

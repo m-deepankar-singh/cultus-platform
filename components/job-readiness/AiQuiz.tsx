@@ -180,19 +180,19 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingA
 
   return (
     <Card className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            <CardTitle className="text-purple-900 dark:text-purple-100">
+            <CardTitle className="text-purple-900 dark:text-purple-100 text-lg sm:text-xl">
               AI-Generated Quiz
             </CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge className={getQuestionTypeColor(currentQuestion.question_type)}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={`${getQuestionTypeColor(currentQuestion.question_type)} text-xs sm:text-sm`}>
               {getQuestionTypeLabel(currentQuestion.question_type)}
             </Badge>
-            <Badge variant="outline">
+            <Badge variant="outline" className="text-xs sm:text-sm">
               {currentQuestionIndex + 1} of {questions.length}
             </Badge>
           </div>
@@ -207,7 +207,7 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingA
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 p-4 sm:p-6">
         {/* Progress Bar */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-purple-700 dark:text-purple-300">
@@ -224,7 +224,7 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingA
 
         {/* Question */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-relaxed">
             {currentQuestion.question_text}
           </h3>
 
@@ -235,27 +235,48 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingA
                 value={answers[currentQuestion.id] as string || ''}
                 onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
               >
-                {currentQuestion.options.map((option) => (
-                  <div key={option.id} className="flex items-center space-x-2">
-                    <RadioGroupItem value={option.id} id={option.id} />
+                {currentQuestion.options.map((option) => {
+                  const isSelected = answers[currentQuestion.id] === option.id
+                  return (
                     <Label
+                      key={option.id}
                       htmlFor={option.id}
-                      className="flex-1 cursor-pointer p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      className={`flex items-center space-x-3 cursor-pointer p-4 rounded-lg border-2 transition-all duration-200 min-h-[60px] ${
+                        isSelected 
+                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 dark:border-purple-400' 
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                      }`}
                     >
-                      {option.text}
+                      <RadioGroupItem 
+                        value={option.id} 
+                        id={option.id}
+                        className={isSelected ? 'border-purple-500 text-purple-600' : ''}
+                      />
+                      <span className={`text-sm sm:text-base ${isSelected ? 'text-purple-900 dark:text-purple-100 font-medium' : 'text-gray-900 dark:text-gray-100'}`}>
+                        {option.text}
+                      </span>
                     </Label>
-                  </div>
-                ))}
+                  )
+                })}
               </RadioGroup>
             ) : currentQuestion.question_type === 'MSQ' ? (
               <div className="space-y-3">
                 {currentQuestion.options.map((option) => {
                   const selectedOptions = (answers[currentQuestion.id] as string[]) || []
+                  const isSelected = selectedOptions.includes(option.id)
                   return (
-                    <div key={option.id} className="flex items-center space-x-2">
+                    <Label
+                      key={option.id}
+                      htmlFor={option.id}
+                      className={`flex items-center space-x-3 cursor-pointer p-4 rounded-lg border-2 transition-all duration-200 min-h-[60px] ${
+                        isSelected 
+                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 dark:border-purple-400' 
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                      }`}
+                    >
                       <Checkbox
                         id={option.id}
-                        checked={selectedOptions.includes(option.id)}
+                        checked={isSelected}
                         onCheckedChange={(checked) => {
                           const currentSelections = (answers[currentQuestion.id] as string[]) || []
                           if (checked) {
@@ -264,14 +285,12 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingA
                             handleAnswerChange(currentQuestion.id, currentSelections.filter(id => id !== option.id))
                           }
                         }}
+                        className={isSelected ? 'border-purple-500 text-purple-600' : ''}
                       />
-                      <Label
-                        htmlFor={option.id}
-                        className="flex-1 cursor-pointer p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                      >
+                      <span className={`text-sm sm:text-base ${isSelected ? 'text-purple-900 dark:text-purple-100 font-medium' : 'text-gray-900 dark:text-gray-100'}`}>
                         {option.text}
-                      </Label>
-                    </div>
+                      </span>
+                    </Label>
                   )
                 })}
               </div>
@@ -280,32 +299,35 @@ export function AiQuiz({ questions, onSubmit, onCancel, isSubmitting, remainingA
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between pt-4 border-t border-purple-200 dark:border-purple-700">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-purple-200 dark:border-purple-700">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               onClick={handlePrevious}
               disabled={currentQuestionIndex === 0}
+              className="flex-1 sm:flex-none min-h-[44px]"
             >
               Previous
             </Button>
             <Button
               variant="ghost"
               onClick={onCancel}
+              className="flex-1 sm:flex-none min-h-[44px]"
             >
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             {hasAnswered && (
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
             )}
             <Button
               onClick={handleNext}
               disabled={!hasAnswered}
               variant={isLastQuestion ? "default" : "outline"}
+              className="flex-1 sm:flex-none min-h-[44px]"
             >
               {isLastQuestion ? 'Review & Submit' : 'Next'}
             </Button>
