@@ -40,8 +40,12 @@ export const audioContext: (
       await a.play();
       if (options?.id && audioContextMap.has(options.id)) {
         const ctx = audioContextMap.get(options.id);
-        if (ctx) {
+        if (ctx && ctx.state !== 'closed') {
           return ctx;
+        }
+        // Remove closed context from cache
+        if (ctx && ctx.state === 'closed') {
+          audioContextMap.delete(options.id);
         }
       }
       const ctx = new AudioContext(options);
@@ -53,8 +57,12 @@ export const audioContext: (
       await ensureUserInteraction();
       if (options?.id && audioContextMap.has(options.id)) {
         const ctx = audioContextMap.get(options.id);
-        if (ctx) {
+        if (ctx && ctx.state !== 'closed') {
           return ctx;
+        }
+        // Remove closed context from cache
+        if (ctx && ctx.state === 'closed') {
+          audioContextMap.delete(options.id);
         }
       }
       const ctx = new AudioContext(options);
@@ -112,4 +120,30 @@ export function arrayBufferToBase64(buffer: ArrayBuffer) {
     binary += String.fromCharCode(bytes[i]);
   }
   return window.btoa(binary);
+}
+
+/**
+ * Safely close an AudioContext and handle cleanup
+ */
+export async function closeAudioContext(ctx: AudioContext): Promise<void> {
+  if (!ctx || ctx.state === 'closed') {
+    return;
+  }
+  
+  try {
+    await ctx.close();
+  } catch (error) {
+    console.warn('AudioContext close warning:', error);
+  }
+}
+
+/**
+ * Clean up closed AudioContexts from the cache
+ */
+export function cleanupAudioContextCache(): void {
+  for (const [id, ctx] of audioContextMap.entries()) {
+    if (ctx.state === 'closed') {
+      audioContextMap.delete(id);
+    }
+  }
 } 

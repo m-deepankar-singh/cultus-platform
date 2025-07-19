@@ -113,31 +113,6 @@ export default function Dashboard() {
             Continue your learning journey and track your progress with your personalized dashboard.
           </p>
           
-          {/* Quick Stats Overview */}
-          <div className="mt-8">
-            <ProgressRingGroup
-              rings={[
-                {
-                  value: Math.round(products.reduce((acc, p) => acc + (p.product_progress_percentage || 0 || 0), 0) / (products.length || 1)),
-                  label: "Overall Progress",
-                  color: "primary",
-                  size: 100
-                },
-                {
-                  value: Math.round((coursesInProgress / (products.length || 1)) * 100),
-                  label: "Active Courses",
-                  color: "warning",
-                  size: 80
-                },
-                {
-                  value: Math.round((completedProducts / (products.length || 1)) * 100),
-                  label: "Completed",
-                  color: "success",
-                  size: 80
-                }
-              ]}
-            />
-          </div>
         </div>
       
       {/* Detailed Progress Overview */}

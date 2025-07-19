@@ -210,7 +210,14 @@ export default function InterviewsPage() {
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {interviewStatus.lastAttemptDate && 
-                          `Last attempt: ${new Date(interviewStatus.lastAttemptDate).toLocaleDateString()}`
+                          `Last attempt: ${(() => {
+                            try {
+                              const date = new Date(interviewStatus.lastAttemptDate);
+                              return isNaN(date.getTime()) ? 'unknown' : date.toLocaleDateString();
+                            } catch {
+                              return 'unknown';
+                            }
+                          })()}`
                         }
                       </p>
                       {interviewStatus.submissionId && (

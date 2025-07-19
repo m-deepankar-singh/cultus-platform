@@ -91,33 +91,45 @@ export function EnhancedExpertSessionPlayer({
   const [milestoneState, setMilestoneState] = useState<MilestoneTrackingState>(() => {
     const currentProgress = session.student_progress.completion_percentage || 0
     const lastMilestone = session.student_progress.last_milestone_reached || 0
+    
+    // Fix: If completion percentage suggests milestones should be unlocked but last_milestone_reached is 0,
+    // use the highest milestone that should be unlocked based on completion percentage
+    const expectedMilestone = MILESTONES.filter(m => currentProgress >= m).pop() || 0
+    const effectiveLastMilestone = Math.max(lastMilestone, expectedMilestone)
+    
     const unlockedMilestones = MILESTONES.filter(m => currentProgress >= m)
     
-    console.log(`🎬 Initializing milestone state: ${currentProgress}% progress, last milestone: ${lastMilestone}`)
+    console.log(`🎬 Initializing milestone state: ${currentProgress}% progress, DB milestone: ${lastMilestone}, effective milestone: ${effectiveLastMilestone}`)
     
     return {
-      lastMilestoneSaved: lastMilestone,
+      lastMilestoneSaved: effectiveLastMilestone,
       pauseStartTime: null,
       sessionStartTime: null,
-      currentMilestone: lastMilestone,
+      currentMilestone: effectiveLastMilestone,
       milestonesUnlocked: unlockedMilestones,
       isSessionActive: false
     }
   })
 
-  // Resume dialog now only shows as fallback - auto-resume handles most cases
+  // Resume dialog shows when auto-resume fails or for user choice
   useEffect(() => {
-    const lastMilestone = session.student_progress.last_milestone_reached || 0
+    const effectiveLastMilestone = milestoneState.lastMilestoneSaved
     
-    // Only show dialog if there's milestone progress but auto-resume hasn't started
-    if (lastMilestone >= 10 && 
+    // Show dialog if there's milestone progress and user hasn't started watching
+    if (effectiveLastMilestone >= 10 && 
         !session.student_progress.is_completed && 
         !hasStartedWatching) {
-      // Auto-resume will handle this in handleLoadedMetadata
-      // Dialog is only shown as fallback if auto-resume fails
-      setShowResumeDialog(false)
+      // Give auto-resume a chance to work, then show dialog as fallback
+      const timer = setTimeout(() => {
+        if (!hasStartedWatching) {
+          console.log(`⚠️ Auto-resume may have failed, showing resume dialog for ${effectiveLastMilestone}% milestone`)
+          setShowResumeDialog(true)
+        }
+      }, 2000) // Wait 2 seconds for auto-resume to complete
+      
+      return () => clearTimeout(timer)
     }
-  }, [session.student_progress.last_milestone_reached, session.student_progress.is_completed, hasStartedWatching])
+  }, [milestoneState.lastMilestoneSaved, session.student_progress.is_completed, hasStartedWatching])
 
   // Enhanced progress update with session tracking
   const handleProgressUpdate = useCallback((
@@ -189,11 +201,21 @@ export function EnhancedExpertSessionPlayer({
 
     const currentPercentage = Math.floor((currentTime / duration) * 100)
     
+    console.log(`🔍 Milestone Check:`, {
+      currentTime,
+      duration,
+      currentPercentage,
+      lastMilestoneSaved: milestoneState.lastMilestoneSaved,
+      milestones: MILESTONES
+    })
+    
     // Find the highest milestone that should be unlocked based on current progress
     const milestoneToUnlock = MILESTONES.find(milestone => 
       currentPercentage >= milestone && 
       milestone > milestoneState.lastMilestoneSaved
     )
+    
+    console.log(`🎯 Milestone to unlock:`, milestoneToUnlock)
     
     if (milestoneToUnlock) {
       console.log(`🎯 Milestone ${milestoneToUnlock}% reached at ${currentTime}s (${currentPercentage}% progress)`)
@@ -266,36 +288,66 @@ export function EnhancedExpertSessionPlayer({
       setIsLoading(false)
       
       // Auto-resume from last milestone reached (efficient DB approach)
-      const lastMilestone = session.student_progress.last_milestone_reached || 0
+      const effectiveLastMilestone = milestoneState.lastMilestoneSaved
       
-      if (lastMilestone >= 10 && !session.student_progress.is_completed) {
-        // Calculate resume position from milestone percentage
-        const resumePosition = Math.floor((lastMilestone / 100) * video.duration)
+      console.log(`🔍 Resume Debug:`, {
+        dbLastMilestone: session.student_progress.last_milestone_reached,
+        effectiveLastMilestone,
+        completionPercentage: session.student_progress.completion_percentage,
+        isCompleted: session.student_progress.is_completed,
+        canResume: session.student_progress.can_resume,
+        resumeFromMilestone: session.student_progress.resume_from_milestone,
+        resumePositionSeconds: session.student_progress.resume_position_seconds
+      })
+      
+      if (effectiveLastMilestone >= 10 && !session.student_progress.is_completed) {
+        // Use API-provided resume position if available, otherwise calculate from milestone
+        const resumePosition = session.student_progress.resume_position_seconds || 
+                              Math.floor((effectiveLastMilestone / 100) * video.duration)
         
-        console.log(`🔄 Auto-resuming from ${lastMilestone}% milestone: ${resumePosition}s`)
-        video.currentTime = resumePosition
-        setCurrentTime(resumePosition)
-        setHasStartedWatching(true)
+        console.log(`🔄 Auto-resuming from ${effectiveLastMilestone}% milestone: ${resumePosition}s (video duration: ${video.duration}s)`)
         
-        // Don't show resume dialog since we're auto-resuming
-        setShowResumeDialog(false)
-        
-        // Start the session immediately when auto-resuming
-        setMilestoneState(prev => ({
-          ...prev,
-          sessionStartTime: Date.now(),
-          isSessionActive: true
-        }))
-        
-        // Show notification about auto-resume
-        import('sonner').then(({ toast }) => {
-          toast.success(`Resumed from ${lastMilestone}% checkpoint`, {
-            description: `Continuing from ${Math.floor(resumePosition / 60)}:${(resumePosition % 60).toString().padStart(2, '0')}`,
-            duration: 3000,
-          })
-        })
-      } else if (lastMilestone < 10) {
-        console.log(`🔄 Starting from beginning: last milestone ${lastMilestone}% < 10%`)
+        // Ensure resume position is valid
+        if (resumePosition > 0 && resumePosition < video.duration) {
+          try {
+            video.currentTime = resumePosition
+            setCurrentTime(resumePosition)
+            setHasStartedWatching(true)
+            
+            // Don't show resume dialog since we're auto-resuming
+            setShowResumeDialog(false)
+            
+            // Start the session immediately when auto-resuming
+            setMilestoneState(prev => ({
+              ...prev,
+              sessionStartTime: Date.now(),
+              isSessionActive: true
+            }))
+            
+            // Show notification about auto-resume
+            import('sonner').then(({ toast }) => {
+              toast.success(`Resumed from ${effectiveLastMilestone}% checkpoint`, {
+                description: `Continuing from ${Math.floor(resumePosition / 60)}:${(resumePosition % 60).toString().padStart(2, '0')}`,
+                duration: 3000,
+              })
+            })
+            
+            console.log(`✅ Auto-resume successful: video.currentTime = ${video.currentTime}`)
+          } catch (error) {
+            console.error(`❌ Auto-resume failed:`, error)
+            // Fallback: show resume dialog
+            setTimeout(() => {
+              if (!hasStartedWatching) {
+                setShowResumeDialog(true)
+              }
+            }, 1000)
+          }
+        } else {
+          console.warn(`⚠️ Invalid resume position ${resumePosition}s for video duration ${video.duration}s`)
+          setHasStartedWatching(false)
+        }
+      } else if (effectiveLastMilestone < 10) {
+        console.log(`🔄 Starting from beginning: last milestone ${effectiveLastMilestone}% < 10%`)
         setHasStartedWatching(false)
       }
     }
@@ -571,31 +623,33 @@ export function EnhancedExpertSessionPlayer({
     <div className="space-y-4">
       {/* Resume Dialog */}
       {showResumeDialog && (
-        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
-          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 mx-1 sm:mx-0">
+          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
           <AlertDescription className="space-y-3">
             <div>
-              <p className="font-medium text-blue-900 dark:text-blue-100">Resume from where you left off?</p>
-              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                You can resume from the {session.student_progress.resume_from_milestone}% milestone 
-                ({formatTime(session.student_progress.resume_position_seconds)})
+              <p className="font-medium text-blue-900 dark:text-blue-100 text-sm sm:text-base">Resume from where you left off?</p>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 mt-1">
+                You can resume from the {session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}% milestone 
+                ({formatTime(session.student_progress.resume_position_seconds || Math.floor(((session.student_progress.last_milestone_reached || 0) / 100) * duration))})
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col xs:flex-row gap-2">
               <Button 
                 size="sm" 
                 onClick={resumeFromMilestone}
-                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-xs sm:text-sm flex-1 xs:flex-initial"
               >
-                Resume from {session.student_progress.resume_from_milestone}%
+                <span className="hidden xs:inline">Resume from {session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}%</span>
+                <span className="xs:hidden">Resume ({session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}%)</span>
               </Button>
               <Button 
                 size="sm" 
                 variant="outline" 
                 onClick={startFromBeginning}
-                className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20 text-xs sm:text-sm flex-1 xs:flex-initial"
               >
-                Start from beginning
+                <span className="hidden xs:inline">Start from beginning</span>
+                <span className="xs:hidden">Start over</span>
               </Button>
             </div>
           </AlertDescription>
@@ -614,7 +668,7 @@ export function EnhancedExpertSessionPlayer({
 
       {/* Video Player */}
       <Card ref={containerRef} className="overflow-hidden">
-        <CardContent className="p-0 relative">
+        <CardContent className="p-0 relative bg-black">
           {/* Loading Overlay */}
           {isLoading && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
@@ -652,36 +706,38 @@ export function EnhancedExpertSessionPlayer({
 
           {/* Controls Overlay - Always visible for reliable access */}
           {!isLoading && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 z-20">
-              <div className="space-y-3">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent py-3 px-2 sm:p-4 z-20">
+              <div className="space-y-3 sm:space-y-4">
                 {/* Milestone Progress Indicator */}
-                <MilestoneProgressIndicator
-                  currentPercentage={currentPercentage}
-                  milestonesUnlocked={milestoneState.milestonesUnlocked}
-                  isDisabled={true} // Read-only, no interactions
-                />
+                <div className="px-2 sm:px-0 -mx-1 sm:mx-0">
+                  <MilestoneProgressIndicator
+                    currentPercentage={currentPercentage}
+                    milestonesUnlocked={milestoneState.milestonesUnlocked}
+                    isDisabled={true} // Read-only, no interactions
+                  />
+                </div>
 
                 {/* Video Controls */}
-                <div className="flex items-center justify-between text-white">
+                <div className="flex items-center justify-between text-white gap-2 sm:gap-4">
                   {/* Left: Play/Pause Button */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <Button
                       variant="ghost"
-                      size="lg"
+                      size="sm"
                       onClick={togglePlay}
-                      className="text-white hover:bg-white/20 p-3 rounded-full"
+                      className="text-white hover:bg-white/20 p-2 sm:p-3 rounded-full min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px]"
                       disabled={isUpdatingProgress}
                     >
                       {isPlaying ? (
-                        <Pause className="h-6 w-6" />
+                        <Pause className="h-5 w-5 sm:h-6 sm:w-6" />
                       ) : (
-                        <Play className="h-6 w-6" />
+                        <Play className="h-5 w-5 sm:h-6 sm:w-6" />
                       )}
                     </Button>
                     
                     {/* Progress Saving Indicator */}
                     {isUpdatingProgress && (
-                      <div className="flex items-center gap-2 text-sm text-gray-300">
+                      <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-300">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         <span className="hidden sm:inline">Saving...</span>
                       </div>
@@ -689,25 +745,25 @@ export function EnhancedExpertSessionPlayer({
                   </div>
 
                   {/* Center: Time Display */}
-                  <div className="flex-1 mx-4 text-center">
-                    <div className="text-sm text-gray-300">
+                  <div className="flex-1 mx-2 sm:mx-4 text-center">
+                    <div className="text-xs sm:text-sm text-gray-300 font-mono">
                       {formatTime(currentTime)} / {formatTime(duration)}
                     </div>
                   </div>
 
                   {/* Right: Volume and Fullscreen */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 sm:gap-3">
                     {/* Volume Controls */}
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleMute}
-                      className="text-white hover:bg-white/20 p-2"
+                      className="text-white hover:bg-white/20 p-2 min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px]"
                     >
                       {isMuted || volume === 0 ? (
-                        <VolumeX className="h-4 w-4" />
+                        <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />
                       ) : (
-                        <Volume2 className="h-4 w-4" />
+                        <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" />
                       )}
                     </Button>
 
@@ -716,9 +772,9 @@ export function EnhancedExpertSessionPlayer({
                       variant="ghost"
                       size="sm"
                       onClick={toggleFullscreen}
-                      className="text-white hover:bg-white/20 p-2"
+                      className="text-white hover:bg-white/20 p-2 min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px]"
                     >
-                      <Maximize className="h-4 w-4" />
+                      <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                   </div>
                 </div>
@@ -728,15 +784,16 @@ export function EnhancedExpertSessionPlayer({
 
           {/* Manual Completion Button */}
           {canComplete && !session.student_progress.is_completed && (
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
               <Button
                 onClick={handleManualCompletion}
                 disabled={isUpdatingProgress}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm"
                 size="sm"
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Mark Complete
+                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">Mark Complete</span>
+                <span className="xs:hidden">✓</span>
               </Button>
             </div>
           )}
@@ -744,13 +801,13 @@ export function EnhancedExpertSessionPlayer({
       </Card>
 
       {/* Session Info */}
-      <div className="text-sm text-muted-foreground space-y-1">
-        <div className="flex justify-between items-center">
-          <span>Progress: {Math.round(currentPercentage)}%</span>
-          <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
+      <div className="text-xs sm:text-sm text-muted-foreground space-y-1 px-1 sm:px-0">
+        <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1 xs:gap-2">
+          <span className="font-medium">Progress: {Math.round(currentPercentage)}%</span>
+          <span className="font-mono text-[11px] xs:text-xs sm:text-sm">{formatTime(currentTime)} / {formatTime(duration)}</span>
         </div>
         {milestoneState.currentMilestone > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-[11px] xs:text-xs sm:text-sm">
             <span>Latest milestone: {milestoneState.currentMilestone}%</span>
             {isUpdatingProgress && <Loader2 className="h-3 w-3 animate-spin" />}
           </div>

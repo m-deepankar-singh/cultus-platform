@@ -7,8 +7,6 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider"
 import { AuthProvider } from "@/providers/auth-provider"
-import { initializeMonitoring } from "@/lib/monitoring/init"
-
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
@@ -22,10 +20,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Initialize monitoring in development and production
-  if (typeof window === 'undefined') {
-    initializeMonitoring().catch(console.error);
-  }
 
   return (
     <html lang="en" suppressHydrationWarning>

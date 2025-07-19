@@ -358,7 +358,18 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
             
             {isCompleted && student_progress.completed_at && (
               <div className="text-emerald-600">
-                Completed {formatDistanceToNow(new Date(student_progress.completed_at), { addSuffix: true })}
+                Completed {(() => {
+                  try {
+                    const completedDate = new Date(student_progress.completed_at);
+                    if (isNaN(completedDate.getTime())) {
+                      return 'recently';
+                    }
+                    return formatDistanceToNow(completedDate, { addSuffix: true });
+                  } catch (error) {
+                    console.warn('Invalid completion date:', student_progress.completed_at);
+                    return 'recently';
+                  }
+                })()}
               </div>
             )}
           </div>

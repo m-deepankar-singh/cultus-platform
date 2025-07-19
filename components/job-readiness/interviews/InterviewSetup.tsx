@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScreenRecorder } from '@/lib/ai/screen-recorder';
+import { closeAudioContext } from '@/lib/ai/utils';
 import gsap from 'gsap';
 
 interface InterviewSetupProps {
@@ -247,7 +248,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
         cancelAnimationFrame(animationRef.current);
       }
       if (audioContextRef.current) {
-        audioContextRef.current.close();
+        closeAudioContext(audioContextRef.current);
       }
     };
   }, [selectedMicrophone, permissionGranted]);
@@ -290,7 +291,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
       microphoneStream.getTracks().forEach(track => track.stop());
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      closeAudioContext(audioContextRef.current);
     }
     
     onSetupComplete?.();
@@ -353,9 +354,9 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                     <div className="relative">
                       <div className={cn(
                         "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 backdrop-blur-sm border-2",
-                        isActive && "bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-blue-400 dark:border-blue-500 shadow-lg",
-                        isCompleted && "bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-400 dark:border-emerald-500",
-                        !isActive && !isCompleted && "bg-neutral-200/50 dark:bg-neutral-700/50 text-neutral-600 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600"
+                        isActive && "bg-blue-600 text-white border-blue-500 shadow-lg",
+                        isCompleted && "bg-emerald-500 text-white border-emerald-400",
+                        !isActive && !isCompleted && "bg-neutral-300 dark:bg-neutral-600 text-neutral-600 dark:text-neutral-400 border-neutral-400 dark:border-neutral-500"
                       )}>
                         {isCompleted ? (
                           <CheckCircle className="h-5 w-5" />
@@ -363,23 +364,12 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                           <span>{index + 1}</span>
                         )}
                       </div>
-                      {isActive && (
-                        <OptimizedProgressRing
-                          value={100}
-                          size={44}
-                          strokeWidth={2}
-                          showValue={false}
-                          color="primary"
-                          delay={200}
-                          className="absolute inset-0 transform -translate-x-1 -translate-y-1"
-                        />
-                      )}
                     </div>
                     {index < 3 && (
                       <div className={cn(
-                        "w-12 h-1 mx-2 rounded-full transition-all duration-500",
+                        "w-16 h-1 mx-3 rounded-full transition-all duration-500",
                         index < currentIndex
-                          ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                          ? "bg-emerald-500"
                           : "bg-neutral-300 dark:bg-neutral-600"
                       )} />
                     )}
@@ -388,9 +378,14 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
               })}
             </div>
           </div>
-          <div className="mt-4 text-center">
+          <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground font-medium">
-              Step {['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep) + 1} of 4: {setupStep.charAt(0).toUpperCase() + setupStep.slice(1)}
+              Step {['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep) + 1} of 4: {
+                setupStep === 'permissions' ? 'Permissions' :
+                setupStep === 'devices' ? 'Devices' :
+                setupStep === 'testing' ? 'Testing' :
+                'Ready'
+              }
             </p>
           </div>
         </PerformantAnimatedCard>

@@ -156,8 +156,8 @@ export async function GET(req: NextRequest) {
       };
 
       // Phase 2: Calculate resume capabilities
-      const canResume = !progress.is_completed && progress.resume_from_milestone > 0;
-      const resumePositionSeconds = Math.floor((progress.resume_from_milestone / 100) * session.video_duration);
+      const canResume = !progress.is_completed && progress.last_milestone_reached > 0;
+      const resumePositionSeconds = Math.floor((progress.last_milestone_reached / 100) * session.video_duration);
       
       // Phase 2: Extract milestones unlocked from session history
       const milestonesUnlocked = [];
@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
           
           // Phase 2: Enhanced resume functionality
           can_resume: canResume,
-          resume_from_milestone: progress.resume_from_milestone || 0,
+          resume_from_milestone: progress.last_milestone_reached || 0,
           resume_position_seconds: resumePositionSeconds,
           milestones_unlocked: milestonesUnlocked
         }

@@ -669,7 +669,14 @@ export default function InterviewFeedbackPage() {
                   </h2>
                   <p className="text-muted-foreground">
                     {submission.createdAt ? 
-                      `Submitted ${new Date(submission.createdAt).toLocaleDateString()}` :
+                      `Submitted ${(() => {
+                        try {
+                          const date = new Date(submission.createdAt);
+                          return isNaN(date.getTime()) ? 'on unknown date' : date.toLocaleDateString();
+                        } catch {
+                          return 'on unknown date';
+                        }
+                      })()}` :
                       'Submission date unavailable'
                     }
                   </p>

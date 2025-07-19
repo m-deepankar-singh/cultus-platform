@@ -652,14 +652,28 @@ function InterviewSubmittedContent() {
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-medium">Submitted:</span>
                   <span className="text-gray-600">
-                    {new Date(submission.createdAt).toLocaleDateString()} {new Date(submission.createdAt).toLocaleTimeString()}
+                    {(() => {
+                      try {
+                        const date = new Date(submission.createdAt);
+                        return isNaN(date.getTime()) ? 'Unknown date' : `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+                      } catch {
+                        return 'Unknown date';
+                      }
+                    })()}
                   </span>
                 </div>
                 {submission.analyzedAt && (
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">Analyzed:</span>
                     <span className="text-gray-600">
-                      {new Date(submission.analyzedAt).toLocaleDateString()} {new Date(submission.analyzedAt).toLocaleTimeString()}
+                      {(() => {
+                        try {
+                          const date = new Date(submission.analyzedAt);
+                          return isNaN(date.getTime()) ? 'Unknown date' : `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+                        } catch {
+                          return 'Unknown date';
+                        }
+                      })()}
                     </span>
                   </div>
                 )}

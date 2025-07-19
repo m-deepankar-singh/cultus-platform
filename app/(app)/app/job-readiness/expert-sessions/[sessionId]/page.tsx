@@ -171,7 +171,18 @@ export default function ExpertSessionViewerPage() {
                   <div className="flex items-center justify-center space-x-2">
                     <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     <span className="text-emerald-800 dark:text-emerald-300 font-medium">
-                      Completed on {new Date(session.student_progress.completed_at!).toLocaleDateString()}
+                      Completed on {(() => {
+                        try {
+                          const completedDate = new Date(session.student_progress.completed_at!);
+                          if (isNaN(completedDate.getTime())) {
+                            return 'recently';
+                          }
+                          return completedDate.toLocaleDateString();
+                        } catch (error) {
+                          console.warn('Invalid completion date:', session.student_progress.completed_at);
+                          return 'recently';
+                        }
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -360,7 +371,18 @@ export default function ExpertSessionViewerPage() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Completed</p>
                   <p className="text-muted-foreground">
-                    {formatDistanceToNow(new Date(session.student_progress.completed_at), { addSuffix: true })}
+                    {(() => {
+                      try {
+                        const completedDate = new Date(session.student_progress.completed_at);
+                        if (isNaN(completedDate.getTime())) {
+                          return 'recently';
+                        }
+                        return formatDistanceToNow(completedDate, { addSuffix: true });
+                      } catch (error) {
+                        console.warn('Invalid completion date:', session.student_progress.completed_at);
+                        return 'recently';
+                      }
+                    })()}
                   </p>
                 </div>
               )}
