@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronUp, ChevronDown, Plus, Search, Trash, Save } from "lucide-react"
+import { ChevronUp, ChevronDown, Plus, Search, Trash, Save, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -58,6 +58,14 @@ export function AssessmentQuestionManager({
   const [isSaving, setIsSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(10) // 10 questions per page
+  const [totalQuestions, setTotalQuestions] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
+  
   const { toast } = useToast()
   const [, setError] = useState<string | null>(null)
 
@@ -66,21 +74,17 @@ export function AssessmentQuestionManager({
     fetchSelectedQuestions()
   }, [moduleId])
 
-  // Filter available questions based on search query
+  // Handle search with pagination reset
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredQuestions(availableQuestions)
-    } else {
-      const query = searchQuery.toLowerCase()
-      setFilteredQuestions(
-        availableQuestions.filter(
-          (q) => 
-            q.question_text.toLowerCase().includes(query) || 
-            q.topic?.toLowerCase().includes(query)
-        )
-      )
+    if (isOpen) {
+      // Debounce search to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        fetchAvailableQuestions(1, searchQuery)
+      }, 300)
+      
+      return () => clearTimeout(timeoutId)
     }
-  }, [searchQuery, availableQuestions])
+  }, [searchQuery, isOpen]) // API handles filtering, no need to watch selectedQuestions
 
   // Initialize selected questions from loaded questions
   useEffect(() => {
@@ -125,10 +129,40 @@ export function AssessmentQuestionManager({
     }
   }
 
-  const fetchAvailableQuestions = async () => {
+  const fetchAvailableQuestions = async (page: number = 1, search: string = "") => {
     try {
-      // Fetch all assessment questions
-      const response = await fetch(`/api/admin/question-banks?type=assessment`)
+      setIsLoadingQuestions(true)
+
+      // First, get the latest assigned questions for this module
+      const assignedResponse = await fetch(`/api/admin/modules/${moduleId}/assessment-questions`, {
+        cache: 'no-store'
+      })
+      
+      let assignedQuestionIds = new Set<string>();
+      if (assignedResponse.ok) {
+        const assignedData = await assignedResponse.json()
+        const assignedQuestions = assignedData.questions || []
+        assignedQuestionIds = new Set(assignedQuestions.map((q: Question) => q.id))
+        console.log('Assigned questions:', assignedQuestions.length, 'IDs:', Array.from(assignedQuestionIds))
+      } else {
+        console.log('Failed to fetch assigned questions:', assignedResponse.status)
+      }
+
+      // Fetch ALL questions (with search if provided) - we'll paginate after filtering
+      const queryParams = new URLSearchParams({
+        type: 'assessment',
+        page: '1',
+        pageSize: '1000', // Get a large number to get all questions
+      })
+
+      // Add search parameter if provided
+      if (search.trim()) {
+        queryParams.append('search', search.trim())
+      }
+
+      const response = await fetch(`/api/admin/question-banks?${queryParams}`, {
+        cache: 'no-store' // Disable caching
+      })
       
       if (!response.ok) {
         throw new Error(`Error fetching questions: ${response.status}`)
@@ -136,15 +170,30 @@ export function AssessmentQuestionManager({
       
       const result = await response.json()
       
-      // Handle the new paginated response format
-      const questionData = Array.isArray(result) ? result : result.data || [];
+      // Handle the paginated response format
+      const questionData = result.data || [];
+      console.log('API returned questions:', questionData.length)
       
-      // Filter out questions that are already selected
-      const selectedIds = new Set(selectedQuestions.map(q => q.id))
-      const available = questionData.filter((q: Question) => !selectedIds.has(q.id))
+      // Client-side filtering to exclude questions already assigned to this module
+      const allFilteredQuestions = questionData.filter((q: Question) => !assignedQuestionIds.has(q.id));
+      console.log('After filtering:', allFilteredQuestions.length, 'questions available')
       
-      setAvailableQuestions(available)
-      setFilteredQuestions(available)
+      // Now do frontend pagination on the filtered results
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedQuestions = allFilteredQuestions.slice(startIndex, endIndex);
+      
+      setAvailableQuestions(paginatedQuestions)
+      setFilteredQuestions(paginatedQuestions)
+      
+      // Calculate pagination based on filtered results
+      const filteredTotal = allFilteredQuestions.length;
+      const filteredTotalPages = Math.ceil(filteredTotal / pageSize);
+      
+      setTotalQuestions(filteredTotal)
+      setTotalPages(filteredTotalPages)
+      setCurrentPage(page)
+      
     } catch (error) {
       console.error("Error fetching available questions:", error)
       toast({
@@ -152,13 +201,25 @@ export function AssessmentQuestionManager({
         title: "Failed to load question bank",
         description: error instanceof Error ? error.message : "Please try again later",
       })
+    } finally {
+      setIsLoadingQuestions(false)
     }
   }
 
   const handleOpenDialog = () => {
     setSelected(new Set())
-    fetchAvailableQuestions()
+    setSearchQuery("")
+    setCurrentPage(1)
     setIsOpen(true)
+    
+    // Fetch available questions - the filtering will happen automatically in fetchAvailableQuestions
+    fetchAvailableQuestions(1, "")
+  }
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchAvailableQuestions(page, searchQuery)
+    }
   }
 
   const handleToggleQuestion = (question: Question) => {
@@ -188,15 +249,17 @@ export function AssessmentQuestionManager({
     }))
     
     // Add the new questions to the selected list
-    setSelectedQuestions([...selectedQuestions, ...newQuestions])
+    const updatedSelectedQuestions = [...selectedQuestions, ...newQuestions]
+    setSelectedQuestions(updatedSelectedQuestions)
     
-    // Close the dialog
+    // Clear selections and close dialog
+    setSelected(new Set())
     setIsOpen(false)
     
     // Show success message
     toast({
       title: "Questions added",
-      description: `Added ${questionsToAdd.length} question${questionsToAdd.length !== 1 ? 's' : ''} to the assessment.`
+      description: `Added ${questionsToAdd.length} question${questionsToAdd.length !== 1 ? 's' : ''} to the assessment. Remember to save your changes.`
     })
   }
 
@@ -325,9 +388,8 @@ export function AssessmentQuestionManager({
       
       console.log('Received saved questions response:', responseData)
       
-      // Assuming API returns the updated list of linked questions with their sequences
-      // Or, simply re-fetch to ensure UI is consistent with DB state.
-      fetchSelectedQuestions(); // Refresh the list from the server
+      // Refresh the selected questions from server to get the actual saved state
+      await fetchSelectedQuestions(); // Refresh the list from the server
       
       toast({
         title: "Success",
@@ -391,52 +453,132 @@ export function AssessmentQuestionManager({
                     />
                   </div>
                   
-                  <ScrollArea className="h-[400px] rounded-md border">
-                    {filteredQuestions.length === 0 ? (
-                      <div className="p-4 text-center text-muted-foreground">
-                        {availableQuestions.length === 0 ? 
-                          "No additional questions available in the assessment bank." : 
-                          "No questions match your search."}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center text-sm text-muted-foreground">
+                      <div>
+                        {isLoadingQuestions ? (
+                          "Loading questions..."
+                        ) : filteredQuestions.length > 0 ? (
+                          <>
+                            Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalQuestions || filteredQuestions.length)} of {totalQuestions || filteredQuestions.length} questions
+                            {searchQuery ? ` matching "${searchQuery}"` : ""}
+                          </>
+                        ) : (
+                          "No questions found"
+                        )}
                       </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]">Select</TableHead>
-                            <TableHead>Question</TableHead>
-                            <TableHead className="w-[100px]">Type</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredQuestions.map((question) => (
-                            <TableRow key={question.id} className={selected.has(question.id) ? "bg-muted/50" : ""}>
-                              <TableCell>
-                                <Checkbox
-                                  checked={selected.has(question.id)}
-                                  onCheckedChange={() => handleToggleQuestion(question)}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{question.question_text}</div>
-                                  {question.topic && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                      Topic: {question.topic}
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">
-                                  {question.question_type}
-                                </Badge>
-                              </TableCell>
+                      {totalPages > 1 && (
+                        <div className="text-xs">
+                          Page {currentPage} of {totalPages}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <ScrollArea className="h-[400px] rounded-md border">
+                      {isLoadingQuestions ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          Loading questions...
+                        </div>
+                      ) : filteredQuestions.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          {totalQuestions === 0 ? 
+                            "No additional questions available in the assessment bank." : 
+                            "No questions match your search."}
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[50px]">Select</TableHead>
+                              <TableHead>Question</TableHead>
+                              <TableHead className="w-[100px]">Type</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredQuestions.map((question) => (
+                              <TableRow key={question.id} className={selected.has(question.id) ? "bg-muted/50" : ""}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selected.has(question.id)}
+                                    onCheckedChange={() => handleToggleQuestion(question)}
+                                    disabled={isLoadingQuestions}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium">{question.question_text}</div>
+                                    {question.topic && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        Topic: {question.topic}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">
+                                    {question.question_type}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </ScrollArea>
+                    
+                    {/* Pagination Controls - Show when there are more questions than page size */}
+                    {filteredQuestions.length > 0 && totalQuestions > pageSize && (
+                      <div className="flex items-center justify-center space-x-2 py-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage <= 1 || isLoadingQuestions}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {totalPages > 0 && Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(pageNum)}
+                                disabled={isLoadingQuestions}
+                                className="w-8 h-8 p-0"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage >= totalPages || isLoadingQuestions}
+                        >
+                          Next
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
-                  </ScrollArea>
+                  </div>
                   
                   <div className="mt-2 text-xs text-muted-foreground">
                     {selected.size} question{selected.size !== 1 ? 's' : ''} selected
