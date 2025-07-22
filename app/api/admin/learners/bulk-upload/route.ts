@@ -275,7 +275,7 @@ export async function PUT(request: Request) {
             const emailResponse = await sendLearnerWelcomeEmail(
               finalLearnerData.email, 
               randomPassword,
-              `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}/app/login`
+              `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}`
             );
             
             // Log successful email delivery with Resend message ID

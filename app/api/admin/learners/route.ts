@@ -290,7 +290,7 @@ export async function POST(request: Request) {
       const emailResponse = await sendLearnerWelcomeEmail(
         learnerData.email, 
         randomPassword,
-        `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}/app/login`
+        `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}`
       );
       
       // Log successful email delivery with Resend message ID
