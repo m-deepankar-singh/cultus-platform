@@ -119,7 +119,7 @@ export async function sendEmail(options: MailOptions): Promise<ResendResponse> {
 export async function sendLearnerWelcomeEmail(
   learnerEmail: string,
   temporaryPassword: string,
-  loginUrl: string = `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}/app/login`
+  loginUrl: string = `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}`
 ): Promise<ResendResponse> {
   console.log(`[EMAIL SERVICE] Preparing welcome email for ${learnerEmail}`);
   
