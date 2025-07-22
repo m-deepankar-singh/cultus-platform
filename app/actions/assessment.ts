@@ -472,12 +472,12 @@ async function handleJobReadinessProgression(
           }
         }
 
-        // Award star and tier if student has completed at least one assessment (regardless of pass/fail)
+        // Award star and tier if student has completed at least one assessment
         if (assessmentCount > 0) {
           const averageScore = totalScore / assessmentCount;
           
           // Determine tier based on average score
-          let finalTierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' | null = null;
+          let finalTierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' = 'BRONZE'; // Default to BRONZE for any completion
           if (averageScore >= finalTierConfig.gold_assessment_min_score) {
             finalTierAchieved = 'GOLD';
           } else if (averageScore >= finalTierConfig.silver_assessment_min_score) {
@@ -486,23 +486,22 @@ async function handleJobReadinessProgression(
             finalTierAchieved = 'BRONZE';
           }
 
-          if (finalTierAchieved) {
-            const updateData = {
-              job_readiness_star_level: 'ONE',
-              job_readiness_tier: finalTierAchieved,
-              job_readiness_last_updated: new Date().toISOString(),
-            };
-            
-            const { error: updateError } = await supabase
-              .from('students')
-              .update(updateData)
-              .eq('id', studentId);
+          // Always award first star and tier for any completed assessment
+          const updateData = {
+            job_readiness_star_level: 'ONE',
+            job_readiness_tier: finalTierAchieved,
+            job_readiness_last_updated: new Date().toISOString(),
+          };
+          
+          const { error: updateError } = await supabase
+            .from('students')
+            .update(updateData)
+            .eq('id', studentId);
 
-            if (updateError) {
-              console.error('Error updating student job readiness progression:', updateError);
-            } else {
-              console.log(`Job readiness progression updated for student ${studentId}: Star ONE, Tier ${finalTierAchieved} (retroactive based on ${assessmentCount} completed assessments, avg score: ${Math.round(averageScore)}%)`);
-            }
+          if (updateError) {
+            console.error('Error updating student job readiness progression:', updateError);
+          } else {
+            console.log(`Job readiness progression updated for student ${studentId}: Star ONE, Tier ${finalTierAchieved} (retroactive based on ${assessmentCount} completed assessments, avg score: ${Math.round(averageScore)}%)`);
           }
         }
       }

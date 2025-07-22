@@ -363,8 +363,8 @@ export async function POST(
 
     const currentStarLevel = currentStudentData?.job_readiness_star_level;
     
-    // Only check for first star if student doesn't have one yet and assessment passed
-    if (passed && !currentStarLevel) {
+    // Check for first star if student doesn't have one yet (regardless of pass/fail)
+    if (!currentStarLevel) {
       // Check if ALL assessments for this product are now completed
       const { data: completedAssessments, error: completedCountError } = await supabase
         .from('modules')
@@ -411,12 +411,13 @@ export async function POST(
           
           const averageScore = assessmentCount > 0 ? totalScore / assessmentCount : 0;
           
-          // Determine tier based on average score
+          // Determine tier based on average score (default to BRONZE for any completion)
           if (averageScore >= finalTierConfig.gold_assessment_min_score) {
             tierAchieved = 'GOLD';
           } else if (averageScore >= finalTierConfig.silver_assessment_min_score) {
             tierAchieved = 'SILVER';
-          } else if (averageScore >= finalTierConfig.bronze_assessment_min_score) {
+          } else {
+            // Always award at least BRONZE tier for completing all assessments
             tierAchieved = 'BRONZE';
           }
           
@@ -427,12 +428,9 @@ export async function POST(
           // Update student with both star level and tier
           const updateData: any = {
             job_readiness_star_level: 'ONE',
+            job_readiness_tier: tierAchieved,
             job_readiness_last_updated: new Date().toISOString(),
           };
-          
-          if (tierAchieved) {
-            updateData.job_readiness_tier = tierAchieved;
-          }
           
           const { error: updateError } = await supabase
             .from('students')
