@@ -112,13 +112,13 @@ export async function sendEmail(options: MailOptions): Promise<ResendResponse> {
 /**
  * Sends a welcome email with login credentials to a new learner
  * @param learnerEmail - The email address of the learner
- * @param temporaryPassword - The temporary password generated for the learner
+ * @param password - The password generated for the learner
  * @param loginUrl - The URL to the login page
  * @returns The response object from Resend API with standardized format
  */
 export async function sendLearnerWelcomeEmail(
   learnerEmail: string,
-  temporaryPassword: string,
+  password: string,
   loginUrl: string = `${process.env.NEXT_PUBLIC_APP_URL || 'https://cultus-platform.com'}`
 ): Promise<ResendResponse> {
   console.log(`[EMAIL SERVICE] Preparing welcome email for ${learnerEmail}`);
@@ -130,7 +130,7 @@ export async function sendLearnerWelcomeEmail(
 Your account has been created. Please use the following credentials to log in:
 
 Email: ${learnerEmail}
-Temporary Password: ${temporaryPassword}
+Password: ${password}
 
 Please log in and change your password as soon as possible: ${loginUrl}
 
@@ -181,8 +181,8 @@ The Cultus Team`;
             <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 16px; color: #4a6cf7; font-weight: 600; background: rgba(74, 108, 247, 0.1); padding: 8px 12px; border-radius: 8px; display: inline-block; margin-top: 8px;">${learnerEmail}</span>
           </p>
           <p style="margin: 0; color: #475569; font-size: 15px;">
-            <strong style="color: #1e293b; font-weight: 600;">Temporary Password:</strong><br>
-            <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 16px; color: #dc2626; font-weight: 600; background: rgba(220, 38, 38, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(220, 38, 38, 0.2); display: inline-block; margin-top: 8px;">${temporaryPassword}</span>
+            <strong style="color: #1e293b; font-weight: 600;">Password:</strong><br>
+            <span style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 16px; color: #dc2626; font-weight: 600; background: rgba(220, 38, 38, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(220, 38, 38, 0.2); display: inline-block; margin-top: 8px;">${password}</span>
           </p>
         </div>
       </div>
@@ -202,7 +202,7 @@ The Cultus Team`;
       <div style="background: rgba(255, 251, 235, 0.8); backdrop-filter: blur(4px); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 24px; margin: 32px 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);">
         <p style="margin: 0; color: #92400e; font-size: 15px; line-height: 1.6; font-weight: 500;">
           <strong style="color: #78350f; font-weight: 600;">🔒 Important Security Notice:</strong><br>
-          Please log in and change your password immediately for security. Your temporary password will expire in 7 days for your protection.
+          Please log in and change your password immediately for security.
         </p>
       </div>
       
