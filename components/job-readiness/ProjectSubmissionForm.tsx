@@ -7,7 +7,7 @@ import { AnimatedButton } from '@/components/ui/animated-button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Send, ArrowLeft, ExternalLink, Code } from 'lucide-react'
+import { Loader2, Send, ArrowLeft, ExternalLink, Code, Briefcase } from 'lucide-react'
 import gsap from 'gsap'
 
 interface Project {
@@ -99,6 +99,66 @@ export function ProjectSubmissionForm({
 
   return (
     <div className="space-y-8">
+      {/* Project Details Section - Always Visible */}
+      <PerformantAnimatedCard 
+        variant="glass" 
+        hoverEffect="lift"
+        className="submission-form-card"
+      >
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold text-lg">Project Details</h2>
+            </div>
+            <h3 className="text-xl font-medium">{project.title}</h3>
+            <p className="text-muted-foreground">
+              {project.description}
+            </p>
+          </div>
+
+          {/* Tasks and Deliverables */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Tasks */}
+            <div className="space-y-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary"></div>
+                Tasks to Complete
+              </h4>
+              <ul className="space-y-2">
+                {project.tasks.map((task, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm">
+                    <span className="text-primary font-medium min-w-[1.5rem] text-center">
+                      {index + 1}.
+                    </span>
+                    <span className="text-muted-foreground">{task}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Deliverables */}
+            <div className="space-y-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-accent"></div>
+                Expected Deliverables
+              </h4>
+              <ul className="space-y-2">
+                {project.deliverables.map((deliverable, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm">
+                    <span className="text-accent font-medium min-w-[1.5rem] text-center">
+                      {index + 1}.
+                    </span>
+                    <span className="text-muted-foreground">{deliverable}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </PerformantAnimatedCard>
+
+      {/* Submission Form Section */}
       <PerformantAnimatedCard 
         variant="glass" 
         hoverEffect="lift"
@@ -111,7 +171,7 @@ export function ProjectSubmissionForm({
               <h2 className="font-semibold text-lg">Submit Your Project</h2>
             </div>
             <p className="text-muted-foreground">
-              {project.title}
+              Provide your submission based on the project requirements above
             </p>
           </div>
           

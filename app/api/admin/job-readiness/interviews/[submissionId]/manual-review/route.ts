@@ -88,14 +88,27 @@ export async function PATCH(
     // For now, the action is logged in the analysis_result field
     
 
-    // If the status is 'Approved', trigger tier promotion if applicable
+    // If the status is 'Approved', trigger star progression if applicable
+    let starLevelUnlocked = false;
+    let newStarLevel = '';
+    
     if (status === 'Approved') {
-      await handleApprovedInterview(submission.student_id, supabase);
+      const starResult = await handleFifthStarProgression(submission.student_id, supabase);
+      starLevelUnlocked = starResult.unlocked;
+      newStarLevel = starResult.newLevel;
     }
 
     return NextResponse.json({
       success: true,
-      message: `Interview submission ${status.toLowerCase()} successfully`
+      message: starLevelUnlocked 
+        ? `Interview approved and 5th star awarded! Student completed Job Readiness.`
+        : `Interview submission ${status.toLowerCase()} successfully`,
+      data: {
+        submission_id: submissionId,
+        status: status,
+        star_level_unlocked: starLevelUnlocked,
+        new_star_level: starLevelUnlocked ? newStarLevel : undefined
+      }
     });
 
   } catch (error) {
@@ -107,29 +120,51 @@ export async function PATCH(
 }
 
 /**
- * Handles approved interviews, potentially promoting the student's tier
+ * Handle fifth star progression for successful interview completion
+ * Follows same pattern as expert sessions (3rd star) and projects (4th star)
  */
-async function handleApprovedInterview(studentId: string, supabase: any): Promise<void> {
+async function handleFifthStarProgression(studentId: string, supabase: any): Promise<{ unlocked: boolean; newLevel: string }> {
   try {
-    // Get current student tier
-    const { data: student, error } = await supabase
+    // Get current star level from database (not JWT claims which might be stale)
+    const { data: currentStudentData, error: studentError } = await supabase
       .from('students')
-      .select('job_readiness_tier')
+      .select('job_readiness_star_level')
       .eq('id', studentId)
       .single();
-    
-    if (error || !student) {
-      return;
+
+    if (studentError) {
+      console.error('❌ Error fetching current student star level:', studentError);
+      return { unlocked: false, newLevel: '' };
     }
+
+    const currentStarLevel = currentStudentData?.job_readiness_star_level || 'NONE';
+    console.log(`🌟 Admin manual review - Student ${studentId} current star level: ${currentStarLevel}`);
     
-    // Logic for tier promotion could be implemented here
-    // For example, from THREE to FOUR upon successful interview
-    if (student.job_readiness_tier === 'THREE') {
-      await supabase
+    if (currentStarLevel === 'FOUR') {
+      console.log(`🌟 Student ${studentId} interview manually approved by admin with fourth star. Awarding fifth star!`);
+      
+      // Update student star level
+      const { error: starUpdateError } = await supabase
         .from('students')
-        .update({ job_readiness_tier: 'FOUR' })
+        .update({
+          job_readiness_star_level: 'FIVE',
+          job_readiness_last_updated: new Date().toISOString(),
+        })
         .eq('id', studentId);
+
+      if (!starUpdateError) {
+        console.log('🎉 Successfully awarded fifth star via admin manual review!');
+        return { unlocked: true, newLevel: 'FIVE' };
+      } else {
+        console.error('❌ Error updating student star level:', starUpdateError);
+        return { unlocked: false, newLevel: '' };
+      }
+    } else {
+      console.log(`📝 Student ${studentId} interview approved but current star level is ${currentStarLevel}, not FOUR. No star unlock.`);
+      return { unlocked: false, newLevel: '' };
     }
   } catch (error) {
+    console.error('Error in handleFifthStarProgression:', error);
+    return { unlocked: false, newLevel: '' };
   }
 } 

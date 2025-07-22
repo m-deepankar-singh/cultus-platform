@@ -52,6 +52,8 @@ export function AssessmentQuestionManager({
   const [isOpen, setIsOpen] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])
   const [selectedQuestions, setSelectedQuestions] = useState<Question[]>([])
+  const [allQuestionsFromAPI, setAllQuestionsFromAPI] = useState<Question[]>([]) // Store ALL questions from API (for selection lookup)
+  const [allAvailableQuestions, setAllAvailableQuestions] = useState<Question[]>([]) // Store current search/filter results
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -143,9 +145,6 @@ export function AssessmentQuestionManager({
         const assignedData = await assignedResponse.json()
         const assignedQuestions = assignedData.questions || []
         assignedQuestionIds = new Set(assignedQuestions.map((q: Question) => q.id))
-        console.log('Assigned questions:', assignedQuestions.length, 'IDs:', Array.from(assignedQuestionIds))
-      } else {
-        console.log('Failed to fetch assigned questions:', assignedResponse.status)
       }
 
       // Fetch ALL questions (with search if provided) - we'll paginate after filtering
@@ -172,17 +171,22 @@ export function AssessmentQuestionManager({
       
       // Handle the paginated response format
       const questionData = result.data || [];
-      console.log('API returned questions:', questionData.length)
       
       // Client-side filtering to exclude questions already assigned to this module
       const allFilteredQuestions = questionData.filter((q: Question) => !assignedQuestionIds.has(q.id));
-      console.log('After filtering:', allFilteredQuestions.length, 'questions available')
+      
+      // Store ALL questions from API (without any search filtering) for selection lookup
+      // This only gets updated when we fetch without search (i.e., when dialog opens or search is cleared)
+      if (!search.trim()) {
+        setAllQuestionsFromAPI(allFilteredQuestions);
+      }
       
       // Now do frontend pagination on the filtered results
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedQuestions = allFilteredQuestions.slice(startIndex, endIndex);
       
+      setAllAvailableQuestions(allFilteredQuestions) // Store current search/filter results for pagination
       setAvailableQuestions(paginatedQuestions)
       setFilteredQuestions(paginatedQuestions)
       
@@ -235,8 +239,8 @@ export function AssessmentQuestionManager({
   }
 
   const handleAddQuestions = () => {
-    // Find the full question objects for the selected IDs
-    const questionsToAdd = availableQuestions.filter(q => selected.has(q.id))
+    // Find the full question objects for the selected IDs from ALL questions (not just current search results)
+    const questionsToAdd = allQuestionsFromAPI.filter(q => selected.has(q.id))
     
     // Assign sequence numbers to the new questions
     const startSequence = selectedQuestions.length > 0 

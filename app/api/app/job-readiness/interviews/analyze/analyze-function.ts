@@ -813,6 +813,53 @@ You are an expert interview assessor conducting a comprehensive evaluation of a 
         console.log('✅ Verification successful:', verifyData);
       }
 
+      // Check for fifth star unlock (requires successful interview completion)
+      let starLevelUnlocked = false;
+      let newStarLevel = '';
+      let fifthStarUnlocked = false;
+
+      if (finalVerdict === 'APPROVED') {
+        // Get current star level from database instead of JWT claims (which might be stale)
+        const { data: currentStudentData, error: studentError } = await supabase
+          .from('students')
+          .select('job_readiness_star_level')
+          .eq('id', userId)
+          .single();
+
+        if (studentError) {
+          console.error('❌ Error fetching current student star level:', studentError);
+        } else {
+          const currentStarLevel = currentStudentData?.job_readiness_star_level || 'NONE';
+          console.log(`🌟 Student ${userId} current star level from database: ${currentStarLevel}`);
+          
+          if (currentStarLevel === 'FOUR') {
+            console.log(`🌟 Student ${userId} passed interview with fourth star. Awarding fifth star!`);
+            
+            // Update student star level
+            const { error: starUpdateError } = await supabase
+              .from('students')
+              .update({
+                job_readiness_star_level: 'FIVE',
+                job_readiness_last_updated: new Date().toISOString(),
+              })
+              .eq('id', userId);
+
+            if (!starUpdateError) {
+              starLevelUnlocked = true;
+              newStarLevel = 'FIVE';
+              fifthStarUnlocked = true;
+              console.log('🎉 Successfully awarded fifth star!');
+            } else {
+              console.error('❌ Error updating student star level:', starUpdateError);
+            }
+          } else {
+            console.log(`📝 Student ${userId} passed interview but current star level is ${currentStarLevel}, not FOUR. No star unlock.`);
+          }
+        }
+      } else {
+        console.log(`📝 Student ${userId} interview verdict was ${finalVerdict}, no star progression.`);
+      }
+
       console.log('🎉 Interview analysis completed successfully');
 
       return {
@@ -821,7 +868,11 @@ You are an expert interview assessor conducting a comprehensive evaluation of a 
         analysisResult,
         verdict: finalVerdict,
         score: overallScore,
-        message: 'Interview analyzed successfully'
+        star_level_unlocked: starLevelUnlocked,
+        new_star_level: starLevelUnlocked ? newStarLevel : undefined,
+        message: fifthStarUnlocked 
+          ? '🎉 Interview passed! You\'ve earned your 5th star and completed Job Readiness!'
+          : 'Interview analyzed successfully'
       };
 
     } catch (geminiError) {

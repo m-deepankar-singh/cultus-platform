@@ -89,16 +89,30 @@ export async function PATCH(
       );
     }
 
+    // Check for fifth star unlock if admin approved the interview
+    let starLevelUnlocked = false;
+    let newStarLevel = '';
+    
+    if (admin_verdict_override === 'approved') {
+      const starResult = await handleFifthStarProgression(submission.student_id, supabase);
+      starLevelUnlocked = starResult.unlocked;
+      newStarLevel = starResult.newLevel;
+    }
+
     // Note: Admin action logging would go here if admin_action_logs table existed
     // For now, the action is logged in the analysis_result field
 
     return NextResponse.json({
       success: true,
-      message: `Interview verdict changed to ${admin_verdict_override}`,
+      message: starLevelUnlocked 
+        ? `Interview approved and 5th star awarded! Student completed Job Readiness.`
+        : `Interview verdict changed to ${admin_verdict_override}`,
       data: {
         submission_id: submissionId,
         admin_verdict_override,
         final_verdict: admin_verdict_override,
+        star_level_unlocked: starLevelUnlocked,
+        new_star_level: starLevelUnlocked ? newStarLevel : undefined,
         updated_at: new Date().toISOString()
       }
     });
@@ -109,5 +123,55 @@ export async function PATCH(
       { error: 'Failed to process verdict change' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Handle fifth star progression for successful interview completion
+ * Follows same pattern as expert sessions (3rd star) and projects (4th star)
+ */
+async function handleFifthStarProgression(studentId: string, supabase: any): Promise<{ unlocked: boolean; newLevel: string }> {
+  try {
+    // Get current star level from database (not JWT claims which might be stale)
+    const { data: currentStudentData, error: studentError } = await supabase
+      .from('students')
+      .select('job_readiness_star_level')
+      .eq('id', studentId)
+      .single();
+
+    if (studentError) {
+      console.error('❌ Error fetching current student star level:', studentError);
+      return { unlocked: false, newLevel: '' };
+    }
+
+    const currentStarLevel = currentStudentData?.job_readiness_star_level || 'NONE';
+    console.log(`🌟 Admin approval - Student ${studentId} current star level: ${currentStarLevel}`);
+    
+    if (currentStarLevel === 'FOUR') {
+      console.log(`🌟 Student ${studentId} interview approved by admin with fourth star. Awarding fifth star!`);
+      
+      // Update student star level
+      const { error: starUpdateError } = await supabase
+        .from('students')
+        .update({
+          job_readiness_star_level: 'FIVE',
+          job_readiness_last_updated: new Date().toISOString(),
+        })
+        .eq('id', studentId);
+
+      if (!starUpdateError) {
+        console.log('🎉 Successfully awarded fifth star via admin approval!');
+        return { unlocked: true, newLevel: 'FIVE' };
+      } else {
+        console.error('❌ Error updating student star level:', starUpdateError);
+        return { unlocked: false, newLevel: '' };
+      }
+    } else {
+      console.log(`📝 Student ${studentId} interview approved but current star level is ${currentStarLevel}, not FOUR. No star unlock.`);
+      return { unlocked: false, newLevel: '' };
+    }
+  } catch (error) {
+    console.error('Error in handleFifthStarProgression:', error);
+    return { unlocked: false, newLevel: '' };
   }
 } 

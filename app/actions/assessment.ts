@@ -325,6 +325,9 @@ export async function submitAssessmentAction(
         completed_at: submissionTime // Always update completed_at since submission is complete
       }, { onConflict: 'student_id, module_id' });
 
+    // Handle Job Readiness progression if this is a job readiness assessment
+    await handleJobReadinessProgression(supabase, studentId, moduleId, score, passed);
+
     revalidatePath('/app/dashboard');
     revalidatePath(`/app/assessment/${moduleId}`);
     revalidatePath(`/app/assessment/${moduleId}/take`);
@@ -344,5 +347,168 @@ export async function submitAssessmentAction(
     const error = e as Error;
     console.error('Unexpected error in submitAssessmentAction:', error);
     return { success: false, error: 'An unexpected error occurred during submission.', errorDetails: { name: error.name, message: error.message, stack: error.stack } };
+  }
+}
+
+/**
+ * Handle Job Readiness progression when assessment is completed
+ */
+async function handleJobReadinessProgression(
+  supabase: any,
+  studentId: string,
+  moduleId: string,
+  score: number,
+  passed: boolean
+) {
+  try {
+    // Check if this is a job readiness assessment
+    const { data: moduleData, error: moduleError } = await supabase
+      .from('modules')
+      .select(`
+        id,
+        type,
+        module_product_assignments!inner (
+          product_id,
+          products!inner (
+            id,
+            type
+          )
+        )
+      `)
+      .eq('id', moduleId)
+      .eq('type', 'Assessment')
+      .eq('module_product_assignments.products.type', 'JOB_READINESS')
+      .maybeSingle();
+
+    if (moduleError || !moduleData) {
+      // Not a job readiness assessment, skip progression
+      return;
+    }
+
+    const productId = moduleData.module_product_assignments[0].product_id;
+
+    // Get job readiness tier configuration
+    const { data: tierConfig, error: tierConfigError } = await supabase
+      .from('job_readiness_products')
+      .select('*')
+      .eq('product_id', productId)
+      .maybeSingle();
+
+    const defaultTierConfig = {
+      bronze_assessment_min_score: 0,
+      bronze_assessment_max_score: 60,
+      silver_assessment_min_score: 61,
+      silver_assessment_max_score: 80,
+      gold_assessment_min_score: 81,
+      gold_assessment_max_score: 100
+    };
+
+    const finalTierConfig = tierConfig || defaultTierConfig;
+
+    // Determine tier based on score
+    let tierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' | null = null;
+    if (passed) {
+      if (score >= finalTierConfig.gold_assessment_min_score) {
+        tierAchieved = 'GOLD';
+      } else if (score >= finalTierConfig.silver_assessment_min_score) {
+        tierAchieved = 'SILVER';
+      } else if (score >= finalTierConfig.bronze_assessment_min_score) {
+        tierAchieved = 'BRONZE';
+      }
+    }
+
+    // Get current student data
+    const { data: currentStudentData, error: studentDataError } = await supabase
+      .from('students')
+      .select('job_readiness_star_level, job_readiness_tier')
+      .eq('id', studentId)
+      .single();
+
+    if (studentDataError) {
+      console.error('Error fetching current student job readiness data:', studentDataError);
+      return;
+    }
+
+    const currentStarLevel = currentStudentData?.job_readiness_star_level;
+    
+    // Check if student should get their first star and tier (either from this submission or existing completions)
+    if (!currentStarLevel) {
+      // Check all completed assessments for this job readiness product
+      const { data: completedAssessments, error: completedError } = await supabase
+        .from('modules')
+        .select(`
+          id,
+          module_product_assignments!inner (
+            product_id
+          ),
+          student_module_progress!inner (
+            status,
+            progress_percentage,
+            progress_details,
+            completed_at
+          )
+        `)
+        .eq('module_product_assignments.product_id', productId)
+        .eq('type', 'Assessment')
+        .eq('student_module_progress.student_id', studentId)
+        .eq('student_module_progress.status', 'Completed');
+
+      if (!completedError && completedAssessments && completedAssessments.length > 0) {
+        // Calculate average score from all completed assessments
+        let totalScore = 0;
+        let assessmentCount = 0;
+        let hasPassedAssessment = false;
+
+        for (const assessment of completedAssessments) {
+          const progressData = assessment.student_module_progress[0];
+          if (progressData?.progress_percentage !== undefined) {
+            totalScore += progressData.progress_percentage;
+            assessmentCount++;
+            
+            // Check if this assessment passed (60% or higher by default)
+            if (progressData.progress_percentage >= 60) {
+              hasPassedAssessment = true;
+            }
+          }
+        }
+
+        // Award star and tier if student has completed at least one assessment (regardless of pass/fail)
+        if (assessmentCount > 0) {
+          const averageScore = totalScore / assessmentCount;
+          
+          // Determine tier based on average score
+          let finalTierAchieved: 'BRONZE' | 'SILVER' | 'GOLD' | null = null;
+          if (averageScore >= finalTierConfig.gold_assessment_min_score) {
+            finalTierAchieved = 'GOLD';
+          } else if (averageScore >= finalTierConfig.silver_assessment_min_score) {
+            finalTierAchieved = 'SILVER';
+          } else if (averageScore >= finalTierConfig.bronze_assessment_min_score) {
+            finalTierAchieved = 'BRONZE';
+          }
+
+          if (finalTierAchieved) {
+            const updateData = {
+              job_readiness_star_level: 'ONE',
+              job_readiness_tier: finalTierAchieved,
+              job_readiness_last_updated: new Date().toISOString(),
+            };
+            
+            const { error: updateError } = await supabase
+              .from('students')
+              .update(updateData)
+              .eq('id', studentId);
+
+            if (updateError) {
+              console.error('Error updating student job readiness progression:', updateError);
+            } else {
+              console.log(`Job readiness progression updated for student ${studentId}: Star ONE, Tier ${finalTierAchieved} (retroactive based on ${assessmentCount} completed assessments, avg score: ${Math.round(averageScore)}%)`);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in handleJobReadinessProgression:', error);
+    // Don't throw error to avoid breaking the main assessment submission
   }
 } 

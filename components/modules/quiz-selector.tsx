@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle2, Plus, Search, X } from "lucide-react"
+import { CheckCircle2, Plus, Search, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -50,46 +50,65 @@ export function QuizSelector({
   disabled = false,
 }: QuizSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([])
+  const [allQuestionsFromAPI, setAllQuestionsFromAPI] = useState<Question[]>([]) // Store ALL questions from API (for selection lookup)
+  const [allAvailableQuestions, setAllAvailableQuestions] = useState<Question[]>([]) // Store current search/filter results
+  const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]) // Store current page questions
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set(selectedQuestions.map(q => q.id)))
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(10) // 10 questions per page
+  const [totalQuestions, setTotalQuestions] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
+  
   const { toast } = useToast()
 
   // Fetch questions when dialog opens
   useEffect(() => {
     if (isOpen) {
-      fetchQuestions()
+      fetchQuestions(1, "")
     }
   }, [isOpen])
 
-  // Filter questions based on search query
+  // Handle search with pagination reset
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredQuestions(questions)
-    } else {
-      const query = searchQuery.toLowerCase()
-      setFilteredQuestions(
-        questions.filter(
-          (q) => 
-            q.question_text.toLowerCase().includes(query) || 
-            q.topic?.toLowerCase().includes(query)
-        )
-      )
+    if (isOpen) {
+      // Debounce search to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        fetchQuestions(1, searchQuery)
+      }, 300)
+      
+      return () => clearTimeout(timeoutId)
     }
-  }, [searchQuery, questions])
+  }, [searchQuery, isOpen])
 
   // Initialize selected questions from props
   useEffect(() => {
     setSelected(new Set(selectedQuestions.map(q => q.id)))
   }, [selectedQuestions])
 
-  const fetchQuestions = async () => {
-    setIsLoading(true)
+  const fetchQuestions = async (page: number = 1, search: string = "") => {
     try {
-      // Fetch course questions specifically
-      const response = await fetch(`/api/admin/question-banks?type=course`)
+      setIsLoadingQuestions(true)
+
+      // Fetch ALL course questions (with search if provided) - we'll paginate after filtering
+      const queryParams = new URLSearchParams({
+        type: 'course',
+        page: '1',
+        pageSize: '1000', // Get a large number to get all questions
+      })
+
+      // Add search parameter if provided
+      if (search.trim()) {
+        queryParams.append('search', search.trim())
+      }
+
+      const response = await fetch(`/api/admin/question-banks?${queryParams}`, {
+        cache: 'no-store' // Disable caching
+      })
       
       if (!response.ok) {
         throw new Error(`Error fetching questions: ${response.status}`)
@@ -97,11 +116,37 @@ export function QuizSelector({
       
       const result = await response.json()
       
-      // Handle the new paginated response format
-      const questionData = Array.isArray(result) ? result : result.data || [];
+      // Handle the paginated response format
+      const questionData = result.data || [];
       
-      setQuestions(questionData)
-      setFilteredQuestions(questionData)
+      // Get IDs of questions already selected for filtering
+      const selectedQuestionIds = new Set(selectedQuestions.map(q => q.id));
+      
+      // Client-side filtering to exclude questions already selected
+      const allFilteredQuestions = questionData.filter((q: Question) => !selectedQuestionIds.has(q.id));
+      
+      // Store ALL questions from API (without any search filtering) for selection lookup
+      // This only gets updated when we fetch without search (i.e., when dialog opens or search is cleared)
+      if (!search.trim()) {
+        setAllQuestionsFromAPI(allFilteredQuestions);
+      }
+      
+      // Now do frontend pagination on the filtered results
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedQuestions = allFilteredQuestions.slice(startIndex, endIndex);
+      
+      setAllAvailableQuestions(allFilteredQuestions) // Store current search/filter results for pagination
+      setFilteredQuestions(paginatedQuestions) // Display only current page
+      
+      // Calculate pagination based on filtered results
+      const filteredTotal = allFilteredQuestions.length;
+      const filteredTotalPages = Math.ceil(filteredTotal / pageSize);
+      
+      setTotalQuestions(filteredTotal)
+      setTotalPages(filteredTotalPages)
+      setCurrentPage(page)
+      
     } catch (error) {
       console.error("Error fetching questions:", error)
       toast({
@@ -110,8 +155,23 @@ export function QuizSelector({
         description: error instanceof Error ? error.message : "Please try again later",
       })
     } finally {
-      setIsLoading(false)
+      setIsLoadingQuestions(false)
     }
+  }
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchQuestions(page, searchQuery)
+    }
+  }
+
+  const handleOpenDialog = () => {
+    setSelected(new Set(selectedQuestions.map(q => q.id)))
+    setSearchQuery("")
+    setCurrentPage(1)
+    setIsOpen(true)
+    
+    // Fetch questions will be called by useEffect when isOpen changes
   }
 
   const handleToggleQuestion = (question: Question) => {
@@ -127,8 +187,8 @@ export function QuizSelector({
   }
 
   const handleSaveSelection = () => {
-    // Find the full question objects for the selected IDs
-    const selectedQuestionObjects = questions.filter(q => selected.has(q.id))
+    // Find the full question objects for the selected IDs from ALL questions (not just current search results)
+    const selectedQuestionObjects = allQuestionsFromAPI.filter(q => selected.has(q.id))
     onChange(selectedQuestionObjects)
     setIsOpen(false)
   }
@@ -150,7 +210,7 @@ export function QuizSelector({
         
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button disabled={disabled} variant="outline">
+            <Button disabled={disabled} variant="outline" onClick={handleOpenDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Add/Edit Quiz Questions
             </Button>
@@ -174,26 +234,39 @@ export function QuizSelector({
                 />
               </div>
               
-              <ScrollArea className="h-[400px] rounded-md border">
-                {isLoading ? (
-                  <div className="p-4 space-y-4">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex items-center space-x-4">
-                        <Skeleton className="h-4 w-4 rounded-sm" />
-                        <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-3 w-2/3" />
-                        </div>
-                      </div>
-                    ))}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                  <div>
+                    {isLoadingQuestions ? (
+                      "Loading questions..."
+                    ) : filteredQuestions.length > 0 ? (
+                      <>
+                        Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalQuestions || filteredQuestions.length)} of {totalQuestions || filteredQuestions.length} questions
+                        {searchQuery ? ` matching "${searchQuery}"` : ""}
+                      </>
+                    ) : (
+                      "No questions found"
+                    )}
                   </div>
-                ) : filteredQuestions.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    {questions.length === 0 ? 
-                      "No questions found in the question bank." : 
-                      "No questions match your search."}
-                  </div>
-                ) : (
+                  {totalPages > 1 && (
+                    <div className="text-xs">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                  )}
+                </div>
+                
+                <ScrollArea className="h-[400px] rounded-md border">
+                  {isLoadingQuestions ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      Loading questions...
+                    </div>
+                  ) : filteredQuestions.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      {totalQuestions === 0 ? 
+                        "No additional questions available in the question bank." : 
+                        "No questions match your search."}
+                    </div>
+                  ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -209,6 +282,7 @@ export function QuizSelector({
                             <Checkbox
                               checked={selected.has(question.id)}
                               onCheckedChange={() => handleToggleQuestion(question)}
+                              disabled={isLoadingQuestions}
                             />
                           </TableCell>
                           <TableCell>
@@ -233,8 +307,62 @@ export function QuizSelector({
                 )}
               </ScrollArea>
               
-              <div className="mt-2 text-xs text-muted-foreground">
-                {selected.size} question{selected.size !== 1 ? 's' : ''} selected
+              {/* Pagination Controls - Show when there are more questions than page size */}
+              {filteredQuestions.length > 0 && totalQuestions > pageSize && (
+                <div className="flex items-center justify-center space-x-2 py-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1 || isLoadingQuestions}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {totalPages > 0 && Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          disabled={isLoadingQuestions}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages || isLoadingQuestions}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {selected.size} question{selected.size !== 1 ? 's' : ''} selected
+                </div>
               </div>
             </div>
             
@@ -307,7 +435,7 @@ export function QuizSelector({
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
-              setIsOpen(true);
+              handleOpenDialog();
             }}
           >
             <Plus className="h-4 w-4 mr-2" />
