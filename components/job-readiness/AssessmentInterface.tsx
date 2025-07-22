@@ -269,22 +269,22 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
           className="assessment-card"
           staggerIndex={0}
         >
-          <div className="p-8 text-center space-y-6">
-            <div className="flex items-center justify-center gap-4 mb-6">
+          <div className="p-4 md:p-8 text-center space-y-6">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
               <div className="p-4 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur">
-                <FileText className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+                <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600 dark:text-blue-400" />
               </div>
-              <div className="text-left">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight gradient-text mb-2">
+              <div className="text-center sm:text-left">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight gradient-text mb-2">
                   {assessment.name}
                 </h1>
-                <p className="text-lg text-muted-foreground">
+                <p className="text-base sm:text-lg text-muted-foreground">
                   {assessment.instructions || 'Complete this assessment to unlock your first star and advance your learning journey.'}
                 </p>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 text-left">
+            <div className="grid md:grid-cols-2 gap-4 md:gap-8 text-left">
               <PerformantAnimatedCard 
                 variant="subtle" 
                 hoverEffect="scale"
@@ -355,9 +355,9 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
               <AnimatedButton 
                 onClick={handleStartAssessment} 
                 size="lg" 
-                className="px-12 py-4 text-lg bg-gradient-to-r from-primary to-accent"
+                className="px-6 md:px-12 py-3 md:py-4 text-base md:text-lg bg-gradient-to-r from-primary to-accent w-full sm:w-auto"
               >
-                <Clock className="h-6 w-6 mr-3" />
+                <Clock className="h-5 w-5 md:h-6 md:w-6 mr-3" />
                 Start Assessment
               </AnimatedButton>
             </div>
@@ -377,20 +377,20 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
         className="assessment-card"
         staggerIndex={0}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold gradient-text">{assessment.name}</h1>
+        <div className="p-4 md:p-6">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center lg:justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
+              <h1 className="text-xl md:text-2xl font-bold gradient-text">{assessment.name}</h1>
               {timeRemaining !== null && (
-                <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur border border-blue-200/30 dark:border-blue-600/30">
+                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur border border-blue-200/30 dark:border-blue-600/30">
                   <OptimizedProgressRing
                     value={timeRemaining < 300 ? (timeRemaining / 300) * 100 : 100}
-                    size={24}
+                    size={20}
                     color={timeRemaining < 300 ? "danger" : "primary"}
                     showValue={false}
                   />
-                  <Timer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className={`font-mono text-sm font-bold ${
+                  <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                  <span className={`font-mono text-xs sm:text-sm font-bold ${
                     timeRemaining < 300 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
                   }`}>
                     {formatTime(timeRemaining)}
@@ -398,7 +398,7 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                 </div>
               )}
             </div>
-            <div className="text-right">
+            <div className="text-left lg:text-right w-full lg:w-auto">
               <div className="text-sm text-muted-foreground">
                 Question {currentQuestionIndex + 1} of {questions.length}
               </div>
@@ -413,7 +413,7 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
               <span className="text-sm font-medium text-muted-foreground">Progress</span>
               <OptimizedProgressRing
                 value={progress}
-                size={40}
+                size={32}
                 color="primary"
                 showValue={true}
                 delay={200}
@@ -440,14 +440,14 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
           className="assessment-card"
           staggerIndex={1}
         >
-          <div className="p-6">
-            <div className="flex items-start justify-between mb-6">
-              <h2 className="text-xl font-semibold flex-1 leading-relaxed">
+          <div className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold flex-1 leading-relaxed">
                 {currentQuestion.question_text}
               </h2>
               <Badge 
                 variant="outline" 
-                className="ml-4 text-xs bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20"
+                className="text-xs bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20 self-start"
               >
                 {currentQuestion.question_type === 'MSQ' ? 'Multiple Select' : 
                  currentQuestion.question_type === 'TF' ? 'True/False' : 'Multiple Choice'}
@@ -471,15 +471,16 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                     staggerIndex={index}
                     className="transition-all duration-200 hover:shadow-md border-2 hover:border-primary/30"
                   >
-                    <div className="p-4 flex items-center space-x-3">
+                    <div className="p-3 md:p-4 flex items-center space-x-3">
                       <Checkbox
                         id={option.id}
                         checked={isMSQOptionSelected(currentQuestion.id, option.id)}
                         onCheckedChange={(checked) => 
                           handleMSQAnswerChange(currentQuestion.id, option.id, !!checked)
                         }
+                        className="min-w-[1.5rem] min-h-[1.5rem]"
                       />
-                      <Label htmlFor={option.id} className="flex-1 cursor-pointer text-base">
+                      <Label htmlFor={option.id} className="flex-1 cursor-pointer text-sm md:text-base leading-relaxed">
                         {option.text}
                       </Label>
                     </div>
@@ -504,9 +505,9 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                     staggerIndex={index}
                     className="transition-all duration-200 hover:shadow-md border-2 hover:border-primary/30"
                   >
-                    <div className="p-4 flex items-center space-x-3">
-                      <RadioGroupItem value={option.id} id={option.id} />
-                      <Label htmlFor={option.id} className="flex-1 cursor-pointer text-base">
+                    <div className="p-3 md:p-4 flex items-center space-x-3">
+                      <RadioGroupItem value={option.id} id={option.id} className="min-w-[1.5rem] min-h-[1.5rem]" />
+                      <Label htmlFor={option.id} className="flex-1 cursor-pointer text-sm md:text-base leading-relaxed">
                         {option.text}
                       </Label>
                     </div>
@@ -526,22 +527,22 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
         className="assessment-card"
         staggerIndex={2}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between">
+        <div className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <AnimatedButton
               variant="outline"
               onClick={handlePreviousQuestion}
               disabled={currentQuestionIndex === 0}
-              className="px-6"
+              className="px-4 md:px-6 w-full sm:w-auto order-2 sm:order-1"
             >
               Previous
             </AnimatedButton>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 w-full sm:w-auto order-1 sm:order-2">
               {currentQuestionIndex === questions.length - 1 ? (
                 <AnimatedButton 
                   onClick={() => setShowConfirmSubmit(true)}
-                  className="px-8 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+                  className="px-4 md:px-8 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 w-full sm:w-auto"
                   disabled={getAnsweredCount() === 0}
                 >
                   <CheckCircle2 className="h-5 w-5 mr-2" />
@@ -551,7 +552,7 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                 <AnimatedButton
                   onClick={handleNextQuestion}
                   disabled={currentQuestionIndex === questions.length - 1}
-                  className="px-6 bg-gradient-to-r from-primary to-accent"
+                  className="px-4 md:px-6 bg-gradient-to-r from-primary to-accent w-full sm:w-auto"
                 >
                   Next
                 </AnimatedButton>
@@ -569,38 +570,38 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
           className="assessment-card border-2 border-orange-300/50 dark:border-orange-600/50 bg-gradient-to-r from-orange-500/10 to-amber-500/10"
           staggerIndex={3}
         >
-          <div className="p-8 text-center space-y-6">
+          <div className="p-4 md:p-8 text-center space-y-6">
             <div className="flex items-center justify-center mb-4">
-              <div className="p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-amber-500/20 backdrop-blur">
-                <AlertCircle className="h-12 w-12 text-orange-600 dark:text-orange-400" />
+              <div className="p-3 md:p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-amber-500/20 backdrop-blur">
+                <AlertCircle className="h-10 w-10 md:h-12 md:w-12 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-orange-900 dark:text-orange-100 mb-3">
+              <h3 className="text-xl md:text-2xl font-bold text-orange-900 dark:text-orange-100 mb-3">
                 Ready to Submit?
               </h3>
               <div className="space-y-2">
-                <p className="text-orange-700 dark:text-orange-300">
+                <p className="text-sm md:text-base text-orange-700 dark:text-orange-300">
                   You have answered <span className="font-bold">{getAnsweredCount()}</span> of <span className="font-bold">{questions.length}</span> questions.
                 </p>
-                <p className="text-sm text-orange-600 dark:text-orange-400">
+                <p className="text-xs md:text-sm text-orange-600 dark:text-orange-400">
                   Once submitted, you cannot change your answers.
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4">
               <AnimatedButton
                 variant="outline"
                 onClick={() => setShowConfirmSubmit(false)}
-                className="px-6 border-orange-300 hover:bg-orange-50 dark:border-orange-600 dark:hover:bg-orange-900/20"
+                className="px-4 md:px-6 border-orange-300 hover:bg-orange-50 dark:border-orange-600 dark:hover:bg-orange-900/20 w-full sm:w-auto order-2 sm:order-1"
               >
                 Review Answers
               </AnimatedButton>
               <AnimatedButton
                 onClick={handleSubmitAssessment}
                 disabled={submitAssessment.isPending}
-                className="px-8 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+                className="px-4 md:px-8 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 w-full sm:w-auto order-1 sm:order-2"
               >
                 {submitAssessment.isPending ? (
                   <>

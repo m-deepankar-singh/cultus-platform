@@ -21,7 +21,7 @@ export default async function AssessmentPage({ params }: AssessmentPageProps) {
           description="Complete this assessment to unlock your first star and advance your learning journey"
           showProgress={false}
         >
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto px-4">
             <AssessmentInterface moduleId={resolvedParams.moduleId} />
           </div>
         </JobReadinessLayout>
