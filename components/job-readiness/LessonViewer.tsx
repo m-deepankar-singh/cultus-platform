@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast'
 import { AiQuiz } from './AiQuiz'
 import { useSubmitQuiz } from '@/hooks/useJobReadinessMutations'
 import { useSimplifiedCourseProgress } from '@/hooks/useSimplifiedCourseProgress'
+import { useVideoThumbnail } from '@/hooks/use-video-thumbnail'
 
 interface LessonQuizResult {
   score: number
@@ -83,6 +84,13 @@ export function LessonViewer({
   
   const submitQuizMutation = useSubmitQuiz()
   const saveProgressMutation = useSimplifiedCourseProgress()
+  
+  // Generate video thumbnail
+  const { thumbnailUrl, isLoading: thumbnailLoading, error: thumbnailError } = useVideoThumbnail({
+    videoUrl: lesson.video_url,
+    timeStamp: 1, // Extract thumbnail from 1 second into the video
+    quality: 0.8
+  })
   
   // Simplified progress tracking - check if video is completed
   const quizResult = localQuizResult || progressData.lesson_quiz_results?.[lesson.id]
@@ -409,10 +417,35 @@ export function LessonViewer({
       {/* Video Player - No Seeking Allowed */}
       <Card className="overflow-hidden">
         <div ref={containerRef} className="relative aspect-video bg-black">
+          {/* Thumbnail loading indicator */}
+          {thumbnailLoading && !thumbnailUrl && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+              <div className="flex flex-col items-center gap-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Generating thumbnail...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Fallback thumbnail when generation fails */}
+          {thumbnailError && !thumbnailUrl && !isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-4 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-lg">
+                  <Video className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="text-center">
+                  <h3 className="font-medium text-gray-900 dark:text-white">{lesson.title}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Click play to start video</p>
+                </div>
+              </div>
+            </div>
+          )}
           <video
             ref={videoRef}
             className="w-full h-full"
             style={{ pointerEvents: 'none' }} // Disable direct video interaction
+            poster={thumbnailUrl || undefined}
             onTimeUpdate={handleTimeUpdate}
             onDurationChange={handleDurationChange}
             onPlay={() => setIsPlaying(true)}

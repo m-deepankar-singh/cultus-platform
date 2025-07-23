@@ -45,6 +45,7 @@ interface CourseProgress {
   last_viewed_lesson_sequence: number
   video_playback_positions: Record<string, number>
   lesson_quiz_results: Record<string, LessonQuizResult>
+  fully_watched_video_ids?: string[]
 }
 
 interface CourseOverviewProps {
@@ -54,9 +55,37 @@ interface CourseOverviewProps {
 
 export function CourseOverview({ moduleData, progressData }: CourseOverviewProps) {
   const totalLessons = moduleData.lessons.length
-  const completedLessons = Object.keys(progressData.lesson_quiz_results || {}).filter(
-    lessonId => progressData.lesson_quiz_results[lessonId]?.passed
-  ).length
+  
+  // Define lesson status function first
+  const getLessonStatus = (lesson: Lesson) => {
+    const quizResult = progressData.lesson_quiz_results?.[lesson.id]
+    const hasVideoPosition = progressData.video_playback_positions?.[lesson.id] > 0
+    const isVideoCompleted = progressData.fully_watched_video_ids?.includes(lesson.id)
+    
+    // Lesson is completed if:
+    // 1. Has quiz: video watched AND quiz passed
+    // 2. No quiz: video watched
+    if (lesson.enable_ai_quiz) {
+      if (quizResult?.passed) return 'completed'
+      if (isVideoCompleted || hasVideoPosition || quizResult) return 'in-progress'
+    } else {
+      if (isVideoCompleted) return 'completed'
+      if (hasVideoPosition) return 'in-progress'
+    }
+    
+    return 'not-started'
+  }
+  
+  // Count lessons based on their actual status (completed + in-progress)
+  const lessonStatusCounts = moduleData.lessons.reduce((acc, lesson) => {
+    const status = getLessonStatus(lesson)
+    if (status === 'completed') acc.completed++
+    else if (status === 'in-progress') acc.inProgress++
+    return acc
+  }, { completed: 0, inProgress: 0 })
+  
+  const completedLessons = lessonStatusCounts.completed
+  // For progress calculation, only count fully completed lessons (video + quiz if required)
   const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
   
   const lastViewedSequence = progressData.last_viewed_lesson_sequence || 0
@@ -80,16 +109,6 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
         return 'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
     }
   }
-
-  const getLessonStatus = (lesson: Lesson) => {
-    const quizResult = progressData.lesson_quiz_results?.[lesson.id]
-    const hasVideoPosition = progressData.video_playback_positions?.[lesson.id] > 0
-    
-    if (quizResult?.passed) return 'completed'
-    if (hasVideoPosition || quizResult) return 'in-progress'
-    return 'not-started'
-  }
-
 
   return (
     <div className="space-y-8">
