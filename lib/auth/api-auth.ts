@@ -732,20 +732,22 @@ export async function authenticateApiRequestUltraFast(
     }
 
     const processingTime = Date.now() - startTime;
-    securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
-      userId: user.id,
-      userRole: claims.user_role,
-      function: 'authenticateApiRequestUltraFast',
-      processingTime,
-      cacheHit,
-      method: cacheHit ? 'jwt-cache-redis' : 'jwt-cache-rpc',
-      performanceBreakdown: {
-        jwtValidationTime,
-        cacheTime,
-        supabaseCreateTime,
-        totalTime: processingTime
-      }
-    }, request);
+    if (process.env.NODE_ENV === 'development') {
+      securityLogger.logAuthEvent(SecurityEventType.AUTH_SUCCESS, {
+        userId: user.id,
+        userRole: claims.user_role,
+        function: 'authenticateApiRequestUltraFast',
+        processingTime,
+        cacheHit,
+        method: cacheHit ? 'jwt-cache-redis' : 'jwt-cache-rpc',
+        performanceBreakdown: {
+          jwtValidationTime,
+          cacheTime,
+          supabaseCreateTime,
+          totalTime: processingTime
+        }
+      }, request);
+    }
 
     // Create supabase client only if not already created
     const supabase = await createClient();

@@ -182,7 +182,7 @@ export async function GET(
 
     const { data: progressData, error: progressError } = await supabase
       .from('student_module_progress')
-      .select('progress_details')
+      .select('progress_details, completed_videos')
       .eq('student_id', user.id)
       .eq('module_id', moduleId)
       .maybeSingle();
@@ -194,11 +194,23 @@ export async function GET(
     let progressDetails: any = {};
     if (progressData && progressData.progress_details) {
       progressDetails = progressData.progress_details as any;
+      // Merge completed_videos from both locations for backward compatibility
+      const fullyWatchedFromProgress = progressDetails.fully_watched_video_ids || [];
+      const fullyWatchedFromColumn = progressData.completed_videos || [];
+      const mergedWatchedVideos = [...new Set([...fullyWatchedFromProgress, ...fullyWatchedFromColumn])];
+      
       studentProgress = {
         last_viewed_lesson_sequence: progressDetails.last_viewed_lesson_sequence,
         video_playback_positions: progressDetails.video_playback_positions || {},
-        fully_watched_video_ids: progressDetails.fully_watched_video_ids || [],
+        fully_watched_video_ids: mergedWatchedVideos,
         lesson_quiz_results: progressDetails.lesson_quiz_results || {},
+      };
+    } else if (progressData && progressData.completed_videos) {
+      // Handle case where only completed_videos column exists (new format)
+      studentProgress = {
+        video_playback_positions: {},
+        fully_watched_video_ids: progressData.completed_videos || [],
+        lesson_quiz_results: {},
       };
     }
 
