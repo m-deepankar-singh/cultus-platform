@@ -38,21 +38,21 @@ export function ModuleNavigation() {
             Program Modules
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="group relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl blur opacity-25 group-hover:opacity-40 transition-opacity"></div>
-              <PerformantAnimatedCard variant="glass" className="relative animate-pulse h-80">
-                <div className="p-8 space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-muted rounded-xl"></div>
-                    <div className="flex-1 space-y-3">
-                      <div className="h-5 bg-muted rounded w-3/4"></div>
+              <PerformantAnimatedCard variant="glass" className="relative animate-pulse h-72 md:h-80">
+                <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="h-12 w-12 md:h-16 md:w-16 bg-muted rounded-xl flex-shrink-0"></div>
+                    <div className="flex-1 min-w-0 space-y-2 md:space-y-3">
+                      <div className="h-4 md:h-5 bg-muted rounded w-3/4"></div>
                       <div className="h-3 bg-muted rounded w-1/2"></div>
                     </div>
                   </div>
-                  <div className="h-4 bg-muted rounded w-full"></div>
-                  <div className="h-12 bg-muted rounded-lg"></div>
+                  <div className="h-3 md:h-4 bg-muted rounded w-full"></div>
+                  <div className="h-10 md:h-12 bg-muted rounded-lg"></div>
                 </div>
               </PerformantAnimatedCard>
             </div>
@@ -80,10 +80,10 @@ export function ModuleNavigation() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">Program Modules</h2>
-        <div className="flex items-center gap-3">
-          <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+        <h2 className="text-xl sm:text-2xl font-semibold">Program Modules</h2>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="h-1.5 w-12 sm:w-16 bg-muted rounded-full overflow-hidden">
             <div 
               className="h-full bg-primary transition-all duration-1000 ease-out"
               style={{ 
@@ -91,7 +91,7 @@ export function ModuleNavigation() {
               }}
             />
           </div>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
             {moduleGroups.moduleGroups.filter(m => m.isCompleted).length}/{moduleGroups.moduleGroups.length}
           </span>
         </div>
@@ -114,7 +114,7 @@ export function ModuleNavigation() {
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <div className={cn(
-                "relative flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 group-hover:shadow-md",
+                "relative flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border transition-all duration-300 group-hover:shadow-md",
                 isCompleted 
                   ? "bg-emerald-50/50 border-emerald-200/50 dark:bg-emerald-950/20 dark:border-emerald-800/30" 
                   : isUnlocked 
@@ -125,7 +125,7 @@ export function ModuleNavigation() {
                 
                 {/* Icon */}
                 <div className={cn(
-                  "flex-shrink-0 p-3 rounded-lg transition-all duration-300",
+                  "flex-shrink-0 p-2.5 sm:p-3 rounded-lg transition-all duration-300",
                   isCompleted 
                     ? "bg-emerald-100 dark:bg-emerald-900/40" 
                     : isUnlocked 
@@ -133,29 +133,29 @@ export function ModuleNavigation() {
                       : "bg-muted"
                 )}>
                   {isCompleted ? (
-                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
                   ) : isUnlocked ? (
-                    <IconComponent className="h-5 w-5 text-primary" />
+                    <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   ) : (
-                    <Lock className="h-5 w-5 text-muted-foreground" />
+                    <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   )}
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-1">
                     <h3 className={cn(
-                      "font-semibold",
+                      "font-semibold text-sm sm:text-base truncate",
                       !isUnlocked && "text-muted-foreground"
                     )}>
                       {moduleGroup.title}
                     </h3>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                       <Badge 
                         variant={isCompleted ? "default" : isUnlocked ? "secondary" : "outline"}
                         className={cn(
-                          "text-xs px-2 py-0.5",
+                          "text-xs px-1.5 sm:px-2 py-0.5 shrink-0",
                           isCompleted && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
                           isCurrent && !isCompleted && "bg-primary/10 text-primary border-primary/30"
                         )}
@@ -163,14 +163,14 @@ export function ModuleNavigation() {
                         {isCompleted ? "Completed" : isCurrent ? "Current" : isUnlocked ? "Available" : "Locked"}
                       </Badge>
                       
-                      <Badge variant="outline" className="text-xs px-2 py-0.5">
+                      <Badge variant="outline" className="text-xs px-1.5 sm:px-2 py-0.5 shrink-0">
                         Star {moduleGroup.requiredStars + 1}
                       </Badge>
                     </div>
                   </div>
                   
                   <p className={cn(
-                    "text-sm mb-2",
+                    "text-xs sm:text-sm mb-2 line-clamp-2",
                     isUnlocked ? "text-muted-foreground" : "text-muted-foreground/60"
                   )}>
                     {moduleGroup.description}
@@ -178,11 +178,11 @@ export function ModuleNavigation() {
                   
                   {/* Progress */}
                   {moduleGroup.totalCount > 0 && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {moduleGroup.completedCount}/{moduleGroup.totalCount} {moduleGroup.type.replace('_', ' ')}
                       </span>
-                      <div className="h-1 flex-1 bg-muted/50 rounded-full overflow-hidden">
+                      <div className="h-1 flex-1 bg-muted/50 rounded-full overflow-hidden min-w-0">
                         <div 
                           className={cn(
                             "h-full transition-all duration-1000 ease-out",
@@ -196,20 +196,20 @@ export function ModuleNavigation() {
                         />
                       </div>
                       {isCompleted && (
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Complete</span>
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">Complete</span>
                       )}
                     </div>
                   )}
                 </div>
 
                 {/* Action */}
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
                   {isUnlocked ? (
-                    <Link href={moduleGroup.href}>
+                    <Link href={moduleGroup.href} className="block sm:inline-block">
                       <AnimatedButton 
                         size="sm"
                         className={cn(
-                          "transition-all duration-300",
+                          "w-full sm:w-auto h-11 sm:h-9 text-sm transition-all duration-300",
                           isCompleted 
                             ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
                             : "bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -223,7 +223,7 @@ export function ModuleNavigation() {
                     <AnimatedButton 
                       size="sm"
                       disabled 
-                      className="bg-muted text-muted-foreground cursor-not-allowed"
+                      className="w-full sm:w-auto h-11 sm:h-9 text-sm bg-muted text-muted-foreground cursor-not-allowed"
                     >
                       <Lock className="h-3 w-3 mr-1" />
                       Locked

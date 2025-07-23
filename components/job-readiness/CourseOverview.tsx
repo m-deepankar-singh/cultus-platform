@@ -112,19 +112,30 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
             Track your learning progress through this course
           </p>
 
-          <div className="flex items-center justify-center gap-8">
-            <div className="text-center">
-              <OptimizedProgressRing
-                value={progressPercentage}
-                size={120}
-                color={getProgressColor(progressPercentage)}
-                showValue={true}
-                delay={300}
-              />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8">
+            <div className="text-center flex-shrink-0">
+              <div className="sm:hidden">
+                <OptimizedProgressRing
+                  value={progressPercentage}
+                  size={100}
+                  color={getProgressColor(progressPercentage)}
+                  showValue={true}
+                  delay={300}
+                />
+              </div>
+              <div className="hidden sm:block">
+                <OptimizedProgressRing
+                  value={progressPercentage}
+                  size={120}
+                  color={getProgressColor(progressPercentage)}
+                  showValue={true}
+                  delay={300}
+                />
+              </div>
               <p className="text-sm text-muted-foreground mt-2">Overall Progress</p>
             </div>
             
-            <div className="space-y-4 flex-1">
+            <div className="space-y-3 sm:space-y-4 flex-1 w-full sm:w-auto">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
                   Lessons Completed
@@ -134,15 +145,17 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
                 </span>
               </div>
               
-              <div 
-                className="h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-1000 ease-out"
-                style={{ 
-                  width: `${progressPercentage}%`,
-                  transitionDelay: '600ms'
-                }}
-              />
+              <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-3">
+                <div 
+                  className="h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-1000 ease-out"
+                  style={{ 
+                    width: `${progressPercentage}%`,
+                    transitionDelay: '600ms'
+                  }}
+                />
+              </div>
               
-              <div className="text-sm text-blue-700 dark:text-blue-300">
+              <div className="text-sm text-blue-700 dark:text-blue-300 text-center sm:text-left">
                 {progressPercentage}% complete
               </div>
             </div>
@@ -152,14 +165,14 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
       </PerformantAnimatedCard>
 
       {/* Course Content */}
-      <div className="grid md:grid-cols-3 gap-8">
+      <div className="space-y-8">
         {/* Lessons List */}
-        <div className="md:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold gradient-text">
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-xl sm:text-2xl font-semibold gradient-text">
               Course Lessons
             </h2>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 self-start sm:self-auto">
               {totalLessons} lessons
             </Badge>
           </div>
@@ -180,10 +193,10 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
                     className="dashboard-card group"
                   >
                     <div className="space-y-4">
-                      <div className="flex items-start gap-4">
-                        <div className="flex items-center">
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="flex items-center flex-shrink-0">
                           <div className={cn(
-                            "p-3 rounded-full backdrop-blur-sm border transition-all duration-300",
+                            "p-2 sm:p-3 rounded-full backdrop-blur-sm border transition-all duration-300",
                             status === 'completed' 
                               ? 'bg-emerald-500/20 border-emerald-500/30 dark:bg-emerald-500/10' 
                               : status === 'in-progress'
@@ -191,35 +204,35 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
                               : 'bg-muted/50 border-muted-foreground/20'
                           )}>
                             {status === 'completed' ? (
-                              <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
                             ) : status === 'in-progress' ? (
-                              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
                             ) : (
-                              <Video className="h-5 w-5 text-muted-foreground" />
+                              <Video className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                             )}
                           </div>
                         </div>
                         
-                        <div className="flex-1 space-y-3">
+                        <div className="flex-1 space-y-3 min-w-0">
                           <div>
-                            <h3 className="font-semibold text-lg mb-2">
+                            <h3 className="font-semibold text-base sm:text-lg mb-2 line-clamp-2">
                               Lesson {lesson.sequence}: {lesson.title}
                             </h3>
-                            <div className="flex items-center gap-2 mb-3">
+                            <div className="flex items-center gap-2 mb-3 flex-wrap">
                               <span className={cn(
-                                "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium",
+                                "inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium flex-shrink-0",
                                 getStatusColor(status)
                               )}>
                                 {status === 'completed' ? 'Completed' : status === 'in-progress' ? 'In Progress' : 'Not Started'}
                               </span>
                               {lesson.enable_ai_quiz && (
-                                <Badge variant="outline" className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">
+                                <Badge variant="outline" className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20 flex-shrink-0">
                                   <Award className="h-3 w-3 mr-1" />
                                   AI Quiz
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
+                            <p className="text-sm text-muted-foreground line-clamp-2 pr-2">
                               {lesson.description}
                             </p>
                           </div>
@@ -255,18 +268,21 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
                             >
                               {status === 'completed' ? (
                                 <>
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Review Lesson
+                                  <CheckCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="hidden sm:inline">Review Lesson</span>
+                                  <span className="sm:hidden">Review</span>
                                 </>
                               ) : status === 'in-progress' ? (
                                 <>
-                                  <Play className="h-4 w-4 mr-2" />
-                                  Continue Lesson
+                                  <Play className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="hidden sm:inline">Continue Lesson</span>
+                                  <span className="sm:hidden">Continue</span>
                                 </>
                               ) : (
                                 <>
-                                  <Video className="h-4 w-4 mr-2" />
-                                  Start Lesson
+                                  <Video className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="hidden sm:inline">Start Lesson</span>
+                                  <span className="sm:hidden">Start</span>
                                 </>
                               )}
                             </AnimatedButton>
@@ -280,8 +296,8 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
           </div>
         </div>
 
-        {/* Course Information Sidebar */}
-        <div className="space-y-6">
+        {/* Course Information Cards - Stack on mobile, side-by-side on tablet+ */}
+        <div className="grid sm:grid-cols-2 gap-6">
           <PerformantAnimatedCard 
             variant="glass"
             hoverEffect="scale"
@@ -290,28 +306,28 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-lg">Course Details</h3>
+                <BookOpen className="h-5 w-5 text-primary flex-shrink-0" />
+                <h3 className="font-semibold text-base sm:text-lg">Course Details</h3>
               </div>
               
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10">
-                  <span className="text-sm text-muted-foreground">Total Lessons</span>
-                  <span className="font-semibold text-lg">{totalLessons}</span>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Total Lessons</div>
+                  <div className="font-semibold text-lg">{totalLessons}</div>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 to-emerald-500/5">
-                  <span className="text-sm text-muted-foreground">Completed</span>
-                  <span className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">{completedLessons}</span>
+                <div className="p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Completed</div>
+                  <div className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">{completedLessons}</div>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5">
-                  <span className="text-sm text-muted-foreground">Progress</span>
-                  <span className="font-semibold text-lg text-primary">{progressPercentage}%</span>
+                <div className="p-3 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Progress</div>
+                  <div className="font-semibold text-lg text-primary">{progressPercentage}%</div>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10">
-                  <span className="text-sm text-muted-foreground">Last Viewed</span>
-                  <span className="font-semibold text-sm">
+                <div className="p-3 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Last Viewed</div>
+                  <div className="font-semibold text-sm">
                     {lastViewedSequence > 0 ? `Lesson ${lastViewedSequence}` : 'None'}
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -326,30 +342,30 @@ export function CourseOverview({ moduleData, progressData }: CourseOverviewProps
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-full bg-emerald-500/20">
+                <div className="p-2 rounded-full bg-emerald-500/20 flex-shrink-0">
                   <Target className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <h3 className="font-semibold text-lg text-emerald-900 dark:text-emerald-100">
+                <h3 className="font-semibold text-base sm:text-lg text-emerald-900 dark:text-emerald-100">
                   Learning Tips
                 </h3>
               </div>
               
               <div className="space-y-3 text-sm text-emerald-800 dark:text-emerald-200">
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  Watch each video completely for best understanding
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                  <span>Watch each video completely for best understanding</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  Complete the AI quiz to test your knowledge
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                  <span>Complete the AI quiz to test your knowledge</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  You can review lessons anytime
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                  <span>You can review lessons anytime</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  Take notes while learning for better retention
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                  <span>Take notes while learning for better retention</span>
                 </div>
               </div>
             </div>

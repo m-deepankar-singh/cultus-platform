@@ -60,22 +60,24 @@ interface AssessmentResult {
 }
 
 const AssessmentLoadingSkeleton = () => (
-  <div className="container mx-auto p-4 animate-pulse">
-    <div className="h-8 bg-neutral-300 dark:bg-neutral-700 rounded w-1/3 mb-4"></div>
-    <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-1/2 mb-6"></div>
-    <div className="bg-white/60 dark:bg-black/40 backdrop-blur-sm rounded-lg border border-white/20 dark:border-neutral-800/30 p-6 mb-4">
-      <div className="h-6 bg-neutral-300 dark:bg-neutral-700 rounded w-3/4 mb-3"></div>
-      <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-full mb-2"></div>
-      <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-5/6 mb-4"></div>
-      <div className="grid grid-cols-1 gap-3 mt-6">
+  <div className="w-full px-1 sm:px-4 py-2 sm:py-4 max-w-4xl sm:mx-auto animate-pulse">
+    <div className="px-2 sm:px-0">
+      <div className="h-6 sm:h-8 bg-neutral-300 dark:bg-neutral-700 rounded w-1/3 mb-3 sm:mb-4"></div>
+      <div className="h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-1/2 mb-4 sm:mb-6"></div>
+    </div>
+    <div className="bg-white/60 dark:bg-black/40 backdrop-blur-sm rounded-lg border border-white/20 dark:border-neutral-800/30 p-4 sm:p-6 mb-4 mx-2 sm:mx-0">
+      <div className="h-5 sm:h-6 bg-neutral-300 dark:bg-neutral-700 rounded w-3/4 mb-3"></div>
+      <div className="h-3 sm:h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-full mb-2"></div>
+      <div className="h-3 sm:h-4 bg-neutral-300 dark:bg-neutral-700 rounded w-5/6 mb-4"></div>
+      <div className="grid grid-cols-1 gap-3 mt-4 sm:mt-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded"></div>
+          <div key={i} className="h-10 sm:h-12 bg-neutral-300 dark:bg-neutral-700 rounded"></div>
         ))}
       </div>
     </div>
-    <div className="flex justify-between">
-      <div className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-24"></div>
-      <div className="h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-24"></div>
+    <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 px-2 sm:px-0">
+      <div className="h-10 sm:h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-24"></div>
+      <div className="h-10 sm:h-10 bg-neutral-300 dark:bg-neutral-700 rounded w-24"></div>
     </div>
   </div>
 );
@@ -119,6 +121,8 @@ export default function TakeAssessmentPage() {
   const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(null);
   const [autoSaveInterval, setAutoSaveInterval] = useState<NodeJS.Timeout | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [submissionReason, setSubmissionReason] = useState<string | null>(null);
+  const [showWarningModal, setShowWarningModal] = useState(true);
 
   const {
     data: assessmentData,
@@ -154,13 +158,16 @@ export default function TakeAssessmentPage() {
   }, [assessmentData, isLoading, isError]);
 
   useEffect(() => {
-    if (!timeRemaining || !assessmentData || isLoading || isError) return;
+    if (!timeRemaining || !assessmentData || isLoading || isError || isSubmitting || assessmentResult) return;
 
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev && prev <= 1) {
           clearInterval(timer);
-          handleTimeUp();
+          // Only submit if not already submitting or submitted
+          if (!isSubmitting && !assessmentResult) {
+            handleTimeUp();
+          }
           return 0;
         }
         return prev ? prev - 1 : null;
@@ -177,7 +184,7 @@ export default function TakeAssessmentPage() {
       clearInterval(timer);
       clearInterval(saveInterval);
     };
-  }, [timeRemaining, assessmentData, isLoading, isError]);
+  }, [timeRemaining, assessmentData, isLoading, isError, isSubmitting, assessmentResult]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -196,6 +203,23 @@ export default function TakeAssessmentPage() {
       }
     };
   }, [answers, moduleId]);
+
+  // Add Page Visibility API to immediately submit assessment when user leaves the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Only submit if assessment is not already completed and user is taking the assessment
+      if (document.visibilityState === 'hidden' && !assessmentResult && assessmentData && !isSubmitting && !showWarningModal) {
+        console.log('User left the page, immediately submitting assessment');
+        handleSubmitAssessment('page_leave');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [assessmentResult, assessmentData, isSubmitting, showWarningModal]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -218,7 +242,7 @@ export default function TakeAssessmentPage() {
   };
 
   const handleTimeUp = () => {
-    handleSubmitAssessment();
+    handleSubmitAssessment('timer_expired');
   };
 
   const handleSingleAnswerChange = (questionId: string, answerId: string) => {
@@ -264,11 +288,12 @@ export default function TakeAssessmentPage() {
     setIsSubmitDialogOpen(true);
   };
 
-  const handleSubmitAssessment = async () => {
-    if (!moduleId || !assessmentData) return;
+  const handleSubmitAssessment = async (reason?: string) => {
+    if (!moduleId || !assessmentData || isSubmitting || assessmentResult) return;
     
     setIsSubmitting(true);
     setSubmissionError(null);
+    setSubmissionReason(reason || null);
     
     try {
       setIsSubmitDialogOpen(false);
@@ -309,13 +334,13 @@ export default function TakeAssessmentPage() {
 
   if (isError) {
     return (
-      <div className="container mx-auto p-4 text-center">
-        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
-          <h2 className="text-xl font-bold">Error Loading Assessment</h2>
-          <p className="mt-2">{error?.message || 'An unknown error occurred'}</p>
+      <div className="w-full px-1 sm:px-4 py-2 sm:py-4 max-w-4xl sm:mx-auto text-center">
+        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300 p-4 sm:p-6 mx-2 sm:mx-0">
+          <h2 className="text-lg sm:text-xl font-bold">Error Loading Assessment</h2>
+          <p className="mt-2 text-sm sm:text-base leading-relaxed">{error?.message || 'An unknown error occurred'}</p>
           <Button 
             onClick={() => router.push('/app/dashboard')} 
-            className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 min-h-[44px] w-full sm:w-auto"
           >
             Back to Dashboard
           </Button>
@@ -326,16 +351,16 @@ export default function TakeAssessmentPage() {
 
   if (submissionError) {
     return (
-      <div className="container mx-auto p-4 text-center">
-        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300">
-          <h2 className="text-xl font-bold">Submission Error</h2>
-          <p className="mt-2">{submissionError}</p>
+      <div className="w-full px-1 sm:px-4 py-2 sm:py-4 max-w-4xl sm:mx-auto text-center">
+        <AnimatedCard className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 backdrop-blur-sm text-red-700 dark:text-red-300 p-4 sm:p-6 mx-2 sm:mx-0">
+          <h2 className="text-lg sm:text-xl font-bold">Submission Error</h2>
+          <p className="mt-2 text-sm sm:text-base leading-relaxed">{submissionError}</p>
           <Button 
             onClick={() => { setSubmissionError(null); }} 
-            className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            className="mt-4 bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 min-h-[44px] w-full sm:w-auto"
           >
             Try Again
-        </Button>
+          </Button>
         </AnimatedCard>
       </div>
     );
@@ -343,12 +368,12 @@ export default function TakeAssessmentPage() {
 
   if (!assessmentData) {
     return (
-      <div className="container mx-auto p-4 text-center">
-        <AnimatedCard className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300">
-          <p className="mb-4">Assessment data could not be loaded or is not available.</p>
+      <div className="w-full px-1 sm:px-4 py-2 sm:py-4 max-w-4xl sm:mx-auto text-center">
+        <AnimatedCard className="bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm text-amber-700 dark:text-amber-300 p-4 sm:p-6 mx-2 sm:mx-0">
+          <p className="mb-4 text-sm sm:text-base leading-relaxed">Assessment data could not be loaded or is not available.</p>
           <Button 
             onClick={() => router.push('/app/dashboard')} 
-            className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+            className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 min-h-[44px] w-full sm:w-auto"
           >
             Back to Dashboard
           </Button>
@@ -363,81 +388,88 @@ export default function TakeAssessmentPage() {
   const questionAnswer = answers[currentQuestion?.id] || (currentQuestion?.question_type === 'MSQ' ? [] : '');
 
   return (
-    <div className="container mx-auto p-4">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400">
+    <div className="w-full px-1 sm:px-4 py-2 sm:py-4 max-w-4xl sm:mx-auto">
+      {/* Assessment content - blurred when warning modal is open */}
+      <div className={`${showWarningModal ? 'blur-sm pointer-events-none' : ''} transition-all duration-300`}>
+      <header className="mb-4 sm:mb-6 px-2 sm:px-0">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-neutral-400 leading-tight">
           {assessment.name}
         </h1>
         {assessment.instructions && (
-          <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-4">
+          <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 mb-3 sm:mb-4 leading-relaxed">
             {assessment.instructions}
           </p>
         )}
         
-        <AnimatedCard className="mt-4 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-neutral-600 dark:text-neutral-400">
-              Question {currentQuestionIndex + 1} of {assessment.questions.length}
-            </span>
-              <NeutralProgress value={progress} className="w-32 h-2" />
-          </div>
-          
-          {timeRemaining !== null && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/40 dark:bg-neutral-800/40 backdrop-blur-sm border border-white/20 dark:border-neutral-800/30">
-                <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
+        
+        <AnimatedCard className="mt-3 sm:mt-4 p-3 sm:p-4 mx-2 sm:mx-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <span className="text-sm text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+                Question {currentQuestionIndex + 1} of {assessment.questions.length}
+              </span>
+              <NeutralProgress value={progress} className="w-full sm:w-32 h-2" />
+            </div>
+            
+            {timeRemaining !== null && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/40 dark:bg-neutral-800/40 backdrop-blur-sm border border-white/20 dark:border-neutral-800/30 self-start sm:self-auto">
+                <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-300 flex-shrink-0" />
                 <span className={cn(
-                  "font-medium",
+                  "font-medium text-sm sm:text-base",
                   timeRemaining < 60 
                     ? "text-red-500 dark:text-red-400" 
                     : "text-neutral-700 dark:text-neutral-300"
                 )}>
-                {formatTime(timeRemaining)}
-              </span>
-            </div>
-          )}
-        </div>
+                  {formatTime(timeRemaining)}
+                </span>
+              </div>
+            )}
+          </div>
         </AnimatedCard>
       </header>
 
-      <main>
+      <main className="px-2 sm:px-0">
         {currentQuestion && (
-          <AnimatedCard className="mb-6 overflow-hidden">
-            <div className="p-5 border-b border-neutral-200 dark:border-neutral-800/30">
-              <h2 className="text-xl font-semibold text-neutral-800 dark:text-white">
+          <AnimatedCard className="mb-4 sm:mb-6 overflow-hidden mx-2 sm:mx-0">
+            <div className="p-4 sm:p-5 border-b border-neutral-200 dark:border-neutral-800/30">
+              <h2 className="text-lg sm:text-xl font-semibold text-neutral-800 dark:text-white leading-relaxed">
                 {currentQuestionIndex + 1}. {currentQuestion.question_text}
               </h2>
             </div>
             
-            <div className="p-5">
+            <div className="p-4 sm:p-5">
               {currentQuestion.question_type === 'MCQ' && (
                 <RadioGroup
                   value={questionAnswer as string}
                   onValueChange={(value) => handleSingleAnswerChange(currentQuestion.id, value)}
-                  className="space-y-4"
+                  className="space-y-3 sm:space-y-4"
                 >
                   {currentQuestion.options.map((option) => (
-                    <div key={option.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
-                      <NeutralRadioGroupItem value={option.id} id={option.id} />
-                      <Label htmlFor={option.id} className="text-neutral-700 dark:text-neutral-300">{option.text}</Label>
+                    <div key={option.id} className="flex items-start space-x-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors min-h-[44px]">
+                      <NeutralRadioGroupItem value={option.id} id={option.id} className="mt-0.5" />
+                      <Label htmlFor={option.id} className="text-neutral-700 dark:text-neutral-300 text-sm sm:text-base leading-relaxed cursor-pointer flex-1">
+                        {option.text}
+                      </Label>
                     </div>
                   ))}
                 </RadioGroup>
               )}
               
               {currentQuestion.question_type === 'MSQ' && (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {currentQuestion.options.map((option) => (
-                    <div key={option.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
+                    <div key={option.id} className="flex items-start space-x-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors min-h-[44px]">
                       <Checkbox
                         id={option.id}
                         checked={(questionAnswer as string[]).includes(option.id)}
                         onCheckedChange={(checked) => 
                           handleMultiAnswerChange(currentQuestion.id, option.id, checked === true)
                         }
-                        className="border-neutral-300 dark:border-neutral-600 data-[state=checked]:bg-neutral-800 data-[state=checked]:border-neutral-800 dark:data-[state=checked]:bg-neutral-300 dark:data-[state=checked]:border-neutral-300"
+                        className="border-neutral-300 dark:border-neutral-600 data-[state=checked]:bg-neutral-800 data-[state=checked]:border-neutral-800 dark:data-[state=checked]:bg-neutral-300 dark:data-[state=checked]:border-neutral-300 mt-0.5"
                       />
-                      <Label htmlFor={option.id} className="text-neutral-700 dark:text-neutral-300">{option.text}</Label>
+                      <Label htmlFor={option.id} className="text-neutral-700 dark:text-neutral-300 text-sm sm:text-base leading-relaxed cursor-pointer flex-1">
+                        {option.text}
+                      </Label>
                     </div>
                   ))}
                 </div>
@@ -447,26 +479,26 @@ export default function TakeAssessmentPage() {
                 <RadioGroup
                   value={questionAnswer as string}
                   onValueChange={(value) => handleSingleAnswerChange(currentQuestion.id, value)}
-                  className="space-y-4"
+                  className="space-y-3 sm:space-y-4"
                 >
-                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
+                  <div className="flex items-center space-x-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors min-h-[44px]">
                     <NeutralRadioGroupItem value="true" id={`${currentQuestion.id}-true`} />
-                    <Label htmlFor={`${currentQuestion.id}-true`} className="text-neutral-700 dark:text-neutral-300">True</Label>
+                    <Label htmlFor={`${currentQuestion.id}-true`} className="text-neutral-700 dark:text-neutral-300 text-sm sm:text-base cursor-pointer">True</Label>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors">
+                  <div className="flex items-center space-x-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-100/50 dark:hover:bg-neutral-800/20 transition-colors min-h-[44px]">
                     <NeutralRadioGroupItem value="false" id={`${currentQuestion.id}-false`} />
-                    <Label htmlFor={`${currentQuestion.id}-false`} className="text-neutral-700 dark:text-neutral-300">False</Label>
+                    <Label htmlFor={`${currentQuestion.id}-false`} className="text-neutral-700 dark:text-neutral-300 text-sm sm:text-base cursor-pointer">False</Label>
                   </div>
                 </RadioGroup>
               )}
             </div>
             
-            <div className="p-5 border-t border-neutral-200 dark:border-neutral-800/30 flex justify-between">
+            <div className="p-4 sm:p-5 border-t border-neutral-200 dark:border-neutral-800/30 flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
               <Button
                 variant="outline"
                 onClick={goToPreviousQuestion}
                 disabled={currentQuestionIndex === 0}
-                className="border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
+                className="border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 min-h-[44px]"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
@@ -474,7 +506,7 @@ export default function TakeAssessmentPage() {
               {currentQuestionIndex < assessment.questions.length - 1 ? (
                 <Button 
                   onClick={goToNextQuestion}
-                  className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+                  className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 min-h-[44px]"
                 >
                   Next <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -482,7 +514,7 @@ export default function TakeAssessmentPage() {
                 <Button 
                   onClick={confirmSubmit} 
                   disabled={isSubmitting}
-                  className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
+                  className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 min-h-[44px]"
                 >
                   Submit Assessment
                 </Button>
@@ -491,35 +523,35 @@ export default function TakeAssessmentPage() {
           </AnimatedCard>
         )}
         
-        <AnimatedCard className="mb-6 p-4">
-          <div className="flex flex-wrap gap-2">
-          {assessment.questions.map((_, index) => (
-            <Button
-              key={index}
-              variant={index === currentQuestionIndex ? "default" : 
-                      (answers[assessment.questions[index].id] ? "outline" : "ghost")}
-              size="sm"
-              onClick={() => setCurrentQuestionIndex(index)}
+        <AnimatedCard className="mb-4 sm:mb-6 p-3 sm:p-4 mx-2 sm:mx-0">
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+            {assessment.questions.map((_, index) => (
+              <Button
+                key={index}
+                variant={index === currentQuestionIndex ? "default" : 
+                        (answers[assessment.questions[index].id] ? "outline" : "ghost")}
+                size="sm"
+                onClick={() => setCurrentQuestionIndex(index)}
                 className={cn(
-                  "w-10 h-10 p-0",
+                  "w-10 h-10 p-0 min-h-[40px] text-sm sm:text-base",
                   index === currentQuestionIndex ? 
                     "bg-gradient-to-r from-neutral-800 to-neutral-900 dark:from-neutral-200 dark:to-white text-white dark:text-neutral-900" :
                     answers[assessment.questions[index].id] ? 
                       "border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300" :
                       "text-neutral-500 dark:text-neutral-400"
                 )}
-            >
-              {index + 1}
-            </Button>
-          ))}
-        </div>
+              >
+                {index + 1}
+              </Button>
+            ))}
+          </div>
         </AnimatedCard>
         
-        <div className="mt-6 text-center">
+        <div className="mt-4 sm:mt-6 text-center px-4 sm:px-2">
           <Button 
             onClick={confirmSubmit} 
             disabled={isSubmitting}
-            className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 px-8"
+            className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900 px-6 sm:px-8 min-h-[44px] w-full sm:w-auto"
           >
             Submit Assessment
           </Button>
@@ -537,7 +569,7 @@ export default function TakeAssessmentPage() {
           <AlertDialogFooter>
             <AlertDialogCancel className="border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300">Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleSubmitAssessment}
+              onClick={() => handleSubmitAssessment()}
               className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
             >
               Submit
@@ -574,6 +606,21 @@ export default function TakeAssessmentPage() {
                 <p>
                   You answered {assessmentResult?.correctAnswers} out of {assessmentResult?.totalQuestions} questions correctly.
                 </p>
+                
+                {/* Show submission reason if available */}
+                {submissionReason && (
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/30 rounded-lg">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      {submissionReason === 'page_leave' && (
+                        <span><strong>Reason:</strong> Assessment was submitted because you left the page</span>
+                      )}
+                      {submissionReason === 'timer_expired' && (
+                        <span><strong>Reason:</strong> Assessment was submitted because time expired</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+                
                 {!assessmentResult?.passed && assessment.retakes_allowed && (
                   <p className="mt-2 text-amber-600 dark:text-amber-400">
                     You can retake this assessment later.
@@ -588,6 +635,61 @@ export default function TakeAssessmentPage() {
               className="bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-700 hover:to-neutral-800 dark:from-neutral-200 dark:to-white dark:hover:from-neutral-300 dark:hover:to-neutral-100 text-white dark:text-neutral-900"
             >
               Return to Dashboard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </div>
+
+      {/* Warning Modal - Must accept to start assessment */}
+      <AlertDialog open={showWarningModal} onOpenChange={setShowWarningModal}>
+        <AlertDialogContent className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-amber-200 dark:border-amber-800/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              Assessment Guidelines
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="py-4 text-neutral-600 dark:text-neutral-400 space-y-4">
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                    ⚠️ Important: Stay Focused During Assessment
+                  </h4>
+                  <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-2">
+                    <li>• <strong>Do not leave this page</strong> during the assessment</li>
+                    <li>• <strong>Do not switch tabs</strong> or minimize the browser</li>
+                    <li>• <strong>Do not navigate away</strong> from this page</li>
+                  </ul>
+                </div>
+                
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-red-800 dark:text-red-200 mb-2">
+                    ⚡ Automatic Submission Policy
+                  </h4>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Your assessment will be <strong>immediately submitted</strong> if you leave this page for any reason. 
+                    This helps maintain assessment integrity and prevents cheating.
+                  </p>
+                </div>
+
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  By clicking "I Understand, Start Assessment" you acknowledge that you have read and agree to these guidelines.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel 
+              onClick={() => router.push('/app/dashboard')}
+              className="border-neutral-300 hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => setShowWarningModal(false)}
+              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+            >
+              I Understand, Start Assessment
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,7 +1,7 @@
 'use client'
 
 import { 
-  Clock, Users, Trophy, CheckCircle2, Lock, Play, RotateCcw, Eye,
+  Clock, Users, Trophy, CheckCircle2, Lock, Play, Eye,
   Star, Brain, ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
@@ -241,27 +241,18 @@ export function SimpleAssessmentCard({
                 Assessment Locked
               </div>
             ) : is_completed ? (
-              <div className="flex gap-2">
-                <Link 
-                  href={`/app/job-readiness/assessments/${id}/results`}
-                  className="flex-1 py-3 px-4 rounded-xl border text-center backdrop-blur-md flex items-center justify-center gap-2 transition-all hover:bg-white/5"
-                  style={{
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)',
-                    color: 'rgb(34, 197, 94)'
-                  }}
-                >
-                  <Eye className="w-4 h-4" />
-                  View Results
-                </Link>
-                
-                <Link 
-                  href={`/app/job-readiness/assessments/${id}`}
-                  className="py-3 px-4 rounded-xl bg-slate-800/50 border border-slate-600/30 text-slate-300 backdrop-blur-md flex items-center justify-center hover:bg-slate-700/50 transition-all"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </Link>
-              </div>
+              <Link 
+                href={`/app/job-readiness/assessments/${id}/results`}
+                className="w-full py-3 px-4 rounded-xl border text-center backdrop-blur-md flex items-center justify-center gap-2 transition-all hover:bg-white/5"
+                style={{
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  borderColor: 'rgba(34, 197, 94, 0.3)',
+                  color: 'rgb(34, 197, 94)'
+                }}
+              >
+                <Eye className="w-4 h-4" />
+                View Results
+              </Link>
             ) : (
               <Link 
                 href={`/app/job-readiness/assessments/${id}`}
@@ -300,7 +291,7 @@ export function SimpleAssessmentCard({
               >
                 {last_score >= configuration.pass_threshold 
                   ? '🎉 Congratulations! You passed this assessment.' 
-                  : '💪 Keep practicing! You can retake this assessment.'}
+                  : '💪 Keep practicing to improve your skills!'}
               </div>
             </div>
           )}

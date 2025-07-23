@@ -27,11 +27,11 @@ export default function JobReadinessPage() {
             
             <div className="space-y-4">
               <div className="text-center">
-                <div className="flex justify-center gap-1 mb-4">
+                <div className="flex justify-center gap-1 sm:gap-1.5 mb-3 sm:mb-4">
                   {Array.from({ length: 5 }, (_, index) => (
-                    <div key={index} className="relative w-6 h-6 sm:w-8 sm:h-8">
+                    <div key={index} className="relative w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8">
                       <div 
-                        className="w-6 h-6 sm:w-8 sm:h-8 transition-all duration-300"
+                        className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 transition-all duration-300"
                         style={{
                           background: progress?.currentTier === 'BRONZE' 
                             ? '#f97316' 
@@ -46,16 +46,16 @@ export default function JobReadinessPage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground px-2">
                   All learners progress through the same 5-star system by completing modules sequentially
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-center text-sm">
-                <div className="space-y-2">
-                  <div className="relative w-6 h-6 mx-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4 text-center text-sm">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="relative w-5 h-5 sm:w-6 sm:h-6 mx-auto">
                     <div 
-                      className="w-6 h-6"
+                      className="w-5 h-5 sm:w-6 sm:h-6"
                       style={{
                         background: progress?.currentTier === 'BRONZE' 
                           ? '#f97316' 
@@ -67,14 +67,14 @@ export default function JobReadinessPage() {
                       }}
                     />
                   </div>
-                  <div className="font-medium">Star 1</div>
-                  <p className="text-muted-foreground">Complete Assessments</p>
+                  <div className="font-medium text-xs sm:text-sm">Star 1</div>
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-tight">Complete Assessments</p>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="relative w-6 h-6 mx-auto">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="relative w-5 h-5 sm:w-6 sm:h-6 mx-auto">
                     <div 
-                      className="w-6 h-6"
+                      className="w-5 h-5 sm:w-6 sm:h-6"
                       style={{
                         background: progress?.currentTier === 'BRONZE' 
                           ? '#f97316' 
@@ -86,14 +86,14 @@ export default function JobReadinessPage() {
                       }}
                     />
                   </div>
-                  <div className="font-medium">Star 2</div>
-                  <p className="text-muted-foreground">Complete Courses</p>
+                  <div className="font-medium text-xs sm:text-sm">Star 2</div>
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-tight">Complete Courses</p>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="relative w-6 h-6 mx-auto">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="relative w-5 h-5 sm:w-6 sm:h-6 mx-auto">
                     <div 
-                      className="w-6 h-6"
+                      className="w-5 h-5 sm:w-6 sm:h-6"
                       style={{
                         background: progress?.currentTier === 'BRONZE' 
                           ? '#f97316' 
@@ -105,14 +105,14 @@ export default function JobReadinessPage() {
                       }}
                     />
                   </div>
-                  <div className="font-medium">Star 3</div>
-                  <p className="text-muted-foreground">Expert Sessions</p>
+                  <div className="font-medium text-xs sm:text-sm">Star 3</div>
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-tight">Expert Sessions</p>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="relative w-6 h-6 mx-auto">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="relative w-5 h-5 sm:w-6 sm:h-6 mx-auto">
                     <div 
-                      className="w-6 h-6"
+                      className="w-5 h-5 sm:w-6 sm:h-6"
                       style={{
                         background: progress?.currentTier === 'BRONZE' 
                           ? '#f97316' 
@@ -124,14 +124,14 @@ export default function JobReadinessPage() {
                       }}
                     />
                   </div>
-                  <div className="font-medium">Star 4</div>
-                  <p className="text-muted-foreground">Real-world Projects</p>
+                  <div className="font-medium text-xs sm:text-sm">Star 4</div>
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-tight">Real-world Projects</p>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="relative w-6 h-6 mx-auto">
+                <div className="space-y-1.5 sm:space-y-2 col-span-2 sm:col-span-1">
+                  <div className="relative w-5 h-5 sm:w-6 sm:h-6 mx-auto">
                     <div 
-                      className="w-6 h-6"
+                      className="w-5 h-5 sm:w-6 sm:h-6"
                       style={{
                         background: progress?.currentTier === 'BRONZE' 
                           ? '#f97316' 
@@ -143,18 +143,18 @@ export default function JobReadinessPage() {
                       }}
                     />
                   </div>
-                  <div className="font-medium">Star 5</div>
-                  <p className="text-muted-foreground">Interview Simulation</p>
+                  <div className="font-medium text-xs sm:text-sm">Star 5</div>
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-tight">Interview Simulation</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
-              <div className="space-y-2">
-                <p className="text-sm text-blue-800 dark:text-blue-200 text-center font-medium">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 mt-4 sm:mt-6">
+              <div className="space-y-1.5 sm:space-y-2">
+                <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 text-center font-medium">
                   <strong>Tier System (Bronze/Silver/Gold)</strong>
                 </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 text-center leading-relaxed">
+                <p className="text-xs text-blue-700 dark:text-blue-300 text-center leading-relaxed px-1">
                   Your tier is determined by your assessment performance and only affects content difficulty. 
                   All learners can earn the same 5 stars regardless of their tier - Bronze, Silver, and Gold 
                   learners all follow the same progression path but with content tailored to their skill level.

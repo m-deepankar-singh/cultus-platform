@@ -19,12 +19,12 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
 
   if (progressLoading || assessmentsLoading) {
     return (
-      <PerformantAnimatedCard variant="glass" className="py-12">
+      <PerformantAnimatedCard variant="glass" className="py-8 sm:py-12 px-4 sm:px-6 mx-2 sm:mx-0">
         <div className="flex items-center justify-center">
           <div className="flex items-center gap-4 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <div className="space-y-1">
-              <div className="text-lg font-medium">
+              <div className="text-base sm:text-lg font-medium">
                 Loading Assessments...
               </div>
               <div className="text-sm text-muted-foreground">
@@ -41,17 +41,17 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
     return (
       <PerformantAnimatedCard 
         variant="glass" 
-        className="border-destructive/20 bg-destructive/5"
+        className="border-destructive/20 bg-destructive/5 p-4 sm:p-6 mx-2 sm:mx-0"
       >
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-full bg-destructive/10 border border-destructive/20">
+          <div className="p-3 rounded-full bg-destructive/10 border border-destructive/20 flex-shrink-0">
             <AlertCircle className="h-6 w-6 text-destructive" />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-destructive mb-1">
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-destructive mb-1">
               Connection Error
             </h3>
-            <p className="text-destructive/80">
+            <p className="text-sm sm:text-base text-destructive/80">
               Failed to load assessments. Please refresh the page and try again.
             </p>
           </div>
@@ -64,17 +64,17 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
     return (
       <PerformantAnimatedCard 
         variant="glass" 
-        className="py-12 text-center border-primary/20 bg-primary/5"
+        className="py-8 sm:py-12 px-4 sm:px-6 text-center border-primary/20 bg-primary/5 mx-2 sm:mx-0"
       >
         <div className="space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <Zap className="h-8 w-8 text-primary" />
+          <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Zap className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-primary mb-3">
+            <h3 className="text-lg sm:text-xl font-semibold text-primary mb-3">
               No Assessments Available
             </h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto leading-relaxed">
               Assessments are currently being configured for your profile. 
               Please check back shortly or contact support.
             </p>
@@ -92,10 +92,10 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
   const progressPercentage = Math.round((completedAssessments.length / assessments.length) * 100)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Completion Status with Progress Ring */}
-      <PerformantAnimatedCard variant="glass" className="text-center py-6">
-        <div className="flex items-center justify-center gap-6">
+      <PerformantAnimatedCard variant="glass" className="text-center py-4 sm:py-6 px-4 sm:px-6 mx-2 sm:mx-0">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
           <OptimizedProgressRing
             value={progressPercentage}
             size={60}
@@ -103,12 +103,12 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
             showValue={true}
             delay={300}
           />
-          <div className="text-left">
-            <div className="flex items-center gap-2 mb-1">
+          <div className="text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
               <CheckCircle2 className="h-5 w-5 text-success" />
-              <span className="text-lg font-semibold">Assessment Progress</span>
+              <span className="text-base sm:text-lg font-semibold">Assessment Progress</span>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               {completedAssessments.length} of {assessments.length} assessments completed
             </p>
           </div>
@@ -117,15 +117,15 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
 
       {/* Available Assessments */}
       {pendingAssessments.length > 0 && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-0.5 bg-gradient-to-r from-primary to-accent"></div>
-            <h2 className="text-2xl font-bold gradient-text">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-6 sm:w-8 h-0.5 bg-gradient-to-r from-primary to-accent"></div>
+            <h2 className="text-xl sm:text-2xl font-bold gradient-text">
               Available Assessments
             </h2>
           </div>
           
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {pendingAssessments.map((assessment, index) => (
               <AssessmentCard
                 key={assessment.id}
@@ -141,15 +141,15 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
 
       {/* Completed Assessments */}
       {completedAssessments.length > 0 && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-0.5 bg-gradient-to-r from-success to-emerald-500"></div>
-            <h2 className="text-2xl font-bold text-success">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-6 sm:w-8 h-0.5 bg-gradient-to-r from-success to-emerald-500"></div>
+            <h2 className="text-xl sm:text-2xl font-bold text-success">
               Completed Assessments
             </h2>
           </div>
           
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {completedAssessments.map((assessment, index) => (
               <AssessmentCard
                 key={assessment.id}
@@ -165,15 +165,15 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
 
       {/* Locked Assessments */}
       {lockedAssessments.length > 0 && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-0.5 bg-gradient-to-r from-muted-foreground to-muted"></div>
-            <h2 className="text-2xl font-bold text-muted-foreground">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-6 sm:w-8 h-0.5 bg-gradient-to-r from-muted-foreground to-muted"></div>
+            <h2 className="text-xl sm:text-2xl font-bold text-muted-foreground">
               Upcoming Assessments
             </h2>
           </div>
           
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {lockedAssessments.map((assessment, index) => (
               <AssessmentCard
                 key={assessment.id}
@@ -191,7 +191,7 @@ export function AssessmentList({ productId: providedProductId }: AssessmentListP
       {pendingAssessments.length === 0 && completedAssessments.length === assessments.length && (
         <PerformantAnimatedCard 
           variant="glass" 
-          className="text-center py-12 border-success/20 bg-success/5"
+          className="text-center py-8 sm:py-12 px-4 sm:px-6 border-success/20 bg-success/5 mx-2 sm:mx-0"
         >
           <div className="space-y-6">
             <div className="flex justify-center">

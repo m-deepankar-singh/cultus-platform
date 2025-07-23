@@ -104,41 +104,41 @@ export function AppLoginForm() {
 
 	return (
 		<>
-			<div className="text-center mb-6 sm:mb-8">
-				<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
-					<GraduationCap className="w-6 h-6 text-primary" />
+			<div className="text-center mb-4 sm:mb-6 lg:mb-8">
+				<div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 dark:bg-primary/20 mb-3 sm:mb-4">
+					<GraduationCap className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
 				</div>
-				<h1 className="text-2xl sm:text-3xl font-bold mb-2 text-foreground">
+				<h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 text-foreground">
 					Student Login
 				</h1>
-				<p className="text-sm sm:text-base text-muted-foreground">
+				<p className="text-sm sm:text-base text-muted-foreground px-2">
 					Enter your credentials to access your learning dashboard
 				</p>
 			</div>
 			
 			{isInvalidCredentials && (
-				<Alert variant="destructive" className="mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
-					<ShieldX className="h-5 w-5" />
-					<AlertTitle className="font-medium">Incorrect Email or Password</AlertTitle>
-					<AlertDescription className="mt-1">
+				<Alert variant="destructive" className="mb-4 sm:mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
+					<ShieldX className="h-4 w-4 sm:h-5 sm:w-5" />
+					<AlertTitle className="font-medium text-sm sm:text-base">Incorrect Email or Password</AlertTitle>
+					<AlertDescription className="mt-1 text-sm">
 						Please check your credentials and try again. Make sure your caps lock is off.
 					</AlertDescription>
 				</Alert>
 			)}
 			
 			{submissionError && !isInvalidCredentials && (
-				<Alert variant="destructive" className="mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
+				<Alert variant="destructive" className="mb-4 sm:mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
 					<AlertCircle className="h-4 w-4" />
-					<AlertTitle>Login Error</AlertTitle>
-					<AlertDescription>{submissionError}</AlertDescription>
+					<AlertTitle className="text-sm sm:text-base">Login Error</AlertTitle>
+					<AlertDescription className="text-sm">{submissionError}</AlertDescription>
 				</Alert>
 			)}
 			
 			{showTempPasswordAlert && (
-				<Alert variant="default" className="mb-6 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-yellow-500/50 text-yellow-700 dark:border-yellow-500/30 dark:text-yellow-300 [&>svg]:text-yellow-500 dark:[&>svg]:text-yellow-400">
+				<Alert variant="default" className="mb-4 sm:mb-6 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-yellow-500/50 text-yellow-700 dark:border-yellow-500/30 dark:text-yellow-300 [&>svg]:text-yellow-500 dark:[&>svg]:text-yellow-400">
 					<AlertCircle className="h-4 w-4" />
-					<AlertTitle>Are you a new user?</AlertTitle>
-					<AlertDescription>
+					<AlertTitle className="text-sm sm:text-base">Are you a new user?</AlertTitle>
+					<AlertDescription className="text-sm">
 						New accounts require the temporary password sent in your welcome email. 
 						If you haven't received your welcome email or forgot your temporary password, 
 						please contact your administrator.
@@ -147,7 +147,7 @@ export function AppLoginForm() {
 			)}
 			
 			<Form {...form}>
-				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
+				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4 lg:space-y-5">
 					<FormField
 						control={form.control}
 						name="email"
@@ -160,8 +160,9 @@ export function AppLoginForm() {
 										placeholder="student@example.com"
 										{...field}
 										disabled={isLoading}
-										className={`bg-white/70 dark:bg-black/50 backdrop-blur-sm border-neutral-200 dark:border-neutral-800 ${isInvalidCredentials ? 'border-red-400 dark:border-red-500 focus-visible:ring-red-400 dark:focus-visible:ring-red-500' : ''}`}
+										className={`h-11 sm:h-12 bg-white/70 dark:bg-black/50 backdrop-blur-sm border-neutral-200 dark:border-neutral-800 text-base ${isInvalidCredentials ? 'border-red-400 dark:border-red-500 focus-visible:ring-red-400 dark:focus-visible:ring-red-500' : ''}`}
 										autoComplete="email"
+										inputMode="email"
 									/>
 								</FormControl>
 								<FormMessage />
@@ -180,7 +181,7 @@ export function AppLoginForm() {
 										placeholder="••••••••"
 										{...field}
 										disabled={isLoading}
-										className={`bg-white/70 dark:bg-black/50 backdrop-blur-sm border-neutral-200 dark:border-neutral-800 ${isInvalidCredentials ? 'border-red-400 dark:border-red-500 focus-visible:ring-red-400 dark:focus-visible:ring-red-500' : ''}`}
+										className={`h-11 sm:h-12 bg-white/70 dark:bg-black/50 backdrop-blur-sm border-neutral-200 dark:border-neutral-800 text-base ${isInvalidCredentials ? 'border-red-400 dark:border-red-500 focus-visible:ring-red-400 dark:focus-visible:ring-red-500' : ''}`}
 										autoComplete="current-password"
 									/>
 								</FormControl>
@@ -212,7 +213,8 @@ export function AppLoginForm() {
 
 					<Button 
 						type="submit" 
-						className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg mt-2"
+						size="lg"
+						className="w-full h-11 sm:h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg mt-2 text-base font-medium"
 						disabled={isLoading}
 					>
 						{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

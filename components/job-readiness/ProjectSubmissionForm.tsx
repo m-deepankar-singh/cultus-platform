@@ -105,33 +105,33 @@ export function ProjectSubmissionForm({
         hoverEffect="lift"
         className="submission-form-card"
       >
-        <div className="space-y-6">
-          <div className="space-y-2">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold text-lg">Project Details</h2>
+              <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <h2 className="font-semibold text-base sm:text-lg">Project Details</h2>
             </div>
-            <h3 className="text-xl font-medium">{project.title}</h3>
-            <p className="text-muted-foreground">
+            <h3 className="text-lg sm:text-xl font-medium leading-tight break-words">{project.title}</h3>
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               {project.description}
             </p>
           </div>
 
           {/* Tasks and Deliverables */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Tasks */}
             <div className="space-y-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary"></div>
+              <h4 className="font-medium flex items-center gap-2 text-sm sm:text-base">
+                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
                 Tasks to Complete
               </h4>
               <ul className="space-y-2">
                 {project.tasks.map((task, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm">
-                    <span className="text-primary font-medium min-w-[1.5rem] text-center">
+                  <li key={index} className="flex items-start gap-2 text-xs sm:text-sm">
+                    <span className="text-primary font-medium min-w-[1.5rem] text-center flex-shrink-0">
                       {index + 1}.
                     </span>
-                    <span className="text-muted-foreground">{task}</span>
+                    <span className="text-muted-foreground leading-relaxed">{task}</span>
                   </li>
                 ))}
               </ul>
@@ -139,17 +139,17 @@ export function ProjectSubmissionForm({
 
             {/* Deliverables */}
             <div className="space-y-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-accent"></div>
+              <h4 className="font-medium flex items-center gap-2 text-sm sm:text-base">
+                <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0"></div>
                 Expected Deliverables
               </h4>
               <ul className="space-y-2">
                 {project.deliverables.map((deliverable, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm">
-                    <span className="text-accent font-medium min-w-[1.5rem] text-center">
+                  <li key={index} className="flex items-start gap-2 text-xs sm:text-sm">
+                    <span className="text-accent font-medium min-w-[1.5rem] text-center flex-shrink-0">
                       {index + 1}.
                     </span>
-                    <span className="text-muted-foreground">{deliverable}</span>
+                    <span className="text-muted-foreground leading-relaxed">{deliverable}</span>
                   </li>
                 ))}
               </ul>
@@ -164,13 +164,13 @@ export function ProjectSubmissionForm({
         hoverEffect="lift"
         className="submission-form-card"
       >
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Send className="h-5 w-5" />
-              <h2 className="font-semibold text-lg">Submit Your Project</h2>
+              <Send className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+              <h2 className="font-semibold text-base sm:text-lg">Submit Your Project</h2>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               Provide your submission based on the project requirements above
             </p>
           </div>
@@ -218,7 +218,7 @@ export function ProjectSubmissionForm({
                   ? "Paste your GitIngest markdown output here, followed by your project explanation, approach, and any additional documentation..."
                   : "Provide your detailed response to the project requirements. Include your approach, methodology, findings, and conclusions..."
                 }
-                className="min-h-[300px] font-mono text-sm glass-card"
+                className="min-h-[200px] sm:min-h-[300px] font-mono text-xs sm:text-sm glass-card"
                 disabled={isSubmitting}
               />
               <p className="text-sm text-muted-foreground">
@@ -241,12 +241,13 @@ export function ProjectSubmissionForm({
             )}
 
             {/* Submit Buttons */}
-            <div className="flex gap-3 pt-4">
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <AnimatedButton
                 type="button"
                 variant="outline"
                 onClick={onCancel}
                 disabled={isSubmitting}
+                className="w-full sm:w-auto order-2 sm:order-1"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Project
@@ -254,7 +255,7 @@ export function ProjectSubmissionForm({
               <AnimatedButton 
                 type="submit" 
                 disabled={isSubmitting || submissionContent.trim().length < 100}
-                className="bg-gradient-to-r from-primary to-accent"
+                className="bg-gradient-to-r from-primary to-accent w-full sm:w-auto order-1 sm:order-2"
               >
                 {isSubmitting ? (
                   <>

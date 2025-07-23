@@ -73,9 +73,11 @@ export function LessonViewer({
   const [localQuizResult, setLocalQuizResult] = useState<LessonQuizResult | null>(null)
   const [localVideoCompleted, setLocalVideoCompleted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showControls, setShowControls] = useState(true)
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   const router = useRouter()
   
@@ -204,6 +206,46 @@ export function LessonViewer({
     }
   }, [])
 
+  // Auto-hide controls functionality
+  const resetControlsTimeout = () => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current)
+    }
+    setShowControls(true)
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false)
+    }, 2000)
+  }
+
+  const showControlsTemporarily = () => {
+    resetControlsTimeout()
+  }
+
+  // Reset timeout on mouse movement or interaction
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleMouseMove = () => resetControlsTimeout()
+    const handleTouchStart = () => resetControlsTimeout()
+
+    container.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('touchstart', handleTouchStart)
+    container.addEventListener('click', showControlsTemporarily)
+
+    // Initial timeout
+    resetControlsTimeout()
+
+    return () => {
+      container.removeEventListener('mousemove', handleMouseMove)
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('click', showControlsTemporarily)
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60)
     const seconds = Math.floor(timeInSeconds % 60)
@@ -316,48 +358,49 @@ export function LessonViewer({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Lesson Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className={`p-3 rounded-full ${
+      <div className="text-center space-y-4 px-4 sm:px-0">
+        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4 flex-wrap">
+          <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${
             isLessonCompleted 
               ? 'bg-green-100 dark:bg-green-900/30'
               : 'bg-blue-100 dark:bg-blue-900/30'
           }`}>
             {isLessonCompleted ? (
-              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 dark:text-green-400" />
             ) : (
-              <Video className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              <Video className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" />
             )}
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white text-center leading-tight">
             {lesson.title}
           </h1>
           {lesson.enable_ai_quiz && (
-            <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30">
-              <Award className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+            <div className="p-2 sm:p-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex-shrink-0">
+              <Award className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 dark:text-purple-400" />
             </div>
           )}
         </div>
         
-        <div className="flex items-center justify-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-          <span>Lesson {lesson.sequence}</span>
-          <span>•</span>
-          <span>{courseName}</span>
+        <div className="flex items-center justify-center gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400 flex-wrap">
+          <span className="whitespace-nowrap">Lesson {lesson.sequence}</span>
+          <span className="hidden sm:inline">•</span>
+          <span className="truncate max-w-48 sm:max-w-none">{courseName}</span>
           {isLessonCompleted && (
             <>
-              <span>•</span>
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+              <span className="hidden sm:inline">•</span>
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 flex-shrink-0">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                Completed
+                <span className="hidden sm:inline">Completed</span>
+                <span className="sm:hidden">Done</span>
               </Badge>
             </>
           )}
         </div>
         
         {lesson.description && (
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
             {lesson.description}
           </p>
         )}
@@ -392,20 +435,22 @@ export function LessonViewer({
           </video>
 
           {/* Video Controls */}
-          <div className="absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/80 via-transparent to-black/40 opacity-0 hover:opacity-100 transition-opacity">
+          <div className={`absolute inset-0 flex flex-col justify-between p-2 sm:p-4 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300 ${
+            showControls ? 'opacity-100' : 'opacity-0'
+          }`}>
             <div className="flex justify-between items-center">
-              <h3 className="text-white font-medium truncate">{lesson.title}</h3>
-              <div className="flex items-center gap-2">
+              <h3 className="text-white font-medium truncate text-sm sm:text-base flex-1 mr-2">{lesson.title}</h3>
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {duration > 0 && (
-                  <span className="text-white text-sm">
-                    <Clock className="h-4 w-4 inline mr-1" />
+                  <span className="text-white text-xs sm:text-sm whitespace-nowrap">
+                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
                     {formatTime(duration)}
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-4">
               {/* Time display only */}
               <div className="flex justify-between text-xs text-gray-300">
                 <span>{formatTime(currentTime)}</span>
@@ -414,31 +459,31 @@ export function LessonViewer({
 
               {/* Control buttons - No skip controls */}
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={togglePlay}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 p-2"
                   >
                     {isPlaying ? (
-                      <Pause className="h-5 w-5" />
+                      <Pause className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : (
-                      <Play className="h-5 w-5" />
+                      <Play className="h-4 w-4 sm:h-5 sm:w-5" />
                     )}
                   </Button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleMute}
-                      className="text-white hover:bg-white/20"
+                      className="text-white hover:bg-white/20 p-2"
                     >
                       {isMuted ? (
-                        <VolumeX className="h-4 w-4" />
+                        <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : (
-                        <Volume2 className="h-4 w-4" />
+                        <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
                       )}
                     </Button>
                     <input
@@ -448,7 +493,7 @@ export function LessonViewer({
                       step="0.1"
                       value={isMuted ? 0 : volume}
                       onChange={handleVolumeChange}
-                      className="w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                      className="w-12 sm:w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
                 </div>
@@ -457,13 +502,13 @@ export function LessonViewer({
                   variant="ghost"
                   size="sm"
                   onClick={toggleFullscreen}
-                  className="text-white hover:bg-white/20"
+                  className="text-white hover:bg-white/20 p-2"
                   title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                 >
                   {isFullscreen ? (
-                    <Minimize className="h-5 w-5" />
+                    <Minimize className="h-4 w-4 sm:h-5 sm:w-5" />
                   ) : (
-                    <Maximize className="h-5 w-5" />
+                    <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />
                   )}
                 </Button>
               </div>
@@ -472,10 +517,10 @@ export function LessonViewer({
         </div>
 
         {/* Completion Status */}
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="text-sm font-medium">Video Status:</span>
-            <Badge variant={isVideoCompleted ? "default" : "outline"}>
+            <Badge variant={isVideoCompleted ? "default" : "outline"} className="self-start sm:self-auto">
               {isVideoCompleted ? "Completed" : "In Progress"}
             </Badge>
           </div>
@@ -489,26 +534,26 @@ export function LessonViewer({
 
       {/* Quiz Section */}
       {lesson.enable_ai_quiz && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Card className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
-                <Award className="h-5 w-5" />
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100 text-lg sm:text-xl">
+                <Award className="h-5 w-5 flex-shrink-0" />
                 AI-Generated Quiz
               </CardTitle>
-              <CardDescription className="text-purple-700 dark:text-purple-300">
+              <CardDescription className="text-purple-700 dark:text-purple-300 text-sm sm:text-base">
                 Test your understanding of this lesson with our AI-generated quiz
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {quizResult ? (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="text-sm font-medium">Quiz Result:</span>
-                    <Badge className={quizResult.passed 
+                    <Badge className={`self-start sm:self-auto ${quizResult.passed 
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                       : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                    }>
+                    }`}>
                       {quizResult.score}% {quizResult.passed ? '(Passed)' : '(Failed)'}
                     </Badge>
                   </div>
@@ -520,7 +565,8 @@ export function LessonViewer({
                       onClick={() => setShowQuiz(true)}
                       className="w-full"
                     >
-                      Retake Quiz
+                      <span className="hidden sm:inline">Retake Quiz</span>
+                      <span className="sm:hidden">Retake</span>
                     </Button>
                   )}
                 </div>
@@ -529,7 +575,8 @@ export function LessonViewer({
                   onClick={() => setShowQuiz(true)}
                   className="w-full"
                 >
-                  Take Quiz
+                  <span className="hidden sm:inline">Take Quiz</span>
+                  <span className="sm:hidden">Start Quiz</span>
                 </Button>
               ) : (
                 <div className="text-sm text-purple-700 dark:text-purple-300">
@@ -552,20 +599,36 @@ export function LessonViewer({
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between">
         <Button
           variant="outline"
           onClick={goToPreviousLesson}
           disabled={!previousLesson}
+          className="w-full sm:w-auto"
         >
-          {previousLesson ? `← Previous: ${previousLesson.title}` : 'No Previous Lesson'}
+          {previousLesson ? (
+            <>
+              <span className="hidden sm:inline">← Previous: {previousLesson.title}</span>
+              <span className="sm:hidden">← Previous Lesson</span>
+            </>
+          ) : (
+            <span>No Previous Lesson</span>
+          )}
         </Button>
 
         <Button
           onClick={goToNextLesson}
           disabled={!nextLesson || (!isLessonCompleted && lesson.enable_ai_quiz)}
+          className="w-full sm:w-auto"
         >
-          {nextLesson ? `Next: ${nextLesson.title} →` : 'Course Complete'}
+          {nextLesson ? (
+            <>
+              <span className="hidden sm:inline">Next: {nextLesson.title} →</span>
+              <span className="sm:hidden">Next Lesson →</span>
+            </>
+          ) : (
+            <span>Course Complete</span>
+          )}
         </Button>
       </div>
     </div>

@@ -6,10 +6,11 @@ import { useJobReadinessProgress } from '@/hooks/useJobReadinessProgress'
 import { ProjectDisplay } from './ProjectDisplay'
 import { ProjectSubmissionForm } from './ProjectSubmissionForm'
 import { ProjectFeedback } from './ProjectFeedback'
+import { ProjectGenerationLoader } from './ProjectGenerationLoader'
 import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
 import { AnimatedButton } from '@/components/ui/animated-button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, AlertCircle, Lock, RefreshCw } from 'lucide-react'
+import { Loader2, AlertCircle, Lock, RefreshCw, Info } from 'lucide-react'
 
 interface ProjectInterfaceProps {
   productId?: string
@@ -76,20 +77,20 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
   if (!isUnlocked) {
     return (
       <PerformantAnimatedCard variant="glass" hoverEffect="glow" className="dashboard-card border-muted">
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-semibold text-lg">Projects Module Locked</h3>
+              <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+              <h3 className="font-semibold text-base sm:text-lg">Projects Module Locked</h3>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               Complete the Expert Sessions module to unlock Real-World Projects
             </p>
           </div>
           
           <Alert className="border-amber-200/50 bg-amber-50/80 dark:border-amber-800/50 dark:bg-amber-950/80">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <AlertDescription className="text-xs sm:text-sm leading-relaxed">
               You need {requiredStars} stars to access this module. 
               Current progress: {currentStars}/{requiredStars} stars.
               Complete Expert Sessions to earn your 3rd star.
@@ -114,25 +115,16 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
   }
 
   if (projectLoading) {
-    return (
-      <PerformantAnimatedCard variant="glass" className="dashboard-card">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Generating your project...</p>
-          </div>
-        </div>
-      </PerformantAnimatedCard>
-    )
+    return <ProjectGenerationLoader />
   }
 
   if (projectError) {
     return (
       <PerformantAnimatedCard variant="glass" hoverEffect="glow" className="dashboard-card border-destructive/50">
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="space-y-2">
-            <h3 className="font-semibold text-lg text-destructive">Error Loading Project</h3>
-            <p className="text-muted-foreground">
+            <h3 className="font-semibold text-base sm:text-lg text-destructive">Error Loading Project</h3>
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               There was an error generating your project. Please try again.
             </p>
           </div>
@@ -140,7 +132,7 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
           <AnimatedButton 
             onClick={() => refetchProject()} 
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <RefreshCw className="h-4 w-4" />
             Try Again
@@ -253,12 +245,26 @@ export function ProjectInterface({ productId }: ProjectInterfaceProps) {
   }
 
   // Show project display with option to start
+  const isFallbackProject = projectData?.generation_source === 'fallback'
+  
   return (
-    <ProjectDisplay
-      project={projectData?.project}
-      message={projectData?.message}
-      onStartProject={() => setShowSubmissionForm(true)}
-      onRefreshProject={() => refetchProject()}
-    />
+    <div className="space-y-4">
+      {isFallbackProject && (
+        <Alert className="border-blue-200/50 bg-blue-50/80 dark:border-blue-800/50 dark:bg-blue-950/80">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            This project was created using our expert-curated templates while our AI system is busy. 
+            It's still perfectly tailored to your background and skill level.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <ProjectDisplay
+        project={projectData?.project}
+        message={projectData?.message}
+        onStartProject={() => setShowSubmissionForm(true)}
+        onRefreshProject={() => refetchProject()}
+      />
+    </div>
   )
 } 

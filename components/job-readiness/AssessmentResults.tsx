@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAssessmentList } from '@/hooks/useAssessmentList'
 import { useJobReadinessProgress } from '@/hooks/useJobReadinessProgress'
-import { Trophy, CheckCircle2, XCircle, Star, ArrowRight, RotateCcw, Home, Loader2 } from 'lucide-react'
+import { Trophy, CheckCircle2, XCircle, Star, ArrowRight, Home, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { StarRating } from '@/components/ui/StarRating'
 
@@ -243,7 +243,7 @@ export function AssessmentResults({ moduleId }: AssessmentResultsProps) {
               <Alert className="border-orange-200 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20">
                 <AlertDescription className="text-orange-700 dark:text-orange-300">
                   You scored {scorePercentage}%, which is below the passing threshold of {configuration.pass_threshold}%. 
-                  Don't worry - you can retake this assessment to improve your score.
+                  Continue learning to improve your skills!
                 </AlertDescription>
               </Alert>
               
@@ -253,21 +253,15 @@ export function AssessmentResults({ moduleId }: AssessmentResultsProps) {
                   <li>• Review the relevant course materials</li>
                   <li>• Take practice quizzes if available</li>
                   <li>• Focus on areas where you had difficulty</li>
-                  <li>• Ensure you understand the concepts before retaking</li>
+                  <li>• Ensure you understand the concepts thoroughly</li>
                 </ul>
               </div>
               
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button asChild variant="outline" className="flex-1">
+              <div className="flex justify-center pt-2">
+                <Button asChild variant="outline" className="w-full sm:w-auto">
                   <Link href="/app/job-readiness">
                     <Home className="h-4 w-4 mr-2" />
                     Back to Dashboard
-                  </Link>
-                </Button>
-                <Button asChild className="flex-1">
-                  <Link href={`/app/job-readiness/assessments/${moduleId}`}>
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Retake Assessment
                   </Link>
                 </Button>
               </div>

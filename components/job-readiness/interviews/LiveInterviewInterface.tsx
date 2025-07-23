@@ -12,7 +12,7 @@ import { DashboardLoadingSkeleton } from '@/components/ui/dashboard-skeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Mic, MicOff, Monitor, MonitorOff, StopCircle, Camera, CameraOff, Volume2, VolumeX, AlertTriangle, CheckCircle, Play } from 'lucide-react';
+import { AlertCircle, Monitor, MonitorOff, StopCircle, Volume2, VolumeX, AlertTriangle, CheckCircle, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import gsap from 'gsap';
 
@@ -46,7 +46,6 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   } = useInterviewSession();
 
   // Local state for media controls
-  const [cameraViewEnabled, setCameraViewEnabled] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -129,30 +128,38 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     }
   };
 
-  // Auto-hide controls after inactivity
+  // Auto-hide controls after inactivity (mobile-friendly)
   useEffect(() => {
     const resetControlsTimeout = () => {
       setShowControls(true);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
+      // Longer timeout on mobile for better UX
+      const timeout = window.innerWidth < 768 ? 5000 : 3000;
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
-      }, 3000);
+      }, timeout);
     };
 
     const handleMouseMove = () => resetControlsTimeout();
     const handleMouseClick = () => resetControlsTimeout();
+    const handleTouchStart = () => resetControlsTimeout();
+    const handleTouchMove = () => resetControlsTimeout();
 
     if (interviewStarted) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('click', handleMouseClick);
+      document.addEventListener('touchstart', handleTouchStart);
+      document.addEventListener('touchmove', handleTouchMove);
       resetControlsTimeout();
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('click', handleMouseClick);
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
@@ -161,7 +168,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
 
   // Get user camera for video preview (while screen recording happens in background)
   useEffect(() => {
-    if (interviewStarted && videoRef.current && cameraViewEnabled) {
+    if (interviewStarted && videoRef.current) {
       navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
@@ -198,7 +205,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         videoRef.current.srcObject = null;
       }
     };
-  }, [interviewStarted, cameraViewEnabled]);
+  }, [interviewStarted]);
 
   // Additional cleanup when component unmounts or interview ends
   useEffect(() => {
@@ -298,15 +305,24 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     return (
       <div className="relative min-h-screen">
         <AdaptiveParticles />
-        <div className="relative flex items-center justify-center min-h-screen p-6">
+        <div className="relative flex items-center justify-center min-h-screen p-4 sm:p-6">
           <PerformantAnimatedCard 
             variant="glass" 
             hoverEffect="glow"
             staggerIndex={0}
-            className="dashboard-card p-8 max-w-md text-center"
+            className="dashboard-card p-4 sm:p-6 lg:p-8 max-w-md text-center w-full mx-4 sm:mx-0"
           >
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="relative mx-auto w-fit">
+                <OptimizedProgressRing
+                  value={85}
+                  size={80}
+                  strokeWidth={3}
+                  showValue={false}
+                  color="success"
+                  delay={200}
+                  className="animate-pulse sm:hidden"
+                />
                 <OptimizedProgressRing
                   value={85}
                   size={120}
@@ -314,16 +330,16 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
                   showValue={false}
                   color="success"
                   delay={200}
-                  className="animate-pulse"
+                  className="animate-pulse hidden sm:block"
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 dark:border-emerald-400"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-emerald-600 dark:border-emerald-400"></div>
                 </div>
               </div>
               
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-foreground">Submitting Your Interview</h2>
-                <p className="text-muted-foreground text-lg">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">Submitting Your Interview</h2>
+                <p className="text-muted-foreground text-sm sm:text-base lg:text-lg px-2 sm:px-0">
                   Your interview is being uploaded and processed. Please wait...
                 </p>
               </div>
@@ -394,23 +410,23 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     return (
       <div className="relative min-h-screen">
         <AdaptiveParticles />
-        <div className="relative flex items-center justify-center min-h-screen p-6">
+        <div className="relative flex items-center justify-center min-h-screen p-4 sm:p-6">
           <PerformantAnimatedCard 
             variant="glass" 
             hoverEffect="lift"
             staggerIndex={0}
-            className="dashboard-card p-8 max-w-lg text-center"
+            className="dashboard-card p-4 sm:p-6 lg:p-8 max-w-lg text-center w-full mx-4 sm:mx-0"
           >
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {/* Hero Section */}
-              <div className="space-y-6">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50 w-fit mx-auto">
-                  <Monitor className="h-12 w-12 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-4 sm:space-y-6">
+                <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50 w-fit mx-auto">
+                  <Monitor className="h-10 w-10 sm:h-12 sm:w-12 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 
-                <div className="space-y-4">
-                  <h2 className="text-3xl md:text-4xl font-bold tracking-tight gradient-text">Ready to Start Your Interview</h2>
-                  <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                <div className="space-y-3 sm:space-y-4">
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold tracking-tight gradient-text">Ready to Start Your Interview</h2>
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-xl mx-auto px-2 sm:px-0">
                     Your interview for <strong className="text-foreground">{background?.name}</strong> is ready to begin.
                   </p>
                 </div>
@@ -439,21 +455,21 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
               </PerformantAnimatedCard>
               
               {/* Action Button */}
-              <div className="space-y-4">
+              <div className="space-y-4 px-2 sm:px-0">
                 <AnimatedButton 
                   onClick={handleStartInterview}
                   disabled={connecting}
                   size="lg"
-                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-medium py-6 text-lg"
+                  className="w-full min-h-[48px] sm:min-h-[56px] bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-medium py-3 sm:py-6 text-base sm:text-lg touch-manipulation"
                 >
                   {connecting ? (
-                    <div className="flex items-center gap-3">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
                       <span>Connecting...</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3">
-                      <Play className="h-5 w-5" />
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <Play className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span>Start Interview</span>
                     </div>
                   )}
@@ -508,100 +524,72 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
       />
       
       {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
       
       {/* Top bar with timer and progress */}
       <div className={cn(
-        "absolute top-0 left-0 right-0 p-6 transition-opacity duration-300",
+        "absolute top-0 left-0 right-0 p-3 sm:p-4 lg:p-6 transition-opacity duration-300 safe-area-inset-top",
         showControls ? "opacity-100" : "opacity-0"
       )}>
         <div className="flex items-center justify-between text-white">
-          <div className="flex items-center space-x-4">
-            <div className="bg-red-600 px-3 py-1 rounded-full text-sm font-semibold flex items-center">
-              <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="bg-red-600 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center">
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full mr-1 sm:mr-2 animate-pulse"></div>
               LIVE
             </div>
-            <span className="text-lg font-mono font-bold">
+            <span className="text-base sm:text-lg font-mono font-bold">
               {formatTime(timeRemaining)}
             </span>
           </div>
           
           <div className="text-right">
-            <div className="flex items-center justify-end space-x-2 mb-1">
+            <div className="flex items-center justify-end space-x-1 sm:space-x-2 mb-1">
               <div className={cn(
-                "flex items-center space-x-1 px-2 py-1 rounded-full text-xs",
+                "flex items-center space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs",
                 hasSystemAudio 
                   ? "bg-green-500/20 text-green-300" 
                   : "bg-amber-500/20 text-amber-300"
               )}>
-                {hasSystemAudio ? <Volume2 size={12} /> : <VolumeX size={12} />}
-                <span>{hasSystemAudio ? "System Audio" : "No System Audio"}</span>
+                {hasSystemAudio ? <Volume2 size={10} className="sm:w-3 sm:h-3" /> : <VolumeX size={10} className="sm:w-3 sm:h-3" />}
+                <span className="hidden sm:inline">{hasSystemAudio ? "System Audio" : "No System Audio"}</span>
+                <span className="sm:hidden">{hasSystemAudio ? "Audio" : "No Audio"}</span>
               </div>
             </div>
-            <p className="text-sm opacity-80">{background?.name}</p>
-            <p className="text-xs opacity-60">AI Interview Session</p>
+            <p className="text-xs sm:text-sm opacity-80 truncate max-w-[120px] sm:max-w-none">{background?.name}</p>
+            <p className="text-xs opacity-60 hidden sm:block">AI Interview Session</p>
           </div>
         </div>
         
         {/* Progress bar */}
-        <div className="mt-4">
+        <div className="mt-2 sm:mt-4">
           <Progress 
             value={progressPercentage} 
-            className="h-2 bg-white/20"
+            className="h-1.5 sm:h-2 bg-white/20"
           />
         </div>
       </div>
       
       {/* Bottom controls */}
       <div className={cn(
-        "absolute bottom-0 left-0 right-0 p-6 transition-opacity duration-300",
+        "absolute bottom-0 left-0 right-0 p-3 sm:p-4 lg:p-6 transition-opacity duration-300 safe-area-inset-bottom",
         showControls ? "opacity-100" : "opacity-0"
       )}>
-        <div className="flex items-center justify-center space-x-4">
-          {/* Audio toggle */}
-          <Button
-            variant="secondary"
-            size="lg"
-            className={cn(
-              "rounded-full w-14 h-14 p-0",
-              audioInputEnabled 
-                ? "bg-white/20 hover:bg-white/30 text-white" 
-                : "bg-red-600 hover:bg-red-700 text-white"
-            )}
-            onClick={toggleAudioInput}
-          >
-            {audioInputEnabled ? <Mic size={24} /> : <MicOff size={24} />}
-          </Button>
-          
-          {/* Camera view toggle */}
-          <Button
-            variant="secondary"
-            size="lg"
-            className={cn(
-              "rounded-full w-14 h-14 p-0",
-              cameraViewEnabled 
-                ? "bg-white/20 hover:bg-white/30 text-white" 
-                : "bg-red-600 hover:bg-red-700 text-white"
-            )}
-            onClick={() => setCameraViewEnabled(!cameraViewEnabled)}
-          >
-            {cameraViewEnabled ? <Camera size={24} /> : <CameraOff size={24} />}
-          </Button>
-          
+        <div className="flex items-center justify-center">
           {/* End interview button */}
           <Button
             variant="destructive"
             size="lg"
-            className="rounded-full w-14 h-14 p-0 bg-red-600 hover:bg-red-700"
+            className="rounded-full w-12 h-12 sm:w-14 sm:h-14 p-0 bg-red-600 hover:bg-red-700 touch-manipulation"
             onClick={handleEndInterview}
           >
-            <StopCircle size={24} />
+            <StopCircle size={20} className="sm:w-6 sm:h-6" />
           </Button>
         </div>
         
-        <div className="text-center mt-4">
-          <p className="text-white text-sm opacity-80">
-            Speak naturally with the AI interviewer • Click anywhere to show controls
+        <div className="text-center mt-2 sm:mt-4">
+          <p className="text-white text-xs sm:text-sm opacity-80 px-2">
+            <span className="hidden sm:inline">Speak naturally with the AI interviewer • Click the red button to end interview • Click anywhere to show controls</span>
+            <span className="sm:hidden">Speak naturally • Red button to end • Tap to show controls</span>
           </p>
         </div>
       </div>

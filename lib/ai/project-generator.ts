@@ -10,6 +10,11 @@ interface ProjectDetails {
   submission_type: 'text_input';
 }
 
+interface ProjectGenerationResult {
+  projectDetails: ProjectDetails;
+  generationSource: 'ai' | 'fallback';
+}
+
 
 
 /**
@@ -17,12 +22,12 @@ interface ProjectDetails {
  * 
  * @param studentId ID of the student
  * @param productId ID of the product
- * @returns Generated project details or null if generation fails
+ * @returns Generated project details with source info or null if generation fails
  */
 export async function generateProject(
   studentId: string,
   productId: string
-): Promise<ProjectDetails | null> {
+): Promise<ProjectGenerationResult | null> {
   try {
     // Initialize Supabase client
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -45,15 +50,18 @@ export async function generateProject(
     const studentTier = studentData.job_readiness_tier;
     
     if (!backgroundType || !studentTier) {
-      console.error('Student is missing background type or tier', { studentId });
-      return await getFallbackProject(backgroundType, studentTier);
+      console.error('Student is missing background type or tier', { 
+        studentId, 
+        backgroundType, 
+        studentTier 
+      });
+      const fallbackProject = await getFallbackProject(backgroundType, studentTier);
+      if (fallbackProject) {
+        return { projectDetails: fallbackProject, generationSource: 'fallback' };
+      }
+      return null;
     }
     
-    // Log the student data for debugging
-    console.log('Student data for project generation:', { 
-      backgroundType, 
-      studentTier 
-    });
     
     // Step 2: Fetch project configuration
     const { data: projectConfig, error: configError } = await supabase
@@ -72,18 +80,13 @@ export async function generateProject(
       
     if (configError || !projectConfig) {
       console.error('Error fetching project configuration:', configError);
-      return await getFallbackProject(backgroundType, studentTier);
+      const fallbackProject = await getFallbackProject(backgroundType, studentTier);
+      if (fallbackProject) {
+        return { projectDetails: fallbackProject, generationSource: 'fallback' };
+      }
+      return null;
     }
     
-    // Log the project config for debugging
-    console.log('Project config found:', { 
-      backgroundType,
-      hasPrompts: {
-        bronze: !!projectConfig.bronze_input_prompt,
-        silver: !!projectConfig.silver_input_prompt,
-        gold: !!projectConfig.gold_input_prompt
-      }
-    });
     
     // Get prompt based on student tier
     let systemPrompt: string | undefined;
@@ -106,7 +109,11 @@ export async function generateProject(
     
     if (!inputPrompt) {
       console.error('No prompt found for tier', { backgroundType, studentTier });
-      return await getFallbackProject(backgroundType, studentTier);
+      const fallbackProject = await getFallbackProject(backgroundType, studentTier);
+      if (fallbackProject) {
+        return { projectDetails: fallbackProject, generationSource: 'fallback' };
+      }
+      return null;
     }
     
     // Step 3: Call Gemini API with structured output schema
@@ -151,7 +158,11 @@ export async function generateProject(
     
     if (!result.success || !result.data) {
       console.error('Failed to generate project:', result.error);
-      return await getFallbackProject(backgroundType, studentTier);
+      const fallbackProject = await getFallbackProject(backgroundType, studentTier);
+      if (fallbackProject) {
+        return { projectDetails: fallbackProject, generationSource: 'fallback' };
+      }
+      return null;
     }
     
     // Step 4: Process and validate AI response
@@ -160,11 +171,15 @@ export async function generateProject(
     // Validate the structure and content of generated project
     if (!validateProjectDetails(projectDetails)) {
       console.error('Generated project failed validation');
-      return await getFallbackProject(backgroundType, studentTier);
+      const fallbackProject = await getFallbackProject(backgroundType, studentTier);
+      if (fallbackProject) {
+        return { projectDetails: fallbackProject, generationSource: 'fallback' };
+      }
+      return null;
     }
     
-    // Step 5: Return generated project details
-    return projectDetails;
+    // Step 5: Return generated project details with AI source
+    return { projectDetails, generationSource: 'ai' };
   } catch (error) {
     console.error('Error in generateProject:', error);
     return null;
@@ -230,7 +245,6 @@ async function getFallbackProject(
   backgroundType: string | null,
   studentTier: 'BRONZE' | 'SILVER' | 'GOLD' | null
 ): Promise<ProjectDetails | null> {
-  console.log('Using fallback project generation:', { backgroundType, studentTier });
   
   try {
     // Initialize Supabase client
@@ -238,11 +252,10 @@ async function getFallbackProject(
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Default to BUSINESS background if null, and BRONZE tier if null
-    const fallbackBackground = backgroundType || 'BUSINESS';
+    // Default to BUSINESS_ADMINISTRATION background if null, and BRONZE tier if null
+    const fallbackBackground = backgroundType || 'BUSINESS_ADMINISTRATION';
     const fallbackTier = studentTier || 'BRONZE';
     
-    console.log('Using fallback values:', { fallbackBackground, fallbackTier });
     
     // Try to get a generic project configuration
     const { data: fallbackConfig, error: fallbackError } = await supabase
@@ -336,7 +349,6 @@ async function getFallbackProject(
     );
     
     if (result.success && result.data) {
-      console.log('Fallback project generated successfully');
       return result.data;
     } else {
       console.error('Failed to generate fallback project:', result.error);

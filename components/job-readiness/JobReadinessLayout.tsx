@@ -32,8 +32,8 @@ export function JobReadinessLayout({
         <AdaptiveParticles />
         
         <div className="relative space-y-8">
-          <div className="container mx-auto py-4 md:py-8 px-4">
-            <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
+          <div className="w-full py-4 md:py-8 px-1 sm:px-4">
+            <div className="max-w-full sm:max-w-6xl sm:mx-auto space-y-6 md:space-y-8">
               {/* Page Header */}
               {(title || description) && (
                 <div className="text-center space-y-4">
