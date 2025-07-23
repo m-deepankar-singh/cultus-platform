@@ -6,7 +6,7 @@ import { AnimatedButton } from '@/components/ui/animated-button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ProjectTasks } from './ProjectTasks'
-import { Briefcase, RefreshCw, Play, Info, AlertTriangle, FileText, ExternalLink } from 'lucide-react'
+import { Briefcase, Play, Info, AlertTriangle, FileText, ExternalLink } from 'lucide-react'
 import gsap from 'gsap'
 
 interface Project {
@@ -84,30 +84,17 @@ export function ProjectDisplay({
         className="project-display-card"
       >
         <div className="space-y-6">
-          <div className="flex items-start justify-between">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                <Badge variant={isNewProject ? "default" : "secondary"}>
-                  {isNewProject ? "New Project" : "Submitted"}
-                </Badge>
-              </div>
-              <h2 className="text-2xl font-semibold">{project.title}</h2>
-              <p className="text-base text-muted-foreground">
-                {project.description}
-              </p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              <Badge variant={isNewProject ? "default" : "secondary"}>
+                {isNewProject ? "New Project" : "Submitted"}
+              </Badge>
             </div>
-            {isNewProject && (
-              <AnimatedButton 
-                onClick={onRefreshProject}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                New Project
-              </AnimatedButton>
-            )}
+            <h2 className="text-2xl font-semibold">{project.title}</h2>
+            <p className="text-base text-muted-foreground">
+              {project.description}
+            </p>
           </div>
         </div>
       </PerformantAnimatedCard>
@@ -144,33 +131,35 @@ export function ProjectDisplay({
         staggerIndex={3}
         className="project-display-card border-blue-200/50 bg-blue-50/80 dark:border-blue-800/50 dark:bg-blue-950/80 backdrop-blur-sm"
       >
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
-            <FileText className="h-5 w-5" />
-            <h3 className="font-semibold text-lg">Submission Method</h3>
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <h3 className="font-semibold text-base sm:text-lg">Submission Method</h3>
           </div>
           
-          <div className="space-y-4 text-blue-700 dark:text-blue-300">
+          <div className="space-y-3 sm:space-y-4 text-blue-700 dark:text-blue-300">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-white/50 dark:bg-black/50">Text Submission</Badge>
+              <Badge variant="outline" className="bg-white/50 dark:bg-black/50 text-xs sm:text-sm">
+                Text Submission
+              </Badge>
             </div>
             {isCodeProject ? (
               <div className="space-y-3">
-                <p className="text-sm font-medium">For Code Projects:</p>
-                <ul className="space-y-1 text-sm ml-4">
-                  <li>• Use <a href="https://gitingest.com" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-primary transition-colors">GitIngest</a> to extract your code</li>
+                <p className="text-xs sm:text-sm font-medium">For Code Projects:</p>
+                <ul className="space-y-1 text-xs sm:text-sm ml-4 leading-relaxed">
+                  <li>• Use <a href="https://gitingest.com" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-primary transition-colors break-words">GitIngest</a> to extract your code</li>
                   <li>• Copy the generated markdown with your code</li>
                   <li>• Paste it along with your project explanation</li>
                 </ul>
-                <AnimatedButton variant="outline" size="sm" asChild className="mt-2">
-                  <a href="https://gitingest.com" target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3 mr-1" />
+                <AnimatedButton variant="outline" size="sm" asChild className="mt-2 w-full sm:w-auto">
+                  <a href="https://gitingest.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1">
+                    <ExternalLink className="h-3 w-3" />
                     Open GitIngest
                   </a>
                 </AnimatedButton>
               </div>
             ) : (
-              <p className="text-sm">
+              <p className="text-xs sm:text-sm leading-relaxed">
                 Submit your work as detailed text including your approach, methodology, findings, and conclusions.
               </p>
             )}
@@ -186,16 +175,16 @@ export function ProjectDisplay({
           staggerIndex={4}
           className="project-display-card"
         >
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="font-medium">Ready to start?</h3>
-              <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1 flex-1">
+              <h3 className="font-medium text-sm sm:text-base">Ready to start?</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 Once you begin, this project will be locked and you can submit your work.
               </p>
             </div>
             <AnimatedButton 
               onClick={onStartProject}
-              className="flex items-center gap-2 bg-gradient-to-r from-primary to-accent"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-accent w-full sm:w-auto flex-shrink-0"
             >
               <Play className="h-4 w-4" />
               Start Project
@@ -211,13 +200,13 @@ export function ProjectDisplay({
         staggerIndex={5}
         className="project-display-card border-green-200/50 bg-green-50/80 dark:border-green-800/50 dark:bg-green-950/80 backdrop-blur-sm"
       >
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-            <Info className="h-5 w-5" />
-            <h3 className="font-semibold text-lg">Project Guidelines</h3>
+            <Info className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <h3 className="font-semibold text-base sm:text-lg">Project Guidelines</h3>
           </div>
           
-          <ul className="space-y-2 text-sm text-green-700 dark:text-green-300">
+          <ul className="space-y-2 text-xs sm:text-sm text-green-700 dark:text-green-300 leading-relaxed">
             <li>• Complete all tasks listed above to the best of your ability</li>
             <li>• Ensure all deliverables are included in your submission</li>
             <li>• For code projects, use GitIngest to include your code with explanations</li>

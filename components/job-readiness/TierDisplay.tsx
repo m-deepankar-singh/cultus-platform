@@ -108,12 +108,12 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
   return (
     <div className="space-y-8">
       {/* Enhanced Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-3">
-          <Target className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">Tier System</h2>
+      <div className="text-center space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+          <Target className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+          <h2 className="text-xl sm:text-2xl font-semibold">Tier System</h2>
         </div>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto px-2">
           Your tier is determined by assessment scores and affects content difficulty, not star progression
         </p>
       </div>
@@ -127,9 +127,18 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
             currentTierConfig?.colors.bg
           )}
         >
-          <div className="p-8 text-center space-y-6">
-            <div className="space-y-4">
+          <div className="p-4 sm:p-6 lg:p-8 text-center space-y-4 sm:space-y-6">
+            <div className="space-y-3 sm:space-y-4">
               <div className="relative inline-block">
+                <OptimizedProgressRing
+                  value={100}
+                  size={80}
+                  strokeWidth={4}
+                  showValue={false}
+                  color={currentTierConfig?.colors.ring || 'primary'}
+                  delay={300}
+                  className="sm:hidden"
+                />
                 <OptimizedProgressRing
                   value={100}
                   size={120}
@@ -137,24 +146,25 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
                   showValue={false}
                   color={currentTierConfig?.colors.ring || 'primary'}
                   delay={300}
+                  className="hidden sm:block"
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className={cn(
-                    "p-4 rounded-full",
+                    "p-3 sm:p-4 rounded-full",
                     currentTierConfig?.colors.bg
                   )}>
                     {currentTierConfig && (
-                      <currentTierConfig.icon className={cn("w-12 h-12", currentTierConfig.colors.text)} />
+                      <currentTierConfig.icon className={cn("w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12", currentTierConfig.colors.text)} />
                     )}
                   </div>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <h3 className="text-3xl font-bold">
+              <div className="space-y-1.5 sm:space-y-2">
+                <h3 className="text-2xl sm:text-3xl font-bold">
                   {currentTierConfig?.name} Tier
                 </h3>
-                <p className={cn("text-lg", currentTierConfig?.colors.text)}>
+                <p className={cn("text-base sm:text-lg", currentTierConfig?.colors.text)}>
                   Content difficulty: {currentTierConfig?.description}
                 </p>
               </div>
@@ -164,10 +174,10 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
       )}
 
       {/* Enhanced Tier Goals Display */}
-      <div className="space-y-6">
-        <h3 className="text-xl font-semibold text-center">Tier Requirements</h3>
+      <div className="space-y-4 sm:space-y-6">
+        <h3 className="text-lg sm:text-xl font-semibold text-center">Tier Requirements</h3>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           {Object.entries(safeTierCriteria).map(([tier, criteria], index) => {
             const tierName = tier.toUpperCase() as keyof typeof tierConfigs
             const tierConfig = tierConfigs[tierName]
@@ -186,10 +196,19 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
                 )}
               >
                 
-                <div className="p-4 sm:p-6 lg:p-8 text-center space-y-4 sm:space-y-6">
+                <div className="p-3 sm:p-4 lg:p-6 text-center space-y-3 sm:space-y-4 lg:space-y-6">
                   {/* Tier Icon with Progress Ring - Centered */}
                   <div className="flex justify-center">
                     <div className="relative inline-block">
+                      <OptimizedProgressRing
+                        value={isAchieved ? 100 : 0}
+                        size={60}
+                        strokeWidth={3}
+                        showValue={false}
+                        color={tierConfig.colors.ring}
+                        delay={600 + index * 200}
+                        className="sm:hidden"
+                      />
                       <OptimizedProgressRing
                         value={isAchieved ? 100 : 0}
                         size={80}
@@ -197,44 +216,45 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
                         showValue={false}
                         color={tierConfig.colors.ring}
                         delay={600 + index * 200}
+                        className="hidden sm:block"
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className={cn(
-                          "p-3 rounded-full transition-all duration-300",
+                          "p-2 sm:p-2.5 lg:p-3 rounded-full transition-all duration-300",
                           isAchieved 
                             ? `bg-gradient-to-br ${tierConfig.colors.gradient} shadow-lg`
                             : "bg-muted"
                         )}>
                           <tierConfig.icon className={cn(
-                            "w-6 h-6 transition-all duration-300",
+                            "w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-all duration-300",
                             isAchieved ? "text-white" : "text-muted-foreground"
                           )} />
                         </div>
                       </div>
                       
                       {isAchieved && (
-                        <div className="absolute -top-2 -right-2">
-                          <CheckCircle className="w-6 h-6 text-success bg-background rounded-full" />
+                        <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2">
+                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-success bg-background rounded-full" />
                         </div>
                       )}
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     <h4 className={cn(
-                      "text-lg font-semibold flex items-center justify-center gap-2",
+                      "text-base sm:text-lg font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2",
                       tierConfig.colors.text
                     )}>
                       <span className="capitalize">{tier}</span>
                       {isAchieved && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                           Achieved
                         </Badge>
                       )}
                     </h4>
                     
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">
+                      <p className="text-xs sm:text-sm font-medium">
                         Score Range: {criteria.min_score}% - {criteria.max_score}%
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -243,7 +263,7 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
                     </div>
                     
                     {!all_assessments_complete && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium leading-tight">
                         Complete assessments to determine your tier
                       </p>
                     )}
@@ -257,14 +277,14 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
 
       {/* Help Section */}
       {!all_assessments_complete && hasAssessments && (
-        <PerformantAnimatedCard variant="subtle" className="p-6">
-          <div className="flex items-start gap-4">
+        <PerformantAnimatedCard variant="subtle" className="p-3 sm:p-4 lg:p-6">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
             <div className="flex-shrink-0">
-              <Target className="h-6 w-6 text-primary mt-1" />
+              <Target className="h-5 w-5 sm:h-6 sm:w-6 text-primary mt-0.5 sm:mt-1" />
             </div>
-            <div className="space-y-2">
-              <h4 className="font-medium text-lg">How Tier Assignment Works</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-1.5 sm:space-y-2">
+              <h4 className="font-medium text-base sm:text-lg">How Tier Assignment Works</h4>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 Your tier is determined by your assessment performance and sets the difficulty level for all program content. 
                 All learners follow the same 5-star progression path regardless of their tier - Bronze, Silver, and Gold 
                 learners just experience content tailored to their skill level.
@@ -276,14 +296,14 @@ export function TierDisplay({ productId: providedProductId }: TierDisplayProps =
 
       {/* Initial State - No Assessments */}
       {!hasAssessments && (
-        <PerformantAnimatedCard variant="glass" className="p-8 text-center">
-          <div className="space-y-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-              <Target className="h-8 w-8 text-primary" />
+        <PerformantAnimatedCard variant="glass" className="p-4 sm:p-6 lg:p-8 text-center">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <Target className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-primary" />
             </div>
-            <div>
-              <h4 className="font-medium text-lg mb-2">Ready to Get Started?</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-1.5 sm:space-y-2">
+              <h4 className="font-medium text-base sm:text-lg">Ready to Get Started?</h4>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed px-2">
                 Take assessments to determine your tier level and begin your Job Readiness journey with content matched to your skill level.
               </p>
             </div>

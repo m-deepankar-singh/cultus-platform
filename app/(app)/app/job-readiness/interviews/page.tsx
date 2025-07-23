@@ -128,14 +128,15 @@ export default function InterviewsPage() {
       title="Simulated Interviews"
       description="Complete AI-powered mock interviews to demonstrate your skills and earn your 5th star"
     >
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 px-4 sm:px-0">
         
         {/* Back to Job Readiness */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost" size="sm" asChild className="min-h-[40px] text-sm">
             <Link href="/app/job-readiness">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Job Readiness
+              <span className="hidden sm:inline">Back to Job Readiness</span>
+              <span className="sm:hidden">Back</span>
             </Link>
           </Button>
         </div>
@@ -145,24 +146,24 @@ export default function InterviewsPage() {
           variant="glass" 
           hoverEffect="lift"
           staggerIndex={0}
-          className="dashboard-card"
+          className="dashboard-card p-4 sm:p-6"
         >
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50">
-                  <Video className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50">
+                  <Video className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-foreground">Simulated Interviews</h2>
-                  <p className="text-muted-foreground">AI-powered mock interview experience</p>
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">Simulated Interviews</h2>
+                  <p className="text-sm sm:text-base text-muted-foreground">AI-powered mock interview experience</p>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2">
                 <Badge 
                   variant={isCompleted ? "default" : isUnlocked ? "secondary" : "outline"}
                   className={cn(
-                    "px-3 py-1 font-medium",
+                    "px-2 sm:px-3 py-1 font-medium text-xs sm:text-sm",
                     isCompleted && "bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
                     isUnlocked && !isCompleted && "bg-amber-500/20 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-800",
                     !isUnlocked && "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
@@ -233,33 +234,33 @@ export default function InterviewsPage() {
                 )}
 
                 {/* Interview Information */}
-                <CardGrid columns={2} gap="lg">
+                <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
                   <PerformantAnimatedCard 
                     variant="subtle" 
                     hoverEffect="scale"
                     staggerIndex={1}
-                    className="dashboard-card space-y-3"
+                    className="dashboard-card space-y-3 p-4 sm:p-6"
                   >
-                    <h3 className="font-semibold text-lg text-foreground">What to Expect</h3>
-                    <ul className="text-sm space-y-2 text-muted-foreground">
+                    <h3 className="font-semibold text-base sm:text-lg text-foreground">What to Expect</h3>
+                    <ul className="text-xs sm:text-sm space-y-2 text-muted-foreground">
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0"></div>
                         5 AI-generated interview questions
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0"></div>
                         4-minute time limit total
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0"></div>
                         Video recording for AI analysis
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0"></div>
                         Instant feedback and scoring
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0"></div>
                         Questions adapt to your tier level
                       </li>
                     </ul>
@@ -269,44 +270,44 @@ export default function InterviewsPage() {
                     variant="subtle" 
                     hoverEffect="scale"
                     staggerIndex={2}
-                    className="dashboard-card space-y-3"
+                    className="dashboard-card space-y-3 p-4 sm:p-6"
                   >
-                    <h3 className="font-semibold text-lg text-foreground">Technical Requirements</h3>
-                    <ul className="text-sm space-y-2 text-muted-foreground">
+                    <h3 className="font-semibold text-base sm:text-lg text-foreground">Technical Requirements</h3>
+                    <ul className="text-xs sm:text-sm space-y-2 text-muted-foreground">
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 flex-shrink-0"></div>
                         Working camera and microphone
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 flex-shrink-0"></div>
                         Stable internet connection
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 flex-shrink-0"></div>
                         Modern web browser
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 flex-shrink-0"></div>
                         Quiet environment recommended
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 flex-shrink-0"></div>
                         Desktop or laptop preferred
                       </li>
                     </ul>
                   </PerformantAnimatedCard>
-                </CardGrid>
+                </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 pt-4">
+                <div className="flex gap-4 pt-4 px-2 sm:px-0">
                   <AnimatedButton 
                     onClick={handleStartInterview}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium"
+                    className="w-full min-h-[48px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium text-sm sm:text-base touch-manipulation"
                     size="lg"
                   >
                     <div className="flex items-center gap-2">
                       <Play className="h-4 w-4" />
-                      {interviewStatus?.hasAttempted ? 'Retake Interview' : 'Start Interview'}
+                      <span>{interviewStatus?.hasAttempted ? 'Retake Interview' : 'Start Interview'}</span>
                     </div>
                   </AnimatedButton>
                 </div>
@@ -357,12 +358,21 @@ export default function InterviewsPage() {
           variant="glass" 
           hoverEffect="lift"
           staggerIndex={4}
-          className="dashboard-card"
+          className="dashboard-card p-4 sm:p-6"
         >
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-foreground">Your Progress</h2>
-            <div className="flex items-center gap-6">
+          <div className="space-y-4 sm:space-y-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Your Progress</h2>
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
               <div className="text-center">
+                <OptimizedProgressRing
+                  value={(moduleGroups?.student.currentStars || 0) * 20}
+                  size={50}
+                  strokeWidth={3}
+                  showValue={false}
+                  color="primary"
+                  delay={600}
+                  className="sm:hidden"
+                />
                 <OptimizedProgressRing
                   value={(moduleGroups?.student.currentStars || 0) * 20}
                   size={60}
@@ -370,42 +380,43 @@ export default function InterviewsPage() {
                   showValue={false}
                   color="primary"
                   delay={600}
+                  className="hidden sm:block"
                 />
                 <div className="mt-2">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {moduleGroups?.student.currentStars || 0}
                   </div>
                   <div className="text-xs text-muted-foreground">Current Stars</div>
                 </div>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 dark:from-amber-500 dark:to-amber-700 flex items-center justify-center border-2 border-amber-200 dark:border-amber-800">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 dark:from-amber-500 dark:to-amber-700 flex items-center justify-center border-2 border-amber-200 dark:border-amber-800">
                   <span className="text-xs font-bold text-white">
                     {(moduleGroups?.student.currentTier || 'BRONZE').slice(0, 2)}
                   </span>
                 </div>
                 <div className="mt-2">
-                  <div className="text-lg font-bold text-foreground">
+                  <div className="text-base sm:text-lg font-bold text-foreground">
                     {moduleGroups?.student.currentTier || 'BRONZE'}
                   </div>
                   <div className="text-xs text-muted-foreground">Current Tier</div>
                 </div>
               </div>
-              <div className="flex-1">
-                <div className="text-sm text-muted-foreground mb-3">
+              <div className="flex-1 w-full sm:w-auto">
+                <div className="text-xs sm:text-sm text-muted-foreground mb-3 text-center sm:text-left">
                   Interview Progress: {interviewModule?.isCompleted ? 'Complete' : 'Not Started'}
                 </div>
                 <div className="relative">
-                  <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3">
+                  <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2 sm:h-3">
                     <div 
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-1000 ease-out"
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 sm:h-3 rounded-full transition-all duration-1000 ease-out"
                       style={{ 
                         width: `${mounted ? (interviewModule?.isCompleted ? 100 : 0) : 0}%`,
                         transitionDelay: '800ms'
                       }}
                     />
                   </div>
-                  <div className="absolute right-0 top-0 transform translate-y-4">
+                  <div className="absolute right-0 top-0 transform translate-y-3 sm:translate-y-4">
                     <span className="text-xs font-medium text-muted-foreground">
                       {interviewModule?.isCompleted ? '100%' : '0%'}
                     </span>

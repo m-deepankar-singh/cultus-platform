@@ -465,15 +465,15 @@ async function handleJobReadinessProgression(
             totalScore += progressData.progress_percentage;
             assessmentCount++;
             
-            // Check if this assessment passed (60% or higher by default)
-            if (progressData.progress_percentage >= 60) {
+            // Check if this assessment passed using configurable threshold
+            if (progressData.progress_percentage >= finalTierConfig.bronze_assessment_min_score) {
               hasPassedAssessment = true;
             }
           }
         }
 
-        // Award star and tier if student has completed at least one assessment
-        if (assessmentCount > 0) {
+        // Award star and tier ONLY if student has PASSED at least one assessment
+        if (assessmentCount > 0 && hasPassedAssessment) {
           const averageScore = totalScore / assessmentCount;
           
           // Determine tier based on average score
@@ -486,7 +486,7 @@ async function handleJobReadinessProgression(
             finalTierAchieved = 'BRONZE';
           }
 
-          // Always award first star and tier for any completed assessment
+          // Award first star and tier only for passed assessments
           const updateData = {
             job_readiness_star_level: 'ONE',
             job_readiness_tier: finalTierAchieved,

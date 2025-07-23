@@ -50,7 +50,7 @@ export function CourseList({ productId: providedProductId }: CourseListProps = {
   const lockedCourses = courses.filter(c => !c.is_unlocked)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-0">
       {/* Completion Status */}
       <PerformantAnimatedCard 
         variant="subtle" 
@@ -69,10 +69,10 @@ export function CourseList({ productId: providedProductId }: CourseListProps = {
       {/* Available Courses */}
       {pendingCourses.length > 0 && (
         <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-foreground">
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
             Available Courses
           </h2>
-          <CardGrid columns={1} gap="md">
+          <CardGrid columns={2} gap="md">
             {pendingCourses.map((course, index) => (
               <CourseCard
                 key={course.id}
@@ -88,10 +88,10 @@ export function CourseList({ productId: providedProductId }: CourseListProps = {
       {/* Completed Courses */}
       {completedCourses.length > 0 && (
         <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-foreground">
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
             Completed Courses
           </h2>
-          <CardGrid columns={1} gap="md">
+          <CardGrid columns={2} gap="md">
             {completedCourses.map((course, index) => (
               <CourseCard
                 key={course.id}
@@ -107,10 +107,10 @@ export function CourseList({ productId: providedProductId }: CourseListProps = {
       {/* Locked Courses */}
       {lockedCourses.length > 0 && (
         <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-semibold text-muted-foreground">
             Coming Soon
           </h2>
-          <CardGrid columns={1} gap="md">
+          <CardGrid columns={2} gap="md">
             {lockedCourses.map((course, index) => (
               <CourseCard
                 key={course.id}

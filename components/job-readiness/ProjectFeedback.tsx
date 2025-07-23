@@ -99,27 +99,27 @@ export function ProjectFeedback({
       {/* Results Header */}
       <Card className={`border-2 ${passed ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950' : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'}`}>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
               {passed ? (
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 flex-shrink-0 mt-1 sm:mt-0" />
               ) : (
-                <XCircle className="h-8 w-8 text-red-600" />
+                <XCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-600 flex-shrink-0 mt-1 sm:mt-0" />
               )}
-              <div>
-                <CardTitle className={`text-2xl ${passed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+              <div className="min-w-0">
+                <CardTitle className={`text-lg sm:text-xl md:text-2xl leading-tight break-words ${passed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
                   {passed ? 'Project Completed!' : 'Project Needs Improvement'}
                 </CardTitle>
-                <CardDescription className={passed ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>
+                <CardDescription className={`text-sm sm:text-base leading-relaxed break-words ${passed ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
                   {submission.project_title}
                 </CardDescription>
               </div>
             </div>
-            <div className="text-right">
-              <div className={`text-3xl font-bold ${getScoreColor(score)}`}>
+            <div className="text-left sm:text-right flex-shrink-0 w-full sm:w-auto">
+              <div className={`text-2xl sm:text-3xl font-bold ${getScoreColor(score)}`}>
                 {score}%
               </div>
-              <Badge variant={getScoreBadgeVariant(score)}>
+              <Badge variant={getScoreBadgeVariant(score)} className="text-xs sm:text-sm mt-1">
                 {passed ? 'Passed' : 'Failed'} (Required: {passing_threshold}%)
               </Badge>
             </div>
@@ -181,16 +181,16 @@ export function ProjectFeedback({
               </Alert>
             )}
             
-            <div className="bg-background/50 border border-border p-4 rounded-lg max-h-40 overflow-y-auto">
+            <div className="bg-background/50 border border-border p-3 sm:p-4 rounded-lg max-h-32 sm:max-h-40 overflow-y-auto">
               {submission.submission_content ? (
-                <p className="text-sm whitespace-pre-wrap font-mono text-foreground">
+                <p className="text-xs sm:text-sm whitespace-pre-wrap font-mono text-foreground leading-relaxed">
                   {submission.submission_content.substring(0, 500)}
                   {submission.submission_content.length > 500 && '...'}
                 </p>
               ) : (
-                <div className="text-center py-8 space-y-2">
-                  <FileText className="h-8 w-8 text-muted-foreground mx-auto" />
-                  <p className="text-sm text-muted-foreground">
+                <div className="text-center py-6 sm:py-8 space-y-2">
+                  <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground mx-auto" />
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Your submission was successfully processed and graded.
                   </p>
                   {submissionResult.storage_optimization?.optimized && (
@@ -294,27 +294,27 @@ export function ProjectFeedback({
       {/* Action Buttons */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="font-medium">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1 flex-1">
+              <h3 className="font-medium text-sm sm:text-base">
                 {passed ? 'What\'s Next?' : 'Next Steps'}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {passed 
                   ? 'Continue with your Job Readiness journey.'
                   : 'Review the feedback above and try again with a new project. Each attempt gives you a fresh project to work on.'
                 }
               </p>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" asChild>
-                <Link href="/app/job-readiness">
-                  <Home className="h-4 w-4 mr-2" />
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <Button variant="outline" asChild className="w-full sm:w-auto">
+                <Link href="/app/job-readiness" className="flex items-center justify-center gap-2">
+                  <Home className="h-4 w-4" />
                   Dashboard
                 </Link>
               </Button>
               {!passed && !isAlreadySubmitted && onStartNew && (
-                <Button onClick={onStartNew} variant="default">
+                <Button onClick={onStartNew} variant="default" className="w-full sm:w-auto">
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Retry with New Project
                 </Button>

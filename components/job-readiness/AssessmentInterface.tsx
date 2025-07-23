@@ -8,6 +8,16 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useAssessmentDetails } from '@/hooks/useAssessmentDetails'
 import { useSubmitAssessment } from '@/hooks/useSubmitAssessment'
 import { Clock, CheckCircle2, AlertCircle, FileText, Trophy, Timer } from 'lucide-react'
@@ -35,6 +45,8 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
   const [isStarted, setIsStarted] = useState(false)
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [submissionReason, setSubmissionReason] = useState<string | null>(null)
+  const [showWarningModal, setShowWarningModal] = useState(true)
 
   useEffect(() => {
     setMounted(true)
@@ -54,8 +66,10 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
     }
   }, [isLoading, assessmentData])
 
-  const handleSubmitAssessment = useCallback(async () => {
-    if (!assessmentData?.assessment.questions) return
+  const handleSubmitAssessment = useCallback(async (reason?: string) => {
+    if (!assessmentData?.assessment.questions || submitAssessment.isPending) return
+    
+    setSubmissionReason(reason || null)
 
     // Convert answers to the expected format
     const answersMap: { [questionId: string]: string | string[] } = {}
@@ -75,8 +89,9 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
         moduleId,
         data: submissionData
       })
-      // Redirect to results page
-      router.push(`/app/job-readiness/assessments/${moduleId}/results`)
+      // Redirect to results page with submission reason
+      const resultsUrl = `/app/job-readiness/assessments/${moduleId}/results${reason ? `?reason=${reason}` : ''}`;
+      router.push(resultsUrl)
     } catch (error) {
       console.error('Failed to submit assessment:', error)
     }
@@ -91,14 +106,14 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
 
   // Countdown timer
   useEffect(() => {
-    if (timeRemaining === null || timeRemaining <= 0) return
+    if (timeRemaining === null || timeRemaining <= 0 || submitAssessment.isPending) return
 
     const timer = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev === null || prev <= 1) {
-          // Time's up - auto submit
-          if (assessmentData?.assessment.questions) {
-            handleSubmitAssessment()
+          // Time's up - auto submit (only if not already submitting)
+          if (assessmentData?.assessment.questions && !submitAssessment.isPending) {
+            handleSubmitAssessment('timer_expired')
           }
           return 0
         }
@@ -107,7 +122,24 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timeRemaining, handleSubmitAssessment, assessmentData])
+  }, [timeRemaining, handleSubmitAssessment, assessmentData, submitAssessment.isPending])
+
+  // Add Page Visibility API to immediately submit assessment when user leaves the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Only submit if assessment is started and not already submitted and not showing warning modal
+      if (document.visibilityState === 'hidden' && isStarted && !submitAssessment.isPending && !showWarningModal) {
+        console.log('User left job readiness assessment page, immediately submitting');
+        handleSubmitAssessment('page_leave');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isStarted, submitAssessment.isPending, handleSubmitAssessment, showWarningModal]);
 
   const handleStartAssessment = () => {
     setIsStarted(true)
@@ -263,6 +295,8 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
   if (!isStarted) {
     return (
       <div className="space-y-6">
+        {/* Assessment content - blurred when warning modal is open */}
+        <div className={`${showWarningModal ? 'blur-sm pointer-events-none' : ''} transition-all duration-300`}>
         <PerformantAnimatedCard 
           variant="glass" 
           hoverEffect="lift"
@@ -283,6 +317,14 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
                 </p>
               </div>
             </div>
+
+            {/* Warning message about immediate submission policy */}
+            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/30">
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Important:</strong> Stay on this page during the assessment. Your assessment will be automatically submitted if you leave this page, switch tabs, or minimize the browser window.
+              </AlertDescription>
+            </Alert>
 
             <div className="grid md:grid-cols-2 gap-4 md:gap-8 text-left">
               <PerformantAnimatedCard 
@@ -363,6 +405,61 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
             </div>
           </div>
         </PerformantAnimatedCard>
+        </div>
+
+        {/* Warning Modal - Must accept to start assessment */}
+        <AlertDialog open={showWarningModal} onOpenChange={setShowWarningModal}>
+          <AlertDialogContent className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-amber-200 dark:border-amber-800/30">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                Job Readiness Assessment Guidelines
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="py-4 text-neutral-600 dark:text-neutral-400 space-y-4">
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 rounded-lg p-4">
+                    <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                      ⚠️ Important: Stay Focused During Assessment
+                    </h4>
+                    <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-2">
+                      <li>• <strong>Do not leave this page</strong> during the assessment</li>
+                      <li>• <strong>Do not switch tabs</strong> or minimize the browser</li>
+                      <li>• <strong>Do not navigate away</strong> from this page</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/30 rounded-lg p-4">
+                    <h4 className="font-semibold text-red-800 dark:text-red-200 mb-2">
+                      ⚡ Auto-Submit Policy
+                    </h4>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Your assessment will be <strong>immediately submitted</strong> if you leave this page for any reason. 
+                      This helps maintain assessment integrity and unlocks your job readiness progress fairly.
+                    </p>
+                  </div>
+
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    By clicking "I Understand, Start Assessment" you acknowledge that you have read and agree to these guidelines.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel 
+                onClick={() => router.push('/app/job-readiness')}
+                className="border-neutral-300 hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => setShowWarningModal(false)}
+                className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+              >
+                I Understand, Start Assessment
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     )
   }
@@ -562,68 +659,65 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
         </div>
       </PerformantAnimatedCard>
 
-      {/* Submit Confirmation */}
-      {showConfirmSubmit && (
-        <PerformantAnimatedCard 
-          variant="glass" 
-          hoverEffect="glow"
-          className="assessment-card border-2 border-orange-300/50 dark:border-orange-600/50 bg-gradient-to-r from-orange-500/10 to-amber-500/10"
-          staggerIndex={3}
-        >
-          <div className="p-4 md:p-8 text-center space-y-6">
-            <div className="flex items-center justify-center mb-4">
-              <div className="p-3 md:p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-amber-500/20 backdrop-blur">
-                <AlertCircle className="h-10 w-10 md:h-12 md:w-12 text-orange-600 dark:text-orange-400" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl md:text-2xl font-bold text-orange-900 dark:text-orange-100 mb-3">
-                Ready to Submit?
-              </h3>
-              <div className="space-y-2">
-                <p className="text-sm md:text-base text-orange-700 dark:text-orange-300">
-                  You have answered <span className="font-bold">{getAnsweredCount()}</span> of <span className="font-bold">{questions.length}</span> questions.
+      {/* Submit Confirmation Modal */}
+      <AlertDialog open={showConfirmSubmit} onOpenChange={setShowConfirmSubmit}>
+        <AlertDialogContent className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-orange-200 dark:border-orange-800/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
+              <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              Ready to Submit Assessment?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="py-4 text-neutral-600 dark:text-neutral-400 space-y-4">
+                <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/30 rounded-lg p-4">
+                  <div className="space-y-2">
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      You have answered <span className="font-bold">{getAnsweredCount()}</span> of <span className="font-bold">{questions.length}</span> questions.
+                    </p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                      <strong>Important:</strong> Once submitted, you cannot change your answers or retake this assessment.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Are you sure you want to submit your final answers?
                 </p>
-                <p className="text-xs md:text-sm text-orange-600 dark:text-orange-400">
-                  Once submitted, you cannot change your answers.
-                </p>
               </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4">
-              <AnimatedButton
-                variant="outline"
-                onClick={() => setShowConfirmSubmit(false)}
-                className="px-4 md:px-6 border-orange-300 hover:bg-orange-50 dark:border-orange-600 dark:hover:bg-orange-900/20 w-full sm:w-auto order-2 sm:order-1"
-              >
-                Review Answers
-              </AnimatedButton>
-              <AnimatedButton
-                onClick={handleSubmitAssessment}
-                disabled={submitAssessment.isPending}
-                className="px-4 md:px-8 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 w-full sm:w-auto order-1 sm:order-2"
-              >
-                {submitAssessment.isPending ? (
-                  <>
-                    <OptimizedProgressRing
-                      value={100}
-                      size={16}
-                      color="warning"
-                      showValue={false}
-                    />
-                    <span className="ml-2">Submitting...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                    Submit Final Answers
-                  </>
-                )}
-              </AnimatedButton>
-            </div>
-          </div>
-        </PerformantAnimatedCard>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel 
+              onClick={() => setShowConfirmSubmit(false)}
+              className="border-neutral-300 hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+            >
+              Review Answers
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleSubmitAssessment()}
+              disabled={submitAssessment.isPending}
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white"
+            >
+              {submitAssessment.isPending ? (
+                <>
+                  <OptimizedProgressRing
+                    value={100}
+                    size={16}
+                    color="warning"
+                    showValue={false}
+                  />
+                  <span className="ml-2">Submitting...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                  Submit Final Answers
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 

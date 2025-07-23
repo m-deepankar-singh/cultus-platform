@@ -329,21 +329,21 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
       {/* Background Effects */}
       <AdaptiveParticles />
       
-      <div className="relative max-w-4xl mx-auto p-6">
+      <div className="relative max-w-4xl mx-auto p-4 sm:p-6">
         {/* Header */}
-        <div className="text-center mb-8 space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">Interview Setup</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Let's make sure everything is working properly for your interview</p>
+        <div className="text-center mb-6 sm:mb-8 space-y-3 sm:space-y-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight gradient-text">Interview Setup</h1>
+          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">Let's make sure everything is working properly for your interview</p>
         </div>
         
         {/* Progress indicator */}
         <PerformantAnimatedCard 
           variant="glass"
-          className="dashboard-card mb-8 p-6"
+          className="dashboard-card mb-6 sm:mb-8 p-4 sm:p-6"
           staggerIndex={0}
         >
-          <div className="flex items-center justify-center">
-            <div className="flex space-x-4">
+          <div className="flex items-center justify-center overflow-x-auto">
+            <div className="flex space-x-2 sm:space-x-4 min-w-fit">
               {['permissions', 'devices', 'testing', 'ready'].map((step, index) => {
                 const currentIndex = ['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep);
                 const isActive = setupStep === step;
@@ -353,13 +353,13 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                   <div key={step} className="flex items-center">
                     <div className="relative">
                       <div className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 backdrop-blur-sm border-2",
+                        "w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-sm border-2",
                         isActive && "bg-blue-600 text-white border-blue-500 shadow-lg",
                         isCompleted && "bg-emerald-500 text-white border-emerald-400",
                         !isActive && !isCompleted && "bg-neutral-300 dark:bg-neutral-600 text-neutral-600 dark:text-neutral-400 border-neutral-400 dark:border-neutral-500"
                       )}>
                         {isCompleted ? (
-                          <CheckCircle className="h-5 w-5" />
+                          <CheckCircle className="h-3 w-3 sm:h-5 sm:w-5" />
                         ) : (
                           <span>{index + 1}</span>
                         )}
@@ -367,7 +367,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                     </div>
                     {index < 3 && (
                       <div className={cn(
-                        "w-16 h-1 mx-3 rounded-full transition-all duration-500",
+                        "w-8 sm:w-16 h-1 mx-2 sm:mx-3 rounded-full transition-all duration-500",
                         index < currentIndex
                           ? "bg-emerald-500"
                           : "bg-neutral-300 dark:bg-neutral-600"
@@ -378,8 +378,8 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
               })}
             </div>
           </div>
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground font-medium">
+          <div className="mt-4 sm:mt-6 text-center">
+            <p className="text-xs sm:text-sm text-muted-foreground font-medium">
               Step {['permissions', 'devices', 'testing', 'ready'].indexOf(setupStep) + 1} of 4: {
                 setupStep === 'permissions' ? 'Permissions' :
                 setupStep === 'devices' ? 'Devices' :
@@ -396,17 +396,17 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
             variant="glass" 
             hoverEffect="lift"
             staggerIndex={1}
-            className="dashboard-card p-8 text-center"
+            className="dashboard-card p-4 sm:p-6 lg:p-8 text-center"
           >
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Icon and Title */}
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50 w-fit mx-auto">
-                  <Monitor className="h-16 w-16 text-blue-600 dark:text-blue-400" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50 w-fit mx-auto">
+                  <Monitor className="h-12 w-12 sm:h-16 sm:w-16 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">Screen Recording & Microphone Access</h2>
-                  <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 text-foreground">Screen Recording & Microphone Access</h2>
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-2xl mx-auto px-2 sm:px-0">
                     We need access to your screen and microphone to conduct the interview.
                     Your privacy is important - the recording stays on your device until you submit.
                   </p>
@@ -433,18 +433,18 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                 </PerformantAnimatedCard>
               )}
               
-              <div className="space-y-3 pt-4">
+              <div className="space-y-3 pt-4 px-2 sm:px-0">
                 <AnimatedButton 
                   onClick={requestPermissions}
                   disabled={systemChecks.browser === 'error'}
                   size="lg"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium"
+                  className="w-full min-h-[44px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium text-sm sm:text-base"
                 >
                   Grant Permissions
                 </AnimatedButton>
                 
                 {onBack && (
-                  <AnimatedButton variant="outline" onClick={onBack} className="w-full">
+                  <AnimatedButton variant="outline" onClick={onBack} className="w-full min-h-[44px] text-sm sm:text-base">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                   </AnimatedButton>
@@ -456,18 +456,18 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
 
         {/* Step 2: Device Selection */}
         {setupStep === 'devices' && (
-          <CardGrid columns={2} gap="lg">
+          <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Screen recording preview */}
             <PerformantAnimatedCard 
               variant="glass" 
               hoverEffect="lift"
               staggerIndex={1}
-              className="dashboard-card p-6"
+              className="dashboard-card p-4 sm:p-6"
             >
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center text-foreground">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 mr-3">
-                    <Monitor className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="font-semibold text-base sm:text-lg flex items-center text-foreground">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-600/20 dark:from-blue-400/10 dark:to-indigo-500/10 mr-2 sm:mr-3">
+                    <Monitor className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   Screen Recording Setup
                 </h3>
@@ -522,12 +522,12 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
               variant="glass" 
               hoverEffect="lift"
               staggerIndex={2}
-              className="dashboard-card p-6"
+              className="dashboard-card p-4 sm:p-6"
             >
-              <div className="space-y-6">
-                <h3 className="font-semibold text-lg flex items-center text-foreground">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 mr-3">
-                    <Mic className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-4 sm:space-y-6">
+                <h3 className="font-semibold text-base sm:text-lg flex items-center text-foreground">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 mr-2 sm:mr-3">
+                    <Mic className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   Audio Setup
                 </h3>
@@ -550,10 +550,10 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                 </div>
                 
                 {/* Audio level indicator */}
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-foreground">Microphone Level</label>
+                <div className="space-y-2 sm:space-y-3">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground">Microphone Level</label>
                   <div className="relative">
-                    <div className="bg-gradient-to-r from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 rounded-full h-4 overflow-hidden border border-neutral-300 dark:border-neutral-600">
+                    <div className="bg-gradient-to-r from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 rounded-full h-3 sm:h-4 overflow-hidden border border-neutral-300 dark:border-neutral-600">
                       <div 
                         className="bg-gradient-to-r from-emerald-500 to-green-600 h-full transition-all duration-150 ease-out"
                         style={{ 
@@ -562,9 +562,9 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                         }}
                       />
                     </div>
-                    <div className="absolute right-2 top-0 transform translate-y-1">
+                    <div className="absolute right-1 sm:right-2 top-0 transform translate-y-0.5 sm:translate-y-1">
                       <div className={cn(
-                        "w-2 h-2 rounded-full transition-all duration-200",
+                        "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-200",
                         audioLevel > 30 ? "bg-emerald-500 dark:bg-emerald-400 animate-pulse" : "bg-neutral-400 dark:bg-neutral-600"
                       )} />
                     </div>
@@ -600,7 +600,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                 </AnimatedButton>
               </div>
             </PerformantAnimatedCard>
-          </CardGrid>
+          </div>
         )}
 
         {/* Step 3: Testing */}
@@ -609,11 +609,20 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
             variant="glass" 
             hoverEffect="glow"
             staggerIndex={1}
-            className="dashboard-card p-8 text-center"
+            className="dashboard-card p-4 sm:p-6 lg:p-8 text-center"
           >
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Loading indicator with progress ring */}
               <div className="relative mx-auto w-fit">
+                <OptimizedProgressRing
+                  value={75}
+                  size={80}
+                  strokeWidth={3}
+                  showValue={false}
+                  color="primary"
+                  delay={200}
+                  className="animate-pulse sm:hidden"
+                />
                 <OptimizedProgressRing
                   value={75}
                   size={120}
@@ -621,16 +630,16 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                   showValue={false}
                   color="primary"
                   delay={200}
-                  className="animate-pulse"
+                  className="animate-pulse hidden sm:block"
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
               </div>
               
               <div className="space-y-2">
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground">Running System Tests</h2>
-                <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Running System Tests</h2>
+                <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-2xl mx-auto px-2 sm:px-0">
                   We're testing your audio and video setup to ensure the best interview experience.
                 </p>
               </div>
@@ -661,17 +670,17 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
             variant="glass" 
             hoverEffect="lift"
             staggerIndex={1}
-            className="dashboard-card p-8 text-center"
+            className="dashboard-card p-4 sm:p-6 lg:p-8 text-center"
           >
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Success indicator */}
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 w-fit mx-auto backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50">
-                  <CheckCircle className="h-16 w-16 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 dark:from-emerald-400/10 dark:to-green-500/10 w-fit mx-auto backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50">
+                  <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">Setup Complete!</h2>
-                  <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 text-foreground">Setup Complete!</h2>
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-2xl mx-auto px-2 sm:px-0">
                     Your screen recording and audio are working perfectly. You're ready to start your interview.
                   </p>
                 </div>
@@ -706,11 +715,11 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
               </PerformantAnimatedCard>
               
               {/* Action Buttons */}
-              <div className="space-y-3 pt-4">
+              <div className="space-y-3 pt-4 px-2 sm:px-0">
                 <AnimatedButton 
                   onClick={completeSetup} 
                   size="lg" 
-                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-medium"
+                  className="w-full min-h-[44px] bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-medium text-sm sm:text-base"
                 >
                   <div className="flex items-center gap-2">
                     <ArrowRight className="h-4 w-4" />
@@ -721,7 +730,7 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
                 <AnimatedButton 
                   variant="outline" 
                   onClick={() => setSetupStep('devices')} 
-                  className="w-full border-border/50 bg-background/50 backdrop-blur-sm hover:bg-accent/50"
+                  className="w-full min-h-[44px] border-border/50 bg-background/50 backdrop-blur-sm hover:bg-accent/50 text-sm sm:text-base"
                 >
                   <div className="flex items-center gap-2">
                     <ArrowLeft className="h-4 w-4" />
@@ -735,13 +744,18 @@ export function InterviewSetup({ onSetupComplete, onBack }: InterviewSetupProps)
 
         {/* Navigation */}
         {setupStep === 'devices' && (
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={() => setSetupStep('permissions')}>
+          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 mt-6 px-2 sm:px-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setSetupStep('permissions')}
+              className="min-h-[44px] text-sm sm:text-base order-2 sm:order-1"
+            >
               Back
             </Button>
             <Button 
               onClick={startTesting}
               disabled={!selectedMicrophone}
+              className="min-h-[44px] text-sm sm:text-base order-1 sm:order-2"
             >
               Continue
             </Button>

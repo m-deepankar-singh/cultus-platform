@@ -9,6 +9,7 @@ import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
  * GET /api/app/job-readiness/projects/generate?productId=123
  */
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
   try {
     const url = new URL(request.url);
     const productId = url.searchParams.get('productId');
@@ -45,12 +46,6 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Output debug info to help with troubleshooting
-    console.log('Found student:', {
-      id: student.id,
-      background: student.job_readiness_background_type,
-      tier: student.job_readiness_tier
-    });
     
     const studentId = student.id;
     
@@ -87,19 +82,23 @@ export async function GET(request: NextRequest) {
             original_length: existingSubmission.original_content_length || 0
           } : null
         },
-        message: "You have already successfully completed this project."
+        message: "You have already successfully completed this project.",
+        generation_source: 'cached' as const,
+        generation_time_ms: Date.now() - startTime
       }, { status: 200 });
     }
     
     // For failed submissions or no submissions, generate a new project
-    const projectDetails = await generateProject(studentId, productId);
+    const projectGenResult = await generateProject(studentId, productId);
     
-    if (!projectDetails) {
+    if (!projectGenResult) {
       return NextResponse.json(
         { error: 'Failed to generate project' },
         { status: 500 }
       );
     }
+    
+    const { projectDetails, generationSource } = projectGenResult;
     
     // Return the freshly generated project (not cached)
     return NextResponse.json({
@@ -112,7 +111,11 @@ export async function GET(request: NextRequest) {
         submission_type: projectDetails.submission_type || 'text_input',
         status: 'new'
       },
-      message: "This is a newly generated project. It will change on refresh until you submit your answer."
+      message: generationSource === 'fallback' 
+        ? "We've created a curated project for your background while our AI system is busy. This project is still tailored to your level."
+        : "This is a newly generated project. It will change on refresh until you submit your answer.",
+      generation_source: generationSource,
+      generation_time_ms: Date.now() - startTime
     });
     
   } catch (error) {

@@ -83,9 +83,9 @@ export function CourseCard({ course, currentTier, staggerIndex = 0 }: CourseCard
     >
       <div className="space-y-6 flex-1 flex flex-col">
         {/* Header with Progress Ring */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4 flex-1">
-            <div className={`p-3 rounded-full backdrop-blur-sm border ${
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+            <div className={`p-2 sm:p-3 rounded-full backdrop-blur-sm border flex-shrink-0 ${
               isLocked 
                 ? 'bg-neutral-500/20 border-neutral-500/20' 
                 : isCompleted 
@@ -93,54 +93,65 @@ export function CourseCard({ course, currentTier, staggerIndex = 0 }: CourseCard
                 : 'bg-blue-500/20 border-blue-500/20'
             }`}>
               {isLocked ? (
-                <Lock className="h-6 w-6 text-neutral-500" />
+                <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-neutral-500" />
               ) : isCompleted ? (
-                <CheckCircle className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400" />
               ) : (
-                <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
               )}
             </div>
             
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-lg mb-2 line-clamp-1">{course.name}</h3>
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="outline" className="text-xs backdrop-blur-sm">
+              <h3 className="font-semibold text-base sm:text-lg mb-2 line-clamp-2 sm:line-clamp-1">{course.name}</h3>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-3 flex-wrap">
+                <Badge variant="outline" className="text-xs backdrop-blur-sm flex-shrink-0">
                   Course {course.sequence}
                 </Badge>
-                <Badge className={statusColor}>
+                <Badge className={`${statusColor} text-xs`}>
                   {statusText}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p className="text-sm text-muted-foreground line-clamp-2 pr-2">
                 {course.description || course.configuration?.description || 'Learn essential skills through hands-on practice and examples.'}
               </p>
             </div>
           </div>
           
-          {/* Progress Ring */}
+          {/* Progress Ring - responsive size */}
           {progressPercentage > 0 && (
-            <div className="flex-shrink-0 ml-4">
-              <OptimizedProgressRing
-                value={progressPercentage}
-                size={60}
-                color={getProgressColor(isCompleted, isInProgress)}
-                showValue={true}
-                delay={300 + staggerIndex * 100}
-              />
+            <div className="flex-shrink-0">
+              <div className="sm:hidden">
+                <OptimizedProgressRing
+                  value={progressPercentage}
+                  size={50}
+                  color={getProgressColor(isCompleted, isInProgress)}
+                  showValue={true}
+                  delay={300 + staggerIndex * 100}
+                />
+              </div>
+              <div className="hidden sm:block">
+                <OptimizedProgressRing
+                  value={progressPercentage}
+                  size={60}
+                  color={getProgressColor(isCompleted, isInProgress)}
+                  showValue={true}
+                  delay={300 + staggerIndex * 100}
+                />
+              </div>
             </div>
           )}
         </div>
 
         {/* Course Info */}
-        <div className="grid md:grid-cols-2 gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-            <span>{course.lessons_count} lessons</span>
+            <BookOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="whitespace-nowrap">{course.lessons_count} lessons</span>
           </div>
           {estimatedHours > 0 && (
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>{estimatedHours}h estimated</span>
+              <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="whitespace-nowrap">{estimatedHours}h estimated</span>
             </div>
           )}
         </div>
@@ -168,8 +179,9 @@ export function CourseCard({ course, currentTier, staggerIndex = 0 }: CourseCard
         <div className="mt-auto pt-4">
           {isLocked ? (
             <AnimatedButton variant="outline" disabled className="w-full">
-              <Lock className="h-4 w-4 mr-2" />
-              Locked - Complete Previous Requirements
+              <Lock className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span className="hidden sm:inline">Locked - Complete Previous Requirements</span>
+              <span className="sm:hidden">Locked</span>
             </AnimatedButton>
           ) : (
             <Link href={`/app/job-readiness/courses/${course.id}`} className="block">
@@ -183,18 +195,21 @@ export function CourseCard({ course, currentTier, staggerIndex = 0 }: CourseCard
               >
                 {isCompleted ? (
                   <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Review Course
+                    <CheckCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="hidden sm:inline">Review Course</span>
+                    <span className="sm:hidden">Review</span>
                   </>
                 ) : isInProgress ? (
                   <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Continue Learning
+                    <Play className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="hidden sm:inline">Continue Learning</span>
+                    <span className="sm:hidden">Continue</span>
                   </>
                 ) : (
                   <>
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Start Course
+                    <BookOpen className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="hidden sm:inline">Start Course</span>
+                    <span className="sm:hidden">Start</span>
                   </>
                 )}
               </AnimatedButton>

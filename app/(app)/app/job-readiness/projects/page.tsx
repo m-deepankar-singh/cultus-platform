@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayout'
 import { ProjectInterface } from '@/components/job-readiness/ProjectInterface'
-import { PerformantAnimatedCard, CardGrid } from '@/components/ui/performant-animated-card'
+import { PerformantAnimatedCard } from '@/components/ui/performant-animated-card'
 import { AnimatedButton } from '@/components/ui/animated-button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
@@ -40,15 +40,17 @@ export default function ProjectsPage() {
     <JobReadinessLayout>
       <div className="space-y-8">
         {/* Page Header */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">Real-World Projects</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <div className="text-center space-y-4 px-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight gradient-text">
+            Real-World Projects
+          </h1>
+          <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Complete AI-generated projects tailored to your background and demonstrate your skills in real-world scenarios.
           </p>
         </div>
 
         {/* Info Cards */}
-        <CardGrid columns={3} gap="lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           <PerformantAnimatedCard 
             variant="glass" 
             hoverEffect="scale"
@@ -57,10 +59,10 @@ export default function ProjectsPage() {
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                <Target className="h-5 w-5" />
-                <h3 className="font-semibold text-lg">Dynamic Projects</h3>
+                <Target className="h-4 w-4 sm:h-5 sm:w-5" />
+                <h3 className="font-semibold text-base sm:text-lg">Dynamic Projects</h3>
               </div>
-              <p className="text-blue-700 dark:text-blue-300 text-sm">
+              <p className="text-blue-700 dark:text-blue-300 text-xs sm:text-sm leading-relaxed">
                 Each project is uniquely generated based on your background and tier level for maximum relevance.
               </p>
             </div>
@@ -74,10 +76,10 @@ export default function ProjectsPage() {
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                <RefreshCw className="h-5 w-5" />
-                <h3 className="font-semibold text-lg">Fresh Each Time</h3>
+                <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
+                <h3 className="font-semibold text-base sm:text-lg">Fresh Each Time</h3>
               </div>
-              <p className="text-amber-700 dark:text-amber-300 text-sm">
+              <p className="text-amber-700 dark:text-amber-300 text-xs sm:text-sm leading-relaxed">
                 Projects change on page refresh until you submit your work, giving you options to find the right fit.
               </p>
             </div>
@@ -91,15 +93,15 @@ export default function ProjectsPage() {
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                <Trophy className="h-5 w-5" />
-                <h3 className="font-semibold text-lg">AI Feedback</h3>
+                <Trophy className="h-4 w-4 sm:h-5 sm:w-5" />
+                <h3 className="font-semibold text-base sm:text-lg">AI Feedback</h3>
               </div>
-              <p className="text-green-700 dark:text-green-300 text-sm">
+              <p className="text-green-700 dark:text-green-300 text-xs sm:text-sm leading-relaxed">
                 Receive detailed AI-powered feedback with strengths, improvements, and actionable recommendations.
               </p>
             </div>
           </PerformantAnimatedCard>
-        </CardGrid>
+        </div>
 
         {/* Important Notice */}
         <PerformantAnimatedCard
@@ -117,45 +119,8 @@ export default function ProjectsPage() {
           </Alert>
         </PerformantAnimatedCard>
 
-        {/* Submission Types Info */}
-        <PerformantAnimatedCard
-          variant="glass"
-          hoverEffect="lift"
-          staggerIndex={4}
-          className="dashboard-card"
-        >
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              <h2 className="font-semibold text-lg">Submission Information</h2>
-            </div>
-            <p className="text-muted-foreground">
-              How to submit your project work
-            </p>
-            
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <h4 className="font-medium">Text Submissions</h4>
-                <p className="text-sm text-muted-foreground">
-                  Most projects accept detailed text responses. For coding projects, you can use 
-                  <a href="https://gitingest.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline mx-1">
-                    GitIngest
-                  </a>
-                  to convert your code repositories into text format.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-medium">Content Requirements</h4>
-                <p className="text-sm text-muted-foreground">
-                  Submissions must be at least 100 characters long and should thoroughly address all project tasks and deliverables.
-                </p>
-              </div>
-            </div>
-          </div>
-        </PerformantAnimatedCard>
-
         {/* Main Project Interface */}
-        <div className="dashboard-card" style={{ '--stagger-index': 5 } as React.CSSProperties}>
+        <div className="dashboard-card" style={{ '--stagger-index': 4 } as React.CSSProperties}>
           <ProjectInterface />
         </div>
       </div>

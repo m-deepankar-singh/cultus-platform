@@ -103,13 +103,13 @@ export default function Dashboard() {
       {/* Ambient background particles */}
       <AdaptiveParticles />
       
-      <div className="relative space-y-8">
+      <div className="relative space-y-6 sm:space-y-8 px-2 sm:px-4 md:px-0">
         {/* Enhanced Hero Section */}
-        <div className="flex flex-col space-y-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
+        <div className="flex flex-col space-y-3 sm:space-y-4 text-center px-2 sm:px-0">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight gradient-text">
             Welcome back!
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">
             Continue your learning journey and track your progress with your personalized dashboard.
           </p>
           
@@ -123,12 +123,12 @@ export default function Dashboard() {
         className="dashboard-card"
       >
         <div className="flex flex-col space-y-6">
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-semibold">Learning Analytics</h2>
+          <div className="flex items-center space-x-2 px-2 sm:px-0">
+            <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <h2 className="text-xl sm:text-2xl font-semibold">Learning Analytics</h2>
           </div>
           
-          <CardGrid columns={4} gap="md">
+          <CardGrid columns={4} gap="sm">
             <PerformantAnimatedCard 
               variant="subtle" 
               hoverEffect="scale"
@@ -139,7 +139,7 @@ export default function Dashboard() {
                 <OptimizedProgressRing
                   value={Math.round(products.reduce((acc, p) => 
                     acc + ((p.product_status || 'NotStarted') === 'InProgress' ? 1 : 0), 0) / (products.length || 1) * 100)}
-                  size={70}
+                  size={60}
                   color="warning"
                   delay={300}
                 />
@@ -159,7 +159,7 @@ export default function Dashboard() {
               <div className="flex justify-center">
                 <OptimizedProgressRing
                   value={Math.round((completedProducts / (products.length || 1)) * 100)}
-                  size={70}
+                  size={60}
                   color="success"
                   delay={400}
                 />
@@ -179,7 +179,7 @@ export default function Dashboard() {
               <div className="flex justify-center">
                 <OptimizedProgressRing
                   value={Math.round(products.reduce((acc, p) => acc + (p.product_progress_percentage || 0), 0) / (products.length || 1))}
-                  size={70}
+                  size={60}
                   color="primary"
                   delay={500}
                 />
@@ -201,7 +201,7 @@ export default function Dashboard() {
               <div className="flex justify-center">
                 <OptimizedProgressRing
                   value={products.length > 0 ? 100 : 0}
-                  size={70}
+                  size={60}
                   color="primary"
                   delay={600}
                 />
@@ -216,10 +216,10 @@ export default function Dashboard() {
       </PerformantAnimatedCard>
       
       {/* Your Courses */}
-      <div className="space-y-6">
-        <div className="flex items-center space-x-2">
-          <BookOpen className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">Your Courses</h2>
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex items-center space-x-2 px-2 sm:px-0">
+          <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+          <h2 className="text-xl sm:text-2xl font-semibold">Your Courses</h2>
         </div>
         
         {products.length === 0 ? (
@@ -241,7 +241,7 @@ export default function Dashboard() {
             </div>
           </PerformantAnimatedCard>
         ) : (
-          <CardGrid columns={4} gap="lg">
+          <CardGrid columns={4} gap="md">
             {products.map((product, index) => (
               <PerformantAnimatedCard 
                 key={product.id} 
@@ -251,7 +251,7 @@ export default function Dashboard() {
                 className="dashboard-card group h-full flex flex-col"
               >
                 {/* Course Header Image */}
-                <div className="relative h-40 w-full mb-4 rounded-lg overflow-hidden">
+                <div className="relative h-32 sm:h-36 md:h-40 w-full mb-3 sm:mb-4 rounded-lg overflow-hidden">
                   {product.image_url ? (
                     <>
                       <Image
@@ -284,11 +284,11 @@ export default function Dashboard() {
                   )}
                   
                   {/* Progress Overlay */}
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute top-1 right-1 sm:top-2 sm:right-2">
                     <OptimizedProgressRing
                       value={product.product_progress_percentage || 0}
-                      size={36}
-                      strokeWidth={3}
+                      size={28}
+                      strokeWidth={2}
                       showValue={false}
                       color={
                         product.product_progress_percentage || 0 < 30 ? "danger" : 
@@ -301,12 +301,12 @@ export default function Dashboard() {
                   </div>
                   
                   {/* Module Count */}
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <div className="flex justify-between items-center text-sm text-white">
-                      <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded">
+                  <div className="absolute bottom-1 left-1 right-1 sm:bottom-2 sm:left-2 sm:right-2">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-white">
+                      <span className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-xs">
                         {(product.modules || []).filter((m: Module) => m.status === 'Completed').length}/{(product.modules || []).length} modules
                       </span>
-                      <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded">
+                      <span className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-xs">
                         {product.product_progress_percentage || 0}%
                       </span>
                     </div>
@@ -314,10 +314,10 @@ export default function Dashboard() {
                 </div>
 
                 {/* Course Content */}
-                <div className="space-y-4 flex-1 flex flex-col">
+                <div className="space-y-3 sm:space-y-4 flex-1 flex flex-col">
                   <div>
-                    <h3 className="font-semibold text-lg mb-2 line-clamp-1">{product.name}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
+                    <h3 className="font-semibold text-base sm:text-lg mb-1 sm:mb-2 line-clamp-1">{product.name}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                       {product.description || "Enhance your skills with this comprehensive course."}
                     </p>
                   </div>
@@ -342,9 +342,9 @@ export default function Dashboard() {
                   {/* Action Button */}
                   <div className="mt-auto">
                     <Link href={`/app/product-details/${product.id}`} className="block">
-                      <AnimatedButton className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground">
+                      <AnimatedButton className="w-full min-h-[44px] bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground text-sm sm:text-base">
                         {(product.product_status || 'NotStarted') === 'NotStarted' ? 'Start Learning' : 
-                         (product.product_status || 'NotStarted') === 'Completed' ? 'View Certificate' : 'Continue Learning'}
+                         (product.product_status || 'NotStarted') === 'Completed' ? 'Review Course' : 'Continue Learning'}
                       </AnimatedButton>
                     </Link>
                   </div>
@@ -357,13 +357,13 @@ export default function Dashboard() {
       
       {/* Upcoming Assessments */}
       {upcomingAssessments.length > 0 && (
-        <div className="space-y-6">
-          <div className="flex items-center space-x-2">
-            <Target className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-semibold">Upcoming Assessments</h2>
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-center space-x-2 px-2 sm:px-0">
+            <Target className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <h2 className="text-xl sm:text-2xl font-semibold">Upcoming Assessments</h2>
           </div>
           
-          <CardGrid columns={2} gap="lg">
+          <CardGrid columns={2} gap="md">
             {upcomingAssessments.map((assessment, index) => (
               <PerformantAnimatedCard 
                 key={assessment.id} 
@@ -372,19 +372,19 @@ export default function Dashboard() {
                 staggerIndex={10 + index}
                 className="dashboard-card"
               >
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-lg">{assessment.title}</h3>
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4 mr-2" />
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:justify-between space-y-2 sm:space-y-0">
+                    <div className="flex-1 space-y-1 sm:space-y-2 w-full sm:w-auto">
+                      <h3 className="font-semibold text-base sm:text-lg">{assessment.title}</h3>
+                      <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
+                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                         <span>Status: {assessment.status}</span>
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 self-end sm:self-start">
                       <OptimizedProgressRing
                         value={assessment.progress}
-                        size={60}
+                        size={50}
                         color={
                           assessment.progress < 30 ? "danger" : 
                           assessment.progress < 70 ? "warning" : 
@@ -396,7 +396,7 @@ export default function Dashboard() {
                   </div>
                   
                   <Link href={`/app/assessment/${assessment.id}/take`} className="block">
-                    <AnimatedButton className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground">
+                    <AnimatedButton className="w-full min-h-[44px] bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground text-sm sm:text-base">
                       {assessment.status === 'Completed' ? 'View Results' : 
                        assessment.status === 'NotStarted' ? 'Start Assessment' : 
                        'Continue Assessment'}

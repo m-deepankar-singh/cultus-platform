@@ -81,16 +81,16 @@ export function AppHeader() {
       className="sticky top-0 z-50 w-full border-b-2 border-primary/20 backdrop-blur-xl bg-background/80 dark:bg-black/40 shadow-lg dark:shadow-primary/10"
       staggerIndex={0}
     >
-      <div className="max-w-7xl mx-auto flex h-12 items-center justify-between px-6">
+      <div className="max-w-7xl mx-auto flex h-14 sm:h-12 items-center justify-between px-4 sm:px-6">
         {/* Left side - Mobile menu + Logo */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <div className="md:hidden header-element">
             <Sheet>
               <SheetTrigger asChild>
                 <AnimatedButton 
                   variant="ghost" 
                   size="icon"
-                  className="rounded-xl hover:bg-primary/10 transition-all duration-300"
+                  className="rounded-xl hover:bg-primary/10 transition-all duration-300 h-11 w-11 sm:h-10 sm:w-10"
                 >
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle menu</span>
@@ -164,7 +164,7 @@ export function AppHeader() {
               alt="Cultus Platform"
               width={100}
               height={32}
-              className="object-contain filter brightness-0 invert dark:filter-none"
+              className="object-contain filter brightness-0 invert dark:filter-none w-20 h-7 sm:w-25 sm:h-8"
               priority
             />
           </Link>
@@ -212,11 +212,11 @@ export function AppHeader() {
         </nav>
         
         {/* Right side - Theme toggle + User menu */}
-        <div className="flex items-center gap-2 header-element">
+        <div className="flex items-center gap-2 sm:gap-3 header-element">
           <PerformantAnimatedCard
             variant="glass"
             hoverEffect="glow"
-            className="p-1 rounded-xl"
+            className="p-1.5 sm:p-1 rounded-xl"
           >
             <ModeToggle />
           </PerformantAnimatedCard>
@@ -226,11 +226,11 @@ export function AppHeader() {
               <PerformantAnimatedCard
                 variant="glass"
                 hoverEffect="lift"
-                className="p-2 rounded-full cursor-pointer group"
+                className="p-2.5 sm:p-2 rounded-full cursor-pointer group"
               >
                 <div className="relative">
-                  <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <User className="h-4 w-4 text-white" />
+                  <div className="w-9 h-9 sm:w-8 sm:h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <User className="h-5 w-5 sm:h-4 sm:w-4 text-white" />
                   </div>
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background animate-pulse"></div>
                 </div>
@@ -242,7 +242,7 @@ export function AppHeader() {
             >
               <PerformantAnimatedCard variant="subtle" className="m-1 p-3">
                 <DropdownMenuLabel className="flex items-center gap-2 font-normal">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                  <div className="w-11 h-11 sm:w-10 sm:h-10 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
                     <User className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex flex-col">

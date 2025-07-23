@@ -51,17 +51,20 @@ export default function CourseContentPage() {
               <div className="h-4 bg-gradient-to-r from-muted/40 to-muted/20 rounded w-2/3 animate-pulse" />
             </div>
             
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-4">
-                <PerformantAnimatedCard variant="glass" className="h-64">
+            <div className="space-y-6 px-4 sm:px-0">
+              <div className="space-y-4">
+                <PerformantAnimatedCard variant="glass" className="h-48 sm:h-64">
                   <div className="h-full bg-gradient-to-br from-muted/20 to-muted/10 rounded-lg animate-pulse" />
                 </PerformantAnimatedCard>
-                <PerformantAnimatedCard variant="glass" className="h-32">
+                <PerformantAnimatedCard variant="glass" className="h-24 sm:h-32">
                   <div className="h-full bg-gradient-to-br from-muted/20 to-muted/10 rounded-lg animate-pulse" />
                 </PerformantAnimatedCard>
               </div>
-              <div className="space-y-4">
-                <PerformantAnimatedCard variant="glass" className="h-48">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <PerformantAnimatedCard variant="glass" className="h-32 sm:h-40">
+                  <div className="h-full bg-gradient-to-br from-muted/20 to-muted/10 rounded-lg animate-pulse" />
+                </PerformantAnimatedCard>
+                <PerformantAnimatedCard variant="glass" className="h-32 sm:h-40">
                   <div className="h-full bg-gradient-to-br from-muted/20 to-muted/10 rounded-lg animate-pulse" />
                 </PerformantAnimatedCard>
               </div>
@@ -78,23 +81,24 @@ export default function CourseContentPage() {
         <AdaptiveParticles />
         
         <JobReadinessLayout>
-          <div className="relative space-y-8">
+          <div className="relative space-y-8 px-4 sm:px-0">
             <div className="flex items-center gap-4">
               <Link href="/app/job-readiness/courses">
                 <AnimatedButton variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Courses
+                  <span className="hidden sm:inline">Back to Courses</span>
+                  <span className="sm:hidden">Back</span>
                 </AnimatedButton>
               </Link>
             </div>
             
             <PerformantAnimatedCard variant="glass" className="dashboard-card border-destructive/20 bg-destructive/5">
-              <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+              <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center space-y-4">
                 <div className="p-3 rounded-full bg-destructive/10 backdrop-blur-sm">
-                  <AlertCircle className="h-8 w-8 text-destructive" />
+                  <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-destructive" />
                 </div>
-                <h2 className="text-xl font-semibold text-destructive">Error Loading Course</h2>
-                <p className="text-muted-foreground max-w-md">
+                <h2 className="text-lg sm:text-xl font-semibold text-destructive">Error Loading Course</h2>
+                <p className="text-muted-foreground max-w-md text-sm sm:text-base">
                   Failed to load course content. Please check if you have access to this course and try again.
                 </p>
                 <AnimatedButton onClick={() => window.location.reload()} className="bg-gradient-to-r from-primary to-accent">
@@ -114,12 +118,13 @@ export default function CourseContentPage() {
         <AdaptiveParticles />
         
         <JobReadinessLayout>
-          <div className="relative space-y-8">
+          <div className="relative space-y-8 px-4 sm:px-0">
             <div className="flex items-center gap-4">
               <Link href="/app/job-readiness/courses">
                 <AnimatedButton variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Courses
+                  <span className="hidden sm:inline">Back to Courses</span>
+                  <span className="sm:hidden">Back</span>
                 </AnimatedButton>
               </Link>
             </div>
@@ -129,17 +134,18 @@ export default function CourseContentPage() {
               className="dashboard-card border-amber-500/20 bg-amber-500/5"
               staggerIndex={0}
             >
-              <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+              <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center space-y-4">
                 <div className="p-3 rounded-full bg-amber-500/10 backdrop-blur-sm">
-                  <BookOpen className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                  <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600 dark:text-amber-400" />
                 </div>
-                <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-100">Course Not Found</h2>
-                <p className="text-amber-700 dark:text-amber-300 max-w-md">
+                <h2 className="text-lg sm:text-xl font-semibold text-amber-900 dark:text-amber-100">Course Not Found</h2>
+                <p className="text-amber-700 dark:text-amber-300 max-w-md text-sm sm:text-base">
                   The requested course could not be found or you may not have access to it.
                 </p>
                 <Link href="/app/job-readiness/courses">
                   <AnimatedButton variant="outline" className="border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10">
-                    Return to Course List
+                    <span className="hidden sm:inline">Return to Course List</span>
+                    <span className="sm:hidden">Back to Courses</span>
                   </AnimatedButton>
                 </Link>
               </div>
@@ -157,31 +163,32 @@ export default function CourseContentPage() {
       <JobReadinessLayout>
         <div className="relative space-y-8">
           {/* Navigation */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-0">
             <Link href="/app/job-readiness/courses">
-              <AnimatedButton variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Courses
+              <AnimatedButton variant="outline" size="sm" className="self-start">
+                <ArrowLeft className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="hidden sm:inline">Back to Courses</span>
+                <span className="sm:hidden">Back</span>
               </AnimatedButton>
             </Link>
             <div className="text-sm text-muted-foreground">
-              Courses • {courseData.module.name}
+              Courses • <span className="font-medium">{courseData.module.name}</span>
             </div>
           </div>
 
           {/* Header Section */}
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-3 rounded-full bg-blue-500/20 dark:bg-blue-500/10 backdrop-blur-sm border border-blue-500/20">
-                <BookOpen className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <div className="text-center space-y-4 px-4">
+            <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4 flex-wrap">
+              <div className="p-2 sm:p-3 rounded-full bg-blue-500/20 dark:bg-blue-500/10 backdrop-blur-sm border border-blue-500/20 flex-shrink-0">
+                <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" />
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight gradient-text text-center">
                 {courseData.module.name}
               </h1>
             </div>
             
             {courseData.module.description && (
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 {courseData.module.description}
               </p>
             )}

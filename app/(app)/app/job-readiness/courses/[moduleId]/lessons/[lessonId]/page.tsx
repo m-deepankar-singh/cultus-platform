@@ -20,16 +20,16 @@ export default function LessonPage() {
   if (isLoading) {
     return (
       <JobReadinessLayout>
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6">
           {/* Loading Skeleton */}
-          <div className="space-y-4">
-            <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-1/3 animate-pulse" />
-            <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-2/3 animate-pulse" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="h-6 sm:h-8 bg-gray-200 dark:bg-gray-800 rounded w-1/2 sm:w-1/3 animate-pulse" />
+            <div className="h-3 sm:h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4 sm:w-2/3 animate-pulse" />
           </div>
           
           <div className="space-y-4">
-            <div className="h-96 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
-            <div className="h-32 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
+            <div className="h-48 sm:h-64 md:h-96 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
+            <div className="h-24 sm:h-32 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
           </div>
         </div>
       </JobReadinessLayout>
@@ -39,19 +39,20 @@ export default function LessonPage() {
   if (error) {
     return (
       <JobReadinessLayout>
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6">
           <div className="flex items-center gap-4">
             <Link href="/app/job-readiness/courses">
               <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Courses
+                <ArrowLeft className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="hidden sm:inline">Back to Courses</span>
+                <span className="sm:hidden">Back</span>
               </Button>
             </Link>
           </div>
           
           <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <AlertDescription className="text-sm sm:text-base">
               Failed to load lesson content. Please check if you have access to this lesson and try again.
             </AlertDescription>
           </Alert>
@@ -65,30 +66,32 @@ export default function LessonPage() {
   if (!courseData?.module || !lesson) {
     return (
       <JobReadinessLayout>
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6">
           <div className="flex items-center gap-4">
             <Link href={`/app/job-readiness/courses/${moduleId}`}>
               <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Course
+                <ArrowLeft className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="hidden sm:inline">Back to Course</span>
+                <span className="sm:hidden">Back</span>
               </Button>
             </Link>
           </div>
           
           <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-900 dark:text-yellow-100">
-                <BookOpen className="h-5 w-5" />
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-yellow-900 dark:text-yellow-100 text-lg sm:text-xl">
+                <BookOpen className="h-5 w-5 flex-shrink-0" />
                 Lesson Not Found
               </CardTitle>
-              <CardDescription className="text-yellow-700 dark:text-yellow-300">
+              <CardDescription className="text-yellow-700 dark:text-yellow-300 text-sm sm:text-base">
                 The requested lesson could not be found or you may not have access to it.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <Link href={`/app/job-readiness/courses/${moduleId}`}>
                 <Button variant="outline" className="text-yellow-700 dark:text-yellow-300">
-                  Return to Course
+                  <span className="hidden sm:inline">Return to Course</span>
+                  <span className="sm:hidden">Back to Course</span>
                 </Button>
               </Link>
             </CardContent>
@@ -106,17 +109,18 @@ export default function LessonPage() {
 
   return (
     <JobReadinessLayout>
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6">
         {/* Navigation */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Link href={`/app/job-readiness/courses/${moduleId}`}>
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Course
+            <Button variant="outline" size="sm" className="self-start">
+              <ArrowLeft className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span className="hidden sm:inline">Back to Course</span>
+              <span className="sm:hidden">Back</span>
             </Button>
           </Link>
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            {courseData.module.name} • Lesson {lesson.sequence}
+            <span className="font-medium">{courseData.module.name}</span> • Lesson {lesson.sequence}
           </div>
         </div>
 
