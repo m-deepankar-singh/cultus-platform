@@ -93,7 +93,7 @@ class SimpleSessionManager {
   /**
    * Check for inactive sessions and disconnect them
    */
-  private checkInactiveSessions(): void {
+  private async checkInactiveSessions(): Promise<void> {
     const now = Date.now();
     const sessionsToRemove: string[] = [];
 
@@ -134,14 +134,47 @@ class SimpleSessionManager {
     if (sessionsToRemove.length > 0) {
       console.log(`🧹 Cleaned up ${sessionsToRemove.length} inactive sessions`);
     }
+
+    // 🆕 Add database cleanup for orphaned sessions
+    await this.cleanupDatabaseSessions();
+  }
+
+  // 🆕 Add new method for database cleanup
+  private async cleanupDatabaseSessions(): Promise<void> {
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      
+      // Clean up sessions older than 15 minutes (more generous than in-memory timeout)
+      const cutoffTime = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      
+      const { data, error } = await supabase
+        .from('active_interview_sessions')
+        .delete()
+        .lt('created_at', cutoffTime)
+        .select('user_id, session_id');
+
+      if (error) {
+        console.warn('⚠️ Database session cleanup failed:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        console.log(`🗑️ Cleaned up ${data.length} orphaned database sessions:`, 
+          data.map(s => s.session_id));
+      }
+    } catch (error) {
+      console.warn('⚠️ Database session cleanup error:', error);
+      // Don't throw - this is background cleanup
+    }
   }
 
   /**
    * Start the cleanup timer
    */
   private startCleanupTimer(): void {
-    this.cleanupInterval = setInterval(() => {
-      this.checkInactiveSessions();
+    this.cleanupInterval = setInterval(async () => {
+      await this.checkInactiveSessions();
     }, this.CLEANUP_INTERVAL);
 
     console.log(`🧹 Started session cleanup timer (${this.CLEANUP_INTERVAL}ms interval)`);

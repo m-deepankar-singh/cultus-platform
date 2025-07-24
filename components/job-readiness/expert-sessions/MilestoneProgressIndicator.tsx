@@ -8,7 +8,7 @@ interface MilestoneProgressIndicatorProps {
   className?: string
 }
 
-const MILESTONES = [10, 25, 50, 75, 90, 95, 100] // percentages
+const MILESTONES = [10, 25, 50, 75, 100] // percentages
 
 export function MilestoneProgressIndicator({
   currentPercentage,
@@ -42,11 +42,11 @@ export function MilestoneProgressIndicator({
             
             // Special handling for edge cases on mobile
             if (milestone === 10) {
-              leftPosition = Math.max(milestone, 10) // Keep 10% milestone away from left edge
-              transform = 'translateX(-20%)'
+              leftPosition = Math.max(milestone, 8) // Keep 10% milestone away from left edge
+              transform = 'translateX(-30%)'
             } else if (milestone === 100) {
-              leftPosition = Math.min(milestone, 90) // Keep 100% milestone away from right edge  
-              transform = 'translateX(-80%)'
+              leftPosition = Math.min(milestone, 92) // Keep 100% milestone away from right edge  
+              transform = 'translateX(-70%)'
             }
             
             return (
@@ -92,57 +92,32 @@ export function MilestoneProgressIndicator({
         </div>
       </div>
       
-      {/* Milestone Legend - Responsive layout */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs text-muted-foreground mt-4 gap-2 sm:gap-4">
-        <div className="flex items-center gap-3 sm:gap-4 justify-center sm:justify-start">
+      {/* Milestone Legend - More minimal on mobile */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs text-muted-foreground mt-3 sm:mt-4 gap-2 sm:gap-4">
+        {/* Hide legend on mobile, show only on sm+ */}
+        <div className="hidden sm:flex items-center gap-4">
           <div className="flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            <span className="text-[11px] sm:text-xs">Unlocked</span>
+            <span className="text-xs">Unlocked</span>
           </div>
           <div className="flex items-center gap-1">
             <Circle className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[11px] sm:text-xs">Locked</span>
+            <span className="text-xs">Locked</span>
           </div>
         </div>
         
-        {/* Current Progress Info */}
+        {/* Current Progress Info - Simplified on mobile */}
         <div className="text-center sm:text-right">
           <div className="text-foreground font-medium text-sm sm:text-base">
-            {Math.round(currentPercentage)}% Complete
+            {Math.floor(currentPercentage)}% Complete
           </div>
-          <div className="text-muted-foreground text-[11px] sm:text-xs">
-            {milestonesUnlocked.length} of {MILESTONES.length} milestones
+          <div className="text-muted-foreground text-[10px] sm:text-xs">
+            <span className="sm:hidden">{milestonesUnlocked.length}/5</span>
+            <span className="hidden sm:inline">{milestonesUnlocked.length} of {MILESTONES.length} milestones</span>
           </div>
         </div>
       </div>
       
-      {/* Milestone List (for mobile/accessibility) - Improved responsive grid */}
-      <div className="w-full overflow-hidden sm:hidden">
-        {/* Mobile Grid (shows milestones since labels are hidden on mobile) */}
-        <div className="grid grid-cols-4 gap-1 mt-3">
-          {MILESTONES.map((milestone) => {
-            const isUnlocked = milestonesUnlocked.includes(milestone)
-            const isCurrent = currentPercentage >= milestone
-            
-            return (
-              <div
-                key={milestone}
-                className={cn(
-                  "flex items-center justify-center",
-                  "py-2 px-1 rounded text-[10px] sm:text-xs font-medium",
-                  "transition-colors duration-200 min-h-[32px] text-center",
-                  "border border-opacity-20",
-                  isUnlocked || isCurrent
-                    ? "bg-emerald-600 text-white shadow-sm border-emerald-400"
-                    : "bg-muted text-muted-foreground border-muted-foreground"
-                )}
-              >
-                {milestone}%
-              </div>
-            )
-          })}
-        </div>
-      </div>
       
       {/* Disabled State Overlay - Only covers this component */}
       {isDisabled && (

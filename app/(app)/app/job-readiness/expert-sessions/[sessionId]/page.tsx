@@ -126,11 +126,12 @@ export default function ExpertSessionViewerPage() {
       <JobReadinessLayout showProgress={false}>
         <Toaster richColors position="top-right" />
         {/* Navigation */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <Link href="/app/job-readiness/expert-sessions">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="text-sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Expert Sessions
+              <span className="hidden xs:inline">Back to Expert Sessions</span>
+              <span className="xs:hidden">Back</span>
             </Button>
           </Link>
         </div>
@@ -138,27 +139,27 @@ export default function ExpertSessionViewerPage() {
         {/* Completion Message */}
         <div className="max-w-2xl mx-auto text-center">
           <Card>
-            <CardContent className="p-8">
-              <div className="space-y-6">
-                <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+            <CardContent className="p-4 sm:p-6 md:p-8">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-100 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold text-foreground">Session Completed!</h2>
-                  <p className="text-muted-foreground">
-                    You have successfully completed "<strong>{session.title}</strong>"
+                  <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Session Completed!</h2>
+                  <p className="text-sm sm:text-base text-muted-foreground px-2">
+                    You have successfully completed "<strong className="break-words">{session.title}</strong>"
                   </p>
                 </div>
 
                 {/* Milestone Achievement Display */}
                 {enhancedSession.student_progress.milestones_unlocked.length > 0 && (
-                  <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-4">
-                    <div className="space-y-2">
-                      <p className="text-sky-800 dark:text-sky-300 font-medium">Milestones Achieved</p>
-                      <div className="flex flex-wrap gap-2 justify-center">
+                  <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-3 sm:p-4">
+                    <div className="space-y-2 sm:space-y-3">
+                      <p className="text-sky-800 dark:text-sky-300 font-medium text-sm sm:text-base">Milestones Achieved</p>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
                         {enhancedSession.student_progress.milestones_unlocked.map(milestone => (
-                          <Badge key={milestone} variant="default" className="bg-sky-600 dark:bg-sky-500 text-white">
+                          <Badge key={milestone} variant="default" className="bg-sky-600 dark:bg-sky-500 text-white text-xs">
                             {milestone}%
                           </Badge>
                         ))}
@@ -167,17 +168,20 @@ export default function ExpertSessionViewerPage() {
                   </div>
                 )}
 
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-                  <div className="flex items-center justify-center space-x-2">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-emerald-800 dark:text-emerald-300 font-medium">
-                      Completed on {(() => {
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 sm:gap-2">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 mx-auto sm:mx-0" />
+                    <span className="text-emerald-800 dark:text-emerald-300 font-medium text-sm sm:text-base">
+                      <span className="hidden sm:inline">Completed on </span>
+                      <span className="sm:hidden">Completed </span>
+                      {(() => {
                         try {
                           const completedDate = new Date(session.student_progress.completed_at!);
                           if (isNaN(completedDate.getTime())) {
                             return 'recently';
                           }
-                          return completedDate.toLocaleDateString();
+                          const formatted = completedDate.toLocaleDateString();
+                          return window.innerWidth < 640 ? formatted.split('/').join('/') : formatted;
                         } catch (error) {
                           console.warn('Invalid completion date:', session.student_progress.completed_at);
                           return 'recently';
@@ -187,15 +191,16 @@ export default function ExpertSessionViewerPage() {
                   </div>
                 </div>
 
-                <p className="text-sm text-muted-foreground">
-                  For security and progress tracking purposes, completed expert sessions cannot be re-watched. 
-                  Continue with your next learning objectives.
+                <p className="text-xs sm:text-sm text-muted-foreground px-2">
+                  <span className="hidden sm:inline">For security and progress tracking purposes, completed expert sessions cannot be re-watched. Continue with your next learning objectives.</span>
+                  <span className="sm:hidden">Completed sessions cannot be re-watched. Continue with next learning objectives.</span>
                 </p>
 
-                <div className="pt-4">
+                <div className="pt-2 sm:pt-4">
                   <Link href="/app/job-readiness/expert-sessions">
-                    <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent">
-                      Continue to Next Sessions
+                    <Button size="sm" className="w-full sm:w-auto sm:size-lg bg-gradient-to-r from-primary to-accent text-sm sm:text-base px-6 py-2 sm:px-8 sm:py-3">
+                      <span className="hidden sm:inline">Continue to Next Sessions</span>
+                      <span className="sm:hidden">Continue</span>
                       <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
                     </Button>
                   </Link>
@@ -213,11 +218,12 @@ export default function ExpertSessionViewerPage() {
       <Toaster richColors position="top-right" />
       
       {/* Navigation */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <Link href="/app/job-readiness/expert-sessions">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="text-sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Expert Sessions
+            <span className="hidden xs:inline">Back to Expert Sessions</span>
+            <span className="xs:hidden">Back</span>
           </Button>
         </Link>
       </div>
@@ -225,38 +231,43 @@ export default function ExpertSessionViewerPage() {
       {/* Session Header */}
       <div className="space-y-6">
         <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <CardTitle className="text-2xl">{session.title}</CardTitle>
-                <CardDescription className="text-base">
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="space-y-2 flex-1 min-w-0">
+                <CardTitle className="text-lg sm:text-2xl break-words">{session.title}</CardTitle>
+                <CardDescription className="text-sm sm:text-base">
                   {session.description}
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                {isCompleted ? (
-                  <Badge variant="default" className="bg-green-500 text-white">
-                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                    Completed
-                  </Badge>
-                ) : completionPercentage > 0 ? (
-                  <Badge variant="secondary">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {completionPercentage}% watched
-                  </Badge>
-                ) : (
-                  <Badge variant="outline">
-                    <Play className="h-4 w-4 mr-1" />
-                    Not started
-                  </Badge>
-                )}
-                
-                {/* Resume Progress Badge */}
-                {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.can_resume && (
-                  <Badge variant="outline" className="border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-500/10 dark:text-sky-400">
-                    Resume from {enhancedSession.student_progress.resume_from_milestone}%
-                  </Badge>
-                )}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2 sm:flex-shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isCompleted ? (
+                    <Badge variant="default" className="bg-green-500 text-white">
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Completed
+                    </Badge>
+                  ) : completionPercentage > 0 ? (
+                    <Badge variant="secondary">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">{Math.floor(completionPercentage)}% watched</span>
+                      <span className="sm:hidden">{Math.floor(completionPercentage)}%</span>
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">
+                      <Play className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Not started</span>
+                      <span className="sm:hidden">New</span>
+                    </Badge>
+                  )}
+                  
+                  {/* Resume Progress Badge */}
+                  {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.can_resume && (
+                    <Badge variant="outline" className="border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-500/10 dark:text-sky-400">
+                      <span className="hidden sm:inline">Resume from {enhancedSession.student_progress.resume_from_milestone}%</span>
+                      <span className="sm:hidden">Resume {enhancedSession.student_progress.resume_from_milestone}%</span>
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -265,18 +276,20 @@ export default function ExpertSessionViewerPage() {
         {/* Milestone Progress Display */}
         {USE_ENHANCED_VIDEO_PLAYER && enhancedSession.student_progress.milestones_unlocked.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Progress Milestones</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Progress Milestones</CardTitle>
+              <CardDescription className="text-sm">
                 Your milestone achievements for this session
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <MilestoneProgressIndicator
-                currentPercentage={completionPercentage}
-                milestonesUnlocked={enhancedSession.student_progress.milestones_unlocked}
-                isDisabled={true}
-              />
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="overflow-x-auto">
+                <MilestoneProgressIndicator
+                  currentPercentage={completionPercentage}
+                  milestonesUnlocked={enhancedSession.student_progress.milestones_unlocked}
+                  isDisabled={true}
+                />
+              </div>
             </CardContent>
           </Card>
         )}
@@ -344,25 +357,26 @@ export default function ExpertSessionViewerPage() {
 
         {/* Session Details */}
         <Card>
-          <CardHeader>
-            <CardTitle>Session Details</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Session Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Duration</p>
-                <p className="text-muted-foreground">{formatDuration(session.video_duration)}</p>
+                <p className="text-sm text-muted-foreground">{formatDuration(session.video_duration)}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Added</p>
-                <p className="text-muted-foreground">
-                  {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
+                <p className="text-sm text-muted-foreground break-words">
+                  <span className="hidden sm:inline">{formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}</span>
+                  <span className="sm:hidden">{formatDistanceToNow(new Date(session.created_at), { addSuffix: true }).replace('about ', '')}</span>
                 </p>
               </div>
               {session.student_progress.watch_time_seconds > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Watch Time</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground break-words">
                     {formatDuration(session.student_progress.watch_time_seconds)} of {formatDuration(session.video_duration)}
                   </p>
                 </div>
@@ -370,14 +384,15 @@ export default function ExpertSessionViewerPage() {
               {isCompleted && session.student_progress.completed_at && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Completed</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground break-words">
                     {(() => {
                       try {
                         const completedDate = new Date(session.student_progress.completed_at);
                         if (isNaN(completedDate.getTime())) {
                           return 'recently';
                         }
-                        return formatDistanceToNow(completedDate, { addSuffix: true });
+                        const formatted = formatDistanceToNow(completedDate, { addSuffix: true });
+                        return window.innerWidth < 640 ? formatted.replace('about ', '') : formatted;
                       } catch (error) {
                         console.warn('Invalid completion date:', session.student_progress.completed_at);
                         return 'recently';
@@ -393,16 +408,17 @@ export default function ExpertSessionViewerPage() {
                   {enhancedSession.student_progress.milestones_unlocked.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Milestones Achieved</p>
-                      <p className="text-muted-foreground">
-                        {enhancedSession.student_progress.milestones_unlocked.length} of 7 milestones reached
+                      <p className="text-sm text-muted-foreground">
+                        {enhancedSession.student_progress.milestones_unlocked.length} of 5 milestones reached
                       </p>
                     </div>
                   )}
                   {enhancedSession.student_progress.can_resume && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Resume Position</p>
-                      <p className="text-muted-foreground">
-                        {enhancedSession.student_progress.resume_from_milestone}% milestone ({formatDuration(enhancedSession.student_progress.resume_position_seconds)})
+                      <p className="text-sm text-muted-foreground break-words">
+                        <span className="hidden sm:inline">{enhancedSession.student_progress.resume_from_milestone}% milestone ({formatDuration(enhancedSession.student_progress.resume_position_seconds)})</span>
+                        <span className="sm:hidden">{enhancedSession.student_progress.resume_from_milestone}% ({formatDuration(enhancedSession.student_progress.resume_position_seconds)})</span>
                       </p>
                     </div>
                   )}

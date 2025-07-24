@@ -337,6 +337,20 @@ export function LiveInterviewProvider({
         console.log('Interview submitted successfully:', submitResult.submissionId);
         setUploading(false);
         setUploadProgress(0);
+        
+        // 🆕 Remove session from database after successful submission
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          await supabase
+            .from('active_interview_sessions')
+            .delete()
+            .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+          console.log('✅ Session removed after successful submission');
+        } catch (error) {
+          console.warn('⚠️ Failed to remove session after submission:', error);
+        }
+        
         return submitResult.submissionId;
       } else {
         throw new Error(submitResult.error || 'Failed to submit interview');
@@ -358,6 +372,18 @@ export function LiveInterviewProvider({
     try {
       setUploading(true);
       setUploadProgress(0);
+      
+      // 🆕 Mark session as completing in database
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        await supabase
+          .from('active_interview_sessions')
+          .update({ status: 'completing' })
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+      } catch (error) {
+        console.warn('⚠️ Failed to update session status:', error);
+      }
       
       // Stop recording
       const recordingResult = await screenRecorder.stopRecording();
@@ -419,6 +445,21 @@ export function LiveInterviewProvider({
   const disconnect = useCallback(() => {
     console.log('🔌 Disconnecting WebSocket and cleaning up resources');
     
+    // 🆕 Clean up database session record
+    const cleanupDatabaseSession = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        await supabase
+          .from('active_interview_sessions')
+          .delete()
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+        console.log('✅ Database session cleaned up');
+      } catch (error) {
+        console.warn('⚠️ Failed to cleanup database session:', error);
+      }
+    };
+    
     // Clear all session timers
     clearSessionTimers();
     
@@ -461,6 +502,9 @@ export function LiveInterviewProvider({
     stopTimer();
     setInterviewStarted(false);
     setSessionActive(false);
+    
+    // Clean up database session (don't await to avoid blocking)
+    cleanupDatabaseSession();
     
     console.log('✅ All interview resources cleaned up');
   }, [client, recording, screenRecorder, audioRecorder, stopTimer, clearSessionTimers]);
@@ -648,6 +692,24 @@ export function LiveInterviewProvider({
     // Store questions immediately
     setGeneratedQuestions(questions);
     setPendingQuestions(questions);
+    
+    // 🆕 Register session in database for crash recovery
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('active_interview_sessions').upsert({
+          user_id: user.id,
+          session_id: sessionIdRef.current,
+          status: 'active'
+        });
+      }
+      console.log('✅ Session registered in database:', sessionIdRef.current);
+    } catch (error) {
+      console.warn('⚠️ Failed to register session in database:', error);
+      // Don't block interview start - this is just for crash recovery
+    }
     
     // First connect with the questions if not already connected
     if (!connected) {

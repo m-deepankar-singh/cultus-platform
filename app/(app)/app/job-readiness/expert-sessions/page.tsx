@@ -46,7 +46,7 @@ export default function ExpertSessionsPage() {
     return (
       <div className="relative min-h-screen">
         <AdaptiveParticles />
-        <div className="container mx-auto py-8 px-4 md:px-0">
+        <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-0">
           <div className="relative space-y-8">
             <div className="flex flex-col space-y-4 text-center">
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
@@ -73,7 +73,7 @@ export default function ExpertSessionsPage() {
     return (
       <div className="relative min-h-screen">
         <AdaptiveParticles />
-        <div className="container mx-auto py-8 px-4 md:px-0">
+        <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-0">
           <div className="relative space-y-8">
             <div className="flex flex-col space-y-4 text-center">
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">
@@ -109,7 +109,7 @@ export default function ExpertSessionsPage() {
     return (
       <div className="relative min-h-screen">
         <AdaptiveParticles />
-        <div className="container mx-auto py-8 px-4 md:px-0">
+        <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-0">
           <div className="relative space-y-8">
             <div className="flex flex-col space-y-4 text-center">
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight gradient-text">

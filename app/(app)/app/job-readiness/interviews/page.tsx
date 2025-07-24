@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { JobReadinessLayout } from '@/components/job-readiness/JobReadinessLayout';
+import { createClient } from '@/lib/supabase/client';
+import { Card } from '@/components/ui/card';
 import { InterviewSessionProvider } from '@/components/job-readiness/providers/InterviewSessionProvider';
 import { LiveInterviewProvider } from '@/components/job-readiness/contexts/LiveInterviewContext';
 import { InterviewSetup } from '@/components/job-readiness/interviews/InterviewSetup';
@@ -23,9 +25,97 @@ import { cn } from '@/lib/utils';
 const TEST_BACKGROUND_ID = 'df8e996e-df6f-43f0-9bfa-c308a7604624'; // Computer Science background ID
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
+// 🆕 Stuck session detection component
+function StuckSessionCheck({ userId, onSessionCleared }: { userId: string; onSessionCleared: () => void }) {
+  const [hasStuckSession, setHasStuckSession] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+
+  // Check for existing stuck session
+  useEffect(() => {
+    if (!userId) return;
+
+    const checkSession = async () => {
+      try {
+        const supabase = createClient();
+        const { data: existingSession } = await supabase
+          .from('active_interview_sessions')
+          .select('created_at, session_id')
+          .eq('user_id', userId)
+          .single();
+
+        if (existingSession) {
+          console.log('🔍 Found existing session:', existingSession.session_id);
+          setHasStuckSession(true);
+        }
+      } catch (error) {
+        // No session found - this is good
+        console.log('✅ No stuck session detected');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+  }, [userId]);
+
+  const clearStuckSession = async () => {
+    if (!userId) return;
+
+    setClearing(true);
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('active_interview_sessions')
+        .delete()
+        .eq('user_id', userId);
+      
+      console.log('✅ Stuck session cleared');
+      setHasStuckSession(false);
+      onSessionCleared();
+    } catch (error) {
+      console.error('❌ Failed to clear stuck session:', error);
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-4 text-sm text-muted-foreground">Checking for active sessions...</div>;
+  }
+
+  if (!hasStuckSession) {
+    return null;
+  }
+
+  return (
+    <Card className="p-6 mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+      <div className="flex items-start space-x-4">
+        <div className="text-amber-600 dark:text-amber-400">⚠️</div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-amber-800 dark:text-amber-200">Previous Session Detected</h3>
+          <p className="text-amber-700 dark:text-amber-300 mt-1">
+            It looks like your previous interview session didn't close properly. 
+            This can happen if your browser crashed or lost connection.
+          </p>
+          <Button 
+            onClick={clearStuckSession}
+            disabled={clearing}
+            className="mt-3"
+            variant="outline"
+          >
+            {clearing ? 'Clearing...' : 'Clear Previous Session & Continue'}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function InterviewsPage() {
   const [currentStep, setCurrentStep] = useState<'landing' | 'setup' | 'interview'>('landing');
   const [mounted, setMounted] = useState(false);
+  const [sessionCleared, setSessionCleared] = useState(false);
   const { data: moduleGroups, isLoading } = useJobReadinessModuleGroups();
   const { invalidateInterviewCache, forceRefreshInterviewStatus } = useInvalidateInterviewCache();
 
@@ -140,6 +230,14 @@ export default function InterviewsPage() {
             </Link>
           </Button>
         </div>
+        
+        {/* 🆕 Stuck Session Check */}
+        {isUnlocked && moduleGroups?.student?.id && (
+          <StuckSessionCheck 
+            userId={moduleGroups.student.id} 
+            onSessionCleared={() => setSessionCleared(true)} 
+          />
+        )}
 
         {/* Status Card */}
         <PerformantAnimatedCard 
