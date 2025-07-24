@@ -5,8 +5,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import { Play, Pause, Volume2, VolumeX, Maximize, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, CheckCircle2, AlertCircle, Loader2, Clock, Video } from 'lucide-react'
 import { MilestoneProgressIndicator } from './MilestoneProgressIndicator'
+import { useVideoThumbnail } from '@/hooks/use-video-thumbnail'
 interface ExpertSession {
   id: string
   title: string
@@ -57,7 +58,7 @@ interface MilestoneTrackingState {
   isSessionActive: boolean
 }
 
-const MILESTONES = [10, 25, 50, 75, 90, 95, 100] // percentages
+const MILESTONES = [10, 25, 50, 75, 100] // percentages
 const COMPLETION_THRESHOLD = 100 // 100% for completion
 const MIN_WATCH_TIME = 3 // seconds before milestone counts
 const PAUSE_SAVE_THRESHOLD = 30 // save after 30s pause
@@ -69,6 +70,7 @@ export function EnhancedExpertSessionPlayer({
 }: EnhancedExpertSessionPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Video state
   const [isPlaying, setIsPlaying] = useState(false)
@@ -76,12 +78,20 @@ export function EnhancedExpertSessionPlayer({
   const [duration, setDuration] = useState(session.video_duration || 0)
   const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
-  const [isFullscreen, ] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showControls, setShowControls] = useState(true)
   
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  
+  // Generate video thumbnail
+  const { thumbnailUrl, isLoading: thumbnailLoading, error: thumbnailError } = useVideoThumbnail({
+    videoUrl: session.video_url,
+    timeStamp: 1, // Extract thumbnail from 1 second into the video
+    quality: 0.8
+  })
   
   // Resume functionality
   const [showResumeDialog, setShowResumeDialog] = useState(false)
@@ -513,6 +523,59 @@ export function EnhancedExpertSessionPlayer({
     }
   }, [milestoneState.isSessionActive, currentTime, duration, handleProgressUpdate])
 
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('msfullscreenchange', handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
+  // Auto-hide controls functionality
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleControlsTimeout = () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current)
+      }
+      setShowControls(true)
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false)
+      }, 2000)
+    }
+
+    const handleMouseMove = () => handleControlsTimeout()
+    const handleTouchStart = () => handleControlsTimeout()
+    const handleClick = () => handleControlsTimeout()
+
+    container.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('touchstart', handleTouchStart)
+    container.addEventListener('click', handleClick)
+
+    // Initial timeout
+    handleControlsTimeout()
+
+    return () => {
+      container.removeEventListener('mousemove', handleMouseMove)
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('click', handleClick)
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current)
+      }
+    }
+  }, [])
+
   // Enhanced control handlers
   const togglePlay = useCallback(async () => {
     if (!videoRef.current) {
@@ -569,19 +632,45 @@ export function EnhancedExpertSessionPlayer({
     }
   }, [isMuted, volume])
 
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return
     
-    if (!isFullscreen) {
-      if (containerRef.current.requestFullscreen) {
-        containerRef.current.requestFullscreen()
+    try {
+      if (!isFullscreen) {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen()
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await (containerRef.current as any).webkitRequestFullscreen()
+        } else if ((containerRef.current as any).msRequestFullscreen) {
+          await (containerRef.current as any).msRequestFullscreen()
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen()
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen()
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen()
+        }
       }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen()
-      }
+    } catch (error) {
+      console.error('Fullscreen error:', error)
+      toast.error('Fullscreen Error', {
+        description: 'Unable to toggle fullscreen mode.',
+      })
     }
   }, [isFullscreen])
+
+
+  // Volume slider handler
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value)
+    setVolume(newVolume)
+    setIsMuted(newVolume === 0)
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume
+    }
+  }, [])
 
   // Manual completion button (only when video fully watched)
   const handleManualCompletion = useCallback(() => {
@@ -624,20 +713,20 @@ export function EnhancedExpertSessionPlayer({
       {/* Resume Dialog */}
       {showResumeDialog && (
         <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 mx-1 sm:mx-0">
-          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-1 flex-shrink-0" />
           <AlertDescription className="space-y-3">
             <div>
               <p className="font-medium text-blue-900 dark:text-blue-100 text-sm sm:text-base">Resume from where you left off?</p>
-              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 mt-1">
-                You can resume from the {session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}% milestone 
-                ({formatTime(session.student_progress.resume_position_seconds || Math.floor(((session.student_progress.last_milestone_reached || 0) / 100) * duration))})
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 mt-1 break-words">
+                <span className="hidden sm:inline">You can resume from the {session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}% milestone ({formatTime(session.student_progress.resume_position_seconds || Math.floor(((session.student_progress.last_milestone_reached || 0) / 100) * duration))})</span>
+                <span className="sm:hidden">Resume from {session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}% milestone</span>
               </p>
             </div>
             <div className="flex flex-col xs:flex-row gap-2">
               <Button 
                 size="sm" 
                 onClick={resumeFromMilestone}
-                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-xs sm:text-sm flex-1 xs:flex-initial"
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-xs sm:text-sm flex-1 xs:flex-initial min-h-[36px]"
               >
                 <span className="hidden xs:inline">Resume from {session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}%</span>
                 <span className="xs:hidden">Resume ({session.student_progress.last_milestone_reached || session.student_progress.resume_from_milestone}%)</span>
@@ -646,7 +735,7 @@ export function EnhancedExpertSessionPlayer({
                 size="sm" 
                 variant="outline" 
                 onClick={startFromBeginning}
-                className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20 text-xs sm:text-sm flex-1 xs:flex-initial"
+                className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20 text-xs sm:text-sm flex-1 xs:flex-initial min-h-[36px]"
               >
                 <span className="hidden xs:inline">Start from beginning</span>
                 <span className="xs:hidden">Start over</span>
@@ -658,9 +747,9 @@ export function EnhancedExpertSessionPlayer({
 
       {/* Error Alert */}
       {(hasError || errorMessage) && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
+        <Alert variant="destructive" className="mx-1 sm:mx-0">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <AlertDescription className="text-sm break-words">
             {errorMessage || 'Failed to load video. Please refresh and try again.'}
           </AlertDescription>
         </Alert>
@@ -679,6 +768,31 @@ export function EnhancedExpertSessionPlayer({
             </div>
           )}
 
+          {/* Thumbnail loading indicator */}
+          {thumbnailLoading && !thumbnailUrl && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="text-sm text-gray-600 dark:text-gray-400">Generating thumbnail...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Fallback thumbnail when generation fails */}
+          {thumbnailError && !thumbnailUrl && !isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-4 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-lg">
+                  <Video className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="text-center">
+                  <h3 className="font-medium text-gray-900 dark:text-white">{session.title}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Click play to start video</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Video Element */}
           <video
             ref={videoRef}
@@ -686,30 +800,51 @@ export function EnhancedExpertSessionPlayer({
             className="w-full aspect-video bg-black"
             preload="metadata"
             playsInline
+            poster={thumbnailUrl || undefined}
             onContextMenu={(e) => e.preventDefault()} // Disable right-click menu
             // Disable native controls to avoid interference with custom controls
             controls={false}
           />
 
           {/* Click-to-play overlay */}
-          <div 
-            className="absolute inset-0 flex items-center justify-center cursor-pointer"
-            onClick={togglePlay}
-            style={{ bottom: '100px' }} // Leave space for controls
-          >
-            {!isPlaying && !isLoading && (
+          {!isPlaying && !isLoading && (
+            <div 
+              className="absolute inset-0 flex items-center justify-center cursor-pointer z-30"
+              onClick={(e) => {
+                e.stopPropagation()
+                togglePlay()
+              }}
+            >
               <div className="bg-black/50 rounded-full p-6 hover:bg-black/70 transition-all">
                 <Play className="h-12 w-12 text-white" />
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Controls Overlay - Always visible for reliable access */}
+          {/* Enhanced Controls Overlay with Auto-Hide */}
           {!isLoading && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent py-3 px-2 sm:p-4 z-20">
-              <div className="space-y-3 sm:space-y-4">
+            <div className={`absolute inset-0 flex flex-col justify-between p-2 sm:p-4 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300 z-20 ${
+              showControls ? 'opacity-100' : 'opacity-0'
+            }`}>
+              {/* Top Section - Session Title */}
+              <div className="flex justify-between items-center">
+                <div className="flex-1 min-w-0 mr-2">
+                  <h3 className="text-white font-medium truncate text-sm sm:text-base">{session.title}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {duration > 0 && (
+                    <span className="text-white text-xs sm:text-sm whitespace-nowrap bg-black/50 px-2 py-1 rounded">
+                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
+                      {formatTime(duration)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Section - Controls */}
+              <div className="space-y-2 sm:space-y-3">
                 {/* Milestone Progress Indicator */}
-                <div className="px-2 sm:px-0 -mx-1 sm:mx-0">
+                <div className="px-1 sm:px-0 -mx-1 sm:mx-0">
                   <MilestoneProgressIndicator
                     currentPercentage={currentPercentage}
                     milestonesUnlocked={milestoneState.milestonesUnlocked}
@@ -718,14 +853,14 @@ export function EnhancedExpertSessionPlayer({
                 </div>
 
                 {/* Video Controls */}
-                <div className="flex items-center justify-between text-white gap-2 sm:gap-4">
+                <div className="flex items-center justify-between text-white gap-1 sm:gap-3">
                   {/* Left: Play/Pause Button */}
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={togglePlay}
-                      className="text-white hover:bg-white/20 p-2 sm:p-3 rounded-full min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px]"
+                      className="text-white hover:bg-white/20 p-2 sm:p-3 rounded-full min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px] touch-manipulation"
                       disabled={isUpdatingProgress}
                     >
                       {isPlaying ? (
@@ -737,44 +872,63 @@ export function EnhancedExpertSessionPlayer({
                     
                     {/* Progress Saving Indicator */}
                     {isUpdatingProgress && (
-                      <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-300">
+                      <div className="flex items-center gap-1 text-xs text-gray-300">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        <span className="hidden sm:inline">Saving...</span>
+                        <span className="hidden xs:inline text-xs">Saving...</span>
                       </div>
                     )}
                   </div>
 
                   {/* Center: Time Display */}
-                  <div className="flex-1 mx-2 sm:mx-4 text-center">
-                    <div className="text-xs sm:text-sm text-gray-300 font-mono">
+                  <div className="flex-1 mx-1 sm:mx-3 text-center">
+                    <div className="text-[10px] xs:text-xs sm:text-sm text-gray-300 font-mono">
                       {formatTime(currentTime)} / {formatTime(duration)}
                     </div>
                   </div>
 
                   {/* Right: Volume and Fullscreen */}
-                  <div className="flex items-center gap-1 sm:gap-3">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     {/* Volume Controls */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleMute}
-                      className="text-white hover:bg-white/20 p-2 min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px]"
-                    >
-                      {isMuted || volume === 0 ? (
-                        <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />
-                      ) : (
-                        <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleMute}
+                        className="text-white hover:bg-white/20 p-2 min-w-[44px] min-h-[44px] touch-manipulation"
+                      >
+                        {isMuted || volume === 0 ? (
+                          <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />
+                        ) : (
+                          <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                        )}
+                      </Button>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        className="w-12 sm:w-20 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, #ffffff ${(isMuted ? 0 : volume) * 100}%, #666666 ${(isMuted ? 0 : volume) * 100}%)`
+                        }}
+                      />
+                    </div>
 
                     {/* Fullscreen Toggle */}
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={toggleFullscreen}
-                      className="text-white hover:bg-white/20 p-2 min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px]"
+                      className="text-white hover:bg-white/20 p-2 min-w-[44px] min-h-[44px] touch-manipulation"
+                      title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                     >
-                      <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />
+                      {isFullscreen ? (
+                        <Minimize className="h-4 w-4 sm:h-5 sm:w-5" />
+                      ) : (
+                        <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -788,10 +942,10 @@ export function EnhancedExpertSessionPlayer({
               <Button
                 onClick={handleManualCompletion}
                 disabled={isUpdatingProgress}
-                className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm"
+                className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm touch-manipulation min-h-[36px] sm:min-h-[40px] px-2 sm:px-3"
                 size="sm"
               >
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                 <span className="hidden xs:inline">Mark Complete</span>
                 <span className="xs:hidden">✓</span>
               </Button>
@@ -800,19 +954,6 @@ export function EnhancedExpertSessionPlayer({
         </CardContent>
       </Card>
 
-      {/* Session Info */}
-      <div className="text-xs sm:text-sm text-muted-foreground space-y-1 px-1 sm:px-0">
-        <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1 xs:gap-2">
-          <span className="font-medium">Progress: {Math.round(currentPercentage)}%</span>
-          <span className="font-mono text-[11px] xs:text-xs sm:text-sm">{formatTime(currentTime)} / {formatTime(duration)}</span>
-        </div>
-        {milestoneState.currentMilestone > 0 && (
-          <div className="flex items-center gap-2 text-[11px] xs:text-xs sm:text-sm">
-            <span>Latest milestone: {milestoneState.currentMilestone}%</span>
-            {isUpdatingProgress && <Loader2 className="h-3 w-3 animate-spin" />}
-          </div>
-        )}
-      </div>
     </div>
   )
 } 

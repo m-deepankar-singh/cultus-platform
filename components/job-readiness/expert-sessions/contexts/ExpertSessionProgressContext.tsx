@@ -85,7 +85,7 @@ type ProgressAction =
   | { type: 'ADD_SESSION_DATA'; payload: object }
 
 // Constants
-const MILESTONES = [10, 25, 50, 75, 90, 95, 100]
+const MILESTONES = [10, 25, 50, 75, 100]
 const COMPLETION_THRESHOLD = 100
 
 // Reducer

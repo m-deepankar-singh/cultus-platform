@@ -99,10 +99,10 @@ export function ExpertSessionList({ sessions }: ExpertSessionListProps) {
       {/* Available Sessions Section */}
       {availableSessions.length > 0 && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Available Sessions</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-xl sm:text-2xl font-semibold">Available Sessions</h2>
             <div className="flex items-center gap-2">
-              <Badge variant="outline">
+              <Badge variant="outline" className="w-fit">
                 {availableSessions.length} session{availableSessions.length !== 1 ? 's' : ''} available
               </Badge>
             </div>
@@ -119,10 +119,10 @@ export function ExpertSessionList({ sessions }: ExpertSessionListProps) {
       {/* Completed Sessions Section */}
       {completedSessions.length > 0 && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-medium text-muted-foreground">Completed Sessions</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-lg sm:text-xl font-medium text-muted-foreground">Completed Sessions</h2>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 w-fit">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 {completedSessions.length} completed
               </Badge>
@@ -141,14 +141,14 @@ export function ExpertSessionList({ sessions }: ExpertSessionListProps) {
       {availableSessions.length === 0 && completedSessions.length === 0 && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Expert Sessions</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold">Expert Sessions</h2>
           </div>
           <PerformantAnimatedCard variant="glass" className="dashboard-card">
-            <div className="py-12 text-center space-y-4">
-              <Play className="h-12 w-12 text-muted-foreground mx-auto" />
-              <div>
-                <h3 className="text-lg font-semibold">No Expert Sessions Available</h3>
-                <p className="text-muted-foreground">
+            <div className="py-8 sm:py-12 px-4 text-center space-y-4">
+              <Play className="h-10 sm:h-12 w-10 sm:w-12 text-muted-foreground mx-auto" />
+              <div className="space-y-2">
+                <h3 className="text-base sm:text-lg font-semibold">No Expert Sessions Available</h3>
+                <p className="text-sm sm:text-base text-muted-foreground">
                   Expert sessions will be available soon. Check back later!
                 </p>
               </div>
@@ -179,12 +179,16 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
     return `${minutes}m`
   }
 
-  const getButtonText = () => {
+  const getButtonText = (isMobile = false) => {
     if (isCompleted) return "Session Completed"
     if (student_progress.can_resume) {
-      return `Resume from ${student_progress.resume_from_milestone}%`
+      return isMobile 
+        ? `Resume ${student_progress.resume_from_milestone}%`
+        : `Resume from ${student_progress.resume_from_milestone}%`
     }
-    return completionPercentage > 0 ? "Continue Watching" : "Start Watching"
+    return completionPercentage > 0 
+      ? (isMobile ? "Continue" : "Continue Watching")
+      : (isMobile ? "Start" : "Start Watching")
   }
 
   const getButtonIcon = () => {
@@ -222,11 +226,11 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
         isCompleted && "opacity-75"
       )}
     >
-      <div className="space-y-4 p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2 flex-1">
+      <div className="space-y-4 p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="space-y-2 flex-1 min-w-0">
             <h3 className={cn(
-              "text-xl font-semibold",
+              "text-lg sm:text-xl font-semibold break-words",
               isCompleted ? "text-muted-foreground" : "text-foreground"
             )}>
               {session.title}
@@ -236,11 +240,11 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
             </p>
           </div>
           
-          <div className="flex items-center gap-2 ml-4">
+          <div className="flex items-center justify-center sm:justify-end gap-2 flex-shrink-0">
             {completionPercentage > 0 && (
               <OptimizedProgressRing
                 value={completionPercentage}
-                size={40}
+                size={36}
                 strokeWidth={4}
                 color={getProgressColor(completionPercentage)}
                 showValue={false}
@@ -266,12 +270,14 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
                 getStatusColor('in-progress')
               )}>
                 <Clock className="h-3 w-3 mr-1" />
-                {completionPercentage}% watched
+                <span className="hidden sm:inline">{Math.floor(completionPercentage)}% watched</span>
+                <span className="sm:hidden">{Math.floor(completionPercentage)}%</span>
               </Badge>
               {student_progress.can_resume && (
                 <Badge variant="outline" className="border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-500/10 dark:text-sky-400">
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  Resume {student_progress.resume_from_milestone}%
+                  <span className="hidden sm:inline">Resume {student_progress.resume_from_milestone}%</span>
+                  <span className="sm:hidden">Resume</span>
                 </Badge>
               )}
             </>
@@ -281,7 +287,8 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
               getStatusColor('not-started')
             )}>
               <Play className="h-3 w-3 mr-1" />
-              Not started
+              <span className="hidden sm:inline">Not started</span>
+              <span className="sm:hidden">New</span>
             </Badge>
           )}
         </div>
@@ -289,18 +296,22 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
         {/* Milestone Progress Display */}
         {student_progress.milestones_unlocked && student_progress.milestones_unlocked.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-sky-600" />
-              <span className="text-sm font-medium">Progress Milestones</span>
-              <Badge variant="outline" className="text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-sky-600" />
+                <span className="text-sm font-medium">Progress Milestones</span>
+              </div>
+              <Badge variant="outline" className="text-xs w-fit">
                 {student_progress.milestones_unlocked.length}/7 reached
               </Badge>
             </div>
-            <MilestoneProgressIndicator
-              currentPercentage={completionPercentage}
-              milestonesUnlocked={student_progress.milestones_unlocked}
-              isDisabled={true}
-            />
+            <div className="overflow-x-auto">
+              <MilestoneProgressIndicator
+                currentPercentage={completionPercentage}
+                milestonesUnlocked={student_progress.milestones_unlocked}
+                isDisabled={true}
+              />
+            </div>
           </div>
         )}
 
@@ -309,7 +320,7 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Progress</span>
-              <span>{completionPercentage}%</span>
+              <span>{Math.floor(completionPercentage)}%</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div
@@ -321,16 +332,17 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
         )}
 
         {/* Session Details */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span>{formatDuration(session.video_duration)}</span>
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{formatDuration(session.video_duration)}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>
-                Added {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
+              <Calendar className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">
+                <span className="hidden sm:inline">Added </span>
+                {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
               </span>
             </div>
           </div>
@@ -338,26 +350,31 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
 
         {/* Enhanced Watch Progress Info */}
         {student_progress.watch_time_seconds > 0 && (
-          <div className="text-sm text-muted-foreground space-y-1">
-            <div>
-              Watched: {formatDuration(student_progress.watch_time_seconds)} of {formatDuration(session.video_duration)}
+          <div className="text-sm text-muted-foreground space-y-2">
+            <div className="break-words">
+              <span className="hidden sm:inline">Watched: </span>
+              <span className="sm:hidden">Progress: </span>
+              {formatDuration(student_progress.watch_time_seconds)} of {formatDuration(session.video_duration)}
             </div>
             
             {/* Resume Information */}
             {student_progress.can_resume && !isCompleted && (
-              <div className="text-sky-600 bg-sky-50 dark:bg-sky-500/10 p-2 rounded text-xs">
-                <div className="flex items-center gap-1">
-                  <RotateCcw className="h-3 w-3" />
-                  <span>
-                    You can resume from {student_progress.resume_from_milestone}% milestone 
-                    ({formatDuration(student_progress.resume_position_seconds || 0)})
-                  </span>
+              <div className="text-sky-600 bg-sky-50 dark:bg-sky-500/10 p-3 rounded text-xs">
+                <div className="flex items-start gap-2">
+                  <RotateCcw className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                  <div className="break-words">
+                    <div className="font-medium mb-1">Resume Available</div>
+                    <div>
+                      Continue from {student_progress.resume_from_milestone}% milestone
+                      <span className="hidden sm:inline"> ({formatDuration(student_progress.resume_position_seconds || 0)})</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
             
             {isCompleted && student_progress.completed_at && (
-              <div className="text-emerald-600">
+              <div className="text-emerald-600 break-words">
                 Completed {(() => {
                   try {
                     const completedDate = new Date(student_progress.completed_at);
@@ -380,29 +397,32 @@ function ExpertSessionCard({ session, index }: ExpertSessionCardProps) {
           {isCompleted ? (
             <div className="space-y-2">
               <AnimatedButton 
-                className="w-full" 
+                className="w-full text-sm" 
                 variant="outline" 
                 disabled
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Session Completed
+                <span className="hidden sm:inline">Session Completed</span>
+                <span className="sm:hidden">Completed</span>
               </AnimatedButton>
               <p className="text-xs text-center text-muted-foreground">
-                Completed sessions cannot be re-watched
+                <span className="hidden sm:inline">Completed sessions cannot be re-watched</span>
+                <span className="sm:hidden">Cannot re-watch completed sessions</span>
               </p>
             </div>
           ) : (
             <Link href={`/app/job-readiness/expert-sessions/${session.id}`}>
               <AnimatedButton 
                 className={cn(
-                  "w-full",
+                  "w-full text-sm",
                   student_progress.can_resume
                     ? "bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700"
                     : "bg-gradient-to-r from-primary to-accent"
                 )}
               >
                 <ButtonIcon className="h-4 w-4 mr-2" />
-                {getButtonText()}
+                <span className="hidden sm:inline">{getButtonText(false)}</span>
+                <span className="sm:hidden">{getButtonText(true)}</span>
               </AnimatedButton>
             </Link>
           )}
