@@ -45,20 +45,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [prefetchAuth]);
 
-  // Sign out function with cache cleanup
+  // Sign out function with immediate cache cleanup
   const signOut = async () => {
     try {
-      // Clear auth cache before signing out
+      // CRITICAL FIX: Clear auth cache IMMEDIATELY
       clearAuthCache();
+      queryClient.clear(); // Clear all queries immediately
+      
+      // Force immediate re-render by invalidating queries
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
       
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Additional cleanup if needed
-      queryClient.clear(); // Clear all queries on sign out
     } catch (error) {
       console.error('Error signing out:', error);
+      // Even on error, ensure UI state is cleared
+      clearAuthCache();
+      queryClient.clear();
       throw error;
     }
   };

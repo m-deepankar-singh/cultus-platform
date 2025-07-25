@@ -3,7 +3,7 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { AdminLoginSchema, type AdminLoginFormValues } from "@/lib/schemas/auth";
 import { SessionService } from "@/lib/auth/session-service";
-import { Loader2, AlertCircle, Shield } from "lucide-react";
+import { Loader2, AlertCircle, Shield, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function AdminLoginForm() {
@@ -27,6 +27,8 @@ export function AdminLoginForm() {
 	const [submissionError, setSubmissionError] = React.useState<string | null>(null);
 	const router = useRouter();
 	const { toast } = useToast();
+	const searchParams = useSearchParams();
+	const sessionExpired = searchParams.get('sessionExpired') === 'true';
 
 	// Load remember me preference from localStorage
 	const [rememberMeDefault] = React.useState(() => SessionService.getRememberMe());
@@ -108,6 +110,14 @@ export function AdminLoginForm() {
 
 			<Form {...form}>
 				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
+					{sessionExpired && (
+						<Alert variant="default" className="bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-amber-500/50 text-amber-700 dark:border-amber-500/30 dark:text-amber-300 [&>svg]:text-amber-500 dark:[&>svg]:text-amber-400">
+							<Clock className="h-4 w-4" />
+							<AlertTitle>Session Expired</AlertTitle>
+							<AlertDescription>Your session has expired. Please log in again.</AlertDescription>
+						</Alert>
+					)}
+					
 					{submissionError && (
 						<Alert variant="destructive" className="bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
 							<AlertCircle className="h-4 w-4" />

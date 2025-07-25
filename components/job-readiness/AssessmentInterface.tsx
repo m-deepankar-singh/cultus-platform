@@ -478,22 +478,29 @@ export function AssessmentInterface({ moduleId }: AssessmentInterfaceProps) {
           <div className="flex flex-col lg:flex-row items-start lg:items-center lg:justify-between gap-4 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
               <h1 className="text-xl md:text-2xl font-bold gradient-text">{assessment.name}</h1>
-              {timeRemaining !== null && (
-                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur border border-blue-200/30 dark:border-blue-600/30">
-                  <OptimizedProgressRing
-                    value={timeRemaining < 300 ? (timeRemaining / 300) * 100 : 100}
-                    size={20}
-                    color={timeRemaining < 300 ? "danger" : "primary"}
-                    showValue={false}
-                  />
-                  <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-                  <span className={`font-mono text-xs sm:text-sm font-bold ${
-                    timeRemaining < 300 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
-                  }`}>
-                    {formatTime(timeRemaining)}
-                  </span>
-                </div>
-              )}
+              {timeRemaining !== null && (() => {
+                // Calculate danger threshold: 20% of total time or minimum 2 minutes (120 seconds)
+                const totalTimeSeconds = assessmentData?.assessment.time_limit_minutes ? assessmentData.assessment.time_limit_minutes * 60 : 0
+                const dangerThreshold = Math.max(120, totalTimeSeconds * 0.2)
+                const isDangerTime = timeRemaining < dangerThreshold
+                
+                return (
+                  <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur border border-blue-200/30 dark:border-blue-600/30">
+                    <OptimizedProgressRing
+                      value={isDangerTime ? (timeRemaining / dangerThreshold) * 100 : 100}
+                      size={20}
+                      color={isDangerTime ? "danger" : "primary"}
+                      showValue={false}
+                    />
+                    <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                    <span className={`font-mono text-xs sm:text-sm font-bold ${
+                      isDangerTime ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {formatTime(timeRemaining)}
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
             <div className="text-left lg:text-right w-full lg:w-auto">
               <div className="text-sm text-muted-foreground">

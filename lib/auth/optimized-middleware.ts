@@ -3,6 +3,16 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { authCacheManager } from './auth-cache-manager';
 import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory } from '@/lib/security';
 import { SESSION_TIMEOUT_CONFIG } from './session-timeout-constants';
+import { jwtVerificationService, type JWTVerificationResult } from './jwt-verification-service';
+import { performanceTracker } from './performance-metrics';
+import { sessionTimeoutService } from './session-timeout-service';
+
+// Feature flags for gradual optimization rollout
+const OPTIMIZATION_FLAGS = {
+  ENABLE_LOCAL_JWT_VERIFICATION: process.env.ENABLE_LOCAL_JWT_VERIFICATION === 'true',
+  ENABLE_REQUEST_LEVEL_CACHE: process.env.ENABLE_REQUEST_LEVEL_CACHE !== 'false', // Default enabled
+  ENABLE_PERFORMANCE_LOGGING: process.env.ENABLE_PERFORMANCE_LOGGING !== 'false', // Default enabled
+} as const;
 
 // Route configuration for optimized pattern matching
 const ROUTE_CONFIG = {
@@ -91,22 +101,34 @@ export class OptimizedMiddleware {
       return this.handleLogout(request, supabase, supabaseResponse);
     }
 
-    // IMPORTANT: DO NOT REMOVE auth.getUser() - it refreshes the session
-    // Do not run code between createServerClient and supabase.auth.getUser()
-    // A simple mistake could make it very hard to debug issues with users being randomly logged out
-    const { data: { user } } = await supabase.auth.getUser();
+    // Fast path for public routes (before authentication)
+    if (this.isPublicRoute(pathname)) {
+      return supabaseResponse;
+    }
+
+    // OPTIMIZED AUTHENTICATION FLOW
+    let user: any = null;
+    let jwtVerificationResult: JWTVerificationResult | null = null;
+
+    if (OPTIMIZATION_FLAGS.ENABLE_LOCAL_JWT_VERIFICATION) {
+      // Use optimized JWT verification (eliminates Auth server round-trip)
+      jwtVerificationResult = await this.getOptimizedAuth(request);
+      user = jwtVerificationResult?.user || null;
+    } else {
+      // Fallback to traditional method (preserves existing behavior)
+      // IMPORTANT: DO NOT REMOVE auth.getUser() - it refreshes the session
+      // Do not run code between createServerClient and supabase.auth.getUser()
+      // A simple mistake could make it very hard to debug issues with users being randomly logged out
+      const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+      user = fetchedUser;
+    }
     
-    // Handle session timeout
+    // Handle session timeout (only if user is authenticated)
     if (user) {
-      const timeoutResponse = await this.checkSessionTimeout(request, user, supabase, supabaseResponse);
+      const timeoutResponse = await this.checkSessionTimeoutOptimized(request, user, supabase, supabaseResponse);
       if (timeoutResponse) {
         return timeoutResponse;
       }
-    }
-
-    // Fast path for public routes
-    if (this.isPublicRoute(pathname)) {
-      return supabaseResponse;
     }
 
     // Route classification
@@ -118,7 +140,7 @@ export class OptimizedMiddleware {
     }
 
     // Get cached or fresh auth data using the middleware's supabase instance
-    const authData = await this.getAuthData(user.id, supabase);
+    const authData = await this.getAuthData(user.id, supabase, jwtVerificationResult);
     if (!authData) {
       return this.handleAuthFailure(request, pathname, routeType, supabaseResponse);
     }
@@ -129,13 +151,83 @@ export class OptimizedMiddleware {
       return this.handleAccessDenied(request, pathname, authData, accessResult.reason || 'Access denied', supabaseResponse);
     }
 
-    // Log performance metrics
+    // Record performance metrics
     const processingTime = Date.now() - startTime;
-    if (processingTime > 100) {
-      console.warn(`Slow middleware processing: ${processingTime}ms for ${pathname}`);
+    const isPublicRoute = this.isPublicRoute(pathname);
+    
+    // Track middleware performance
+    performanceTracker.recordMiddlewareLatency(processingTime, isPublicRoute);
+    
+    // Track authentication failures
+    if (!user && !isPublicRoute) {
+      performanceTracker.recordAuthenticationFailure();
+    }
+    
+    // Log performance metrics if enabled
+    if (OPTIMIZATION_FLAGS.ENABLE_PERFORMANCE_LOGGING && processingTime > 50) {
+      console.warn(`Middleware processing: ${processingTime}ms for ${pathname} | Source: ${jwtVerificationResult?.source || 'traditional'}`);
     }
 
     return supabaseResponse;
+  }
+
+  /**
+   * Optimized authentication using JWT verification service
+   */
+  private async getOptimizedAuth(request: NextRequest): Promise<JWTVerificationResult | null> {
+    try {
+      // Extract JWT token from cookies
+      const accessToken = this.extractAccessToken(request);
+      if (!accessToken) {
+        return null;
+      }
+
+      // Use JWT verification service for local validation
+      const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const result = await jwtVerificationService.verifyJWT(accessToken, projectUrl);
+
+      return result.isValid ? result : null;
+    } catch (error) {
+      console.error('Optimized auth error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract access token from request cookies
+   */
+  private extractAccessToken(request: NextRequest): string | null {
+    // Supabase typically stores tokens in these cookie names
+    const tokenCookieNames = [
+      'sb-access-token',
+      'sb-refresh-token', 
+      'supabase-auth-token',
+      'supabase.auth.token',
+    ];
+
+    for (const cookieName of tokenCookieNames) {
+      const cookie = request.cookies.get(cookieName);
+      if (cookie?.value) {
+        // Try to parse if it's a JSON structure
+        try {
+          const parsed = JSON.parse(cookie.value);
+          if (parsed.access_token) {
+            return parsed.access_token;
+          }
+        } catch {
+          // If not JSON, treat as direct token
+          return cookie.value;
+        }
+      }
+    }
+
+    // Also check Authorization header
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      return authHeader.substring(7);
+    }
+
+    return null;
   }
 
   /**
@@ -177,7 +269,66 @@ export class OptimizedMiddleware {
   }
 
   /**
-   * Check session timeout with optimized logging
+   * Optimized session timeout check with caching
+   */
+  private async checkSessionTimeoutOptimized(
+    request: NextRequest,
+    user: any,
+    supabase: any,
+    supabaseResponse: NextResponse
+  ): Promise<NextResponse | null> {
+    // Use optimized session timeout service
+    const timeoutStatus = sessionTimeoutService.checkSessionTimeout(request, user.id);
+    
+    if (timeoutStatus.isExpired) {
+      const { pathname } = request.nextUrl;
+      const isAppRoute = pathname.startsWith('/app') && !pathname.startsWith('/app/login');
+      const isApiAppRoute = pathname.startsWith('/api/app');
+      
+      // Log timeout event (only if not from cache to reduce log spam)
+      if (!timeoutStatus.cached) {
+        securityLogger.logEvent({
+          eventType: SecurityEventType.SESSION_EXPIRED,
+          severity: SecuritySeverity.WARNING,
+          category: SecurityCategory.AUTHENTICATION,
+          userId: user.id,
+          endpoint: pathname,
+          method: request.method,
+          details: {
+            reason: 'Session timeout - 48 hours inactivity',
+            lastActivity: timeoutStatus.lastActivity ? new Date(timeoutStatus.lastActivity).toISOString() : null,
+            timeSinceActivity: timeoutStatus.timeSinceActivity,
+            fromCache: timeoutStatus.cached,
+          }
+        }, request);
+      }
+
+      // Sign out and clear cache
+      await supabase.auth.signOut();
+      if (user?.id) {
+        await authCacheManager.invalidateUserCache(user.id);
+        sessionTimeoutService.clearUserTimeoutCache(user.id);
+      }
+      
+      // Redirect to appropriate login
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = (isAppRoute || isApiAppRoute) ? '/app/login' : '/admin/login';
+      redirectUrl.search = 'sessionExpired=true';
+      
+      const redirectResponse = NextResponse.redirect(redirectUrl);
+      
+      supabaseResponse.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+      });
+      
+      return redirectResponse;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Check session timeout with optimized logging (legacy method)
    */
   private async checkSessionTimeout(
     request: NextRequest,
@@ -275,7 +426,15 @@ export class OptimizedMiddleware {
   /**
    * Get auth data with caching (Phase 2 optimized with security fixes)
    */
-  private async getAuthData(userId: string, supabase: any): Promise<OptimizedAuthResult | null> {
+  private async getAuthData(userId: string, supabase: any, jwtResult?: JWTVerificationResult | null): Promise<OptimizedAuthResult | null> {
+    // If we have JWT verification result with claims, try to extract auth data directly
+    if (jwtResult?.payload && OPTIMIZATION_FLAGS.ENABLE_LOCAL_JWT_VERIFICATION) {
+      const directAuthData = this.extractAuthDataFromJWT(jwtResult);
+      if (directAuthData) {
+        return directAuthData;
+      }
+    }
+
     // Check if Phase 2 RPC optimization is enabled
     const useRPCOptimization = process.env.ENABLE_PHASE2_RPC === 'true';
     
@@ -286,6 +445,33 @@ export class OptimizedMiddleware {
     
     // Default to Redis-first approach with middleware's supabase instance
     return this.getAuthDataCached(userId, supabase);
+  }
+
+  /**
+   * Extract auth data directly from JWT claims (fastest path)
+   */
+  private extractAuthDataFromJWT(jwtResult: JWTVerificationResult): OptimizedAuthResult | null {
+    try {
+      const { user, payload } = jwtResult;
+      if (!user || !payload) return null;
+
+      // Extract custom claims from JWT payload
+      const userRole = payload.user_role as string || payload.role as string || 'unknown';
+      const clientId = payload.client_id as string || '';
+      const isStudent = payload.is_student as boolean || userRole === 'student';
+
+      return {
+        user,
+        userRole,
+        clientId,
+        isAuthenticated: true,
+        isStudent,
+        cacheHit: true, // JWT extraction counts as cache hit
+      };
+    } catch (error) {
+      console.error('JWT auth data extraction error:', error);
+      return null;
+    }
   }
 
   /**

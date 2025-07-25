@@ -2,6 +2,8 @@
 
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
 import { cacheManager } from './cache/cache-manager';
+import { ApiError } from './api-client';
+import { SESSION_TIMEOUT_CONFIG } from '@/lib/auth/session-timeout-constants';
 
 // Query client configuration optimized for Vercel serverless
 const QUERY_CLIENT_CONFIG = {
@@ -26,6 +28,37 @@ const queryCache = new QueryCache({
       queryKey: query.queryKey,
       queryHash: query.queryHash,
     });
+    
+    // Handle 401 errors globally for all queries
+    if (error instanceof ApiError && error.statusCode === 401) {
+      if (typeof window !== 'undefined') {
+        // Determine if this is a student query based on query key patterns
+        const queryKey = Array.isArray(query.queryKey) ? query.queryKey.join('/') : String(query.queryKey || '');
+        const isStudentQuery = queryKey.includes('student') || 
+                              queryKey.includes('app') || 
+                              queryKey.includes('job-readiness') ||
+                              queryKey.includes('progress') ||
+                              queryKey.includes('assessment') ||
+                              queryKey.includes('course') ||
+                              queryKey.includes('expert-session') ||
+                              queryKey.includes('interview') ||
+                              queryKey.includes('project');
+        
+        // Clear session data
+        localStorage.removeItem(SESSION_TIMEOUT_CONFIG.LAST_ACTIVITY_KEY);
+        
+        // Redirect based on query context
+        const redirectUrl = isStudentQuery ? '/app/login' : '/admin/login';
+        
+        // Clear the query cache to prevent stale auth state
+        queryCache.clear();
+        
+        // Add a small delay to ensure cache is cleared before redirect
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 100);
+      }
+    }
   },
   onSuccess: (data, query) => {
     // Optional: Log successful queries for monitoring

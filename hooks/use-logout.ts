@@ -6,6 +6,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { SessionService } from "@/lib/auth/session-service";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -13,6 +14,7 @@ import { SESSION_TIMEOUT_CONFIG } from "@/lib/auth/session-timeout-constants";
 
 export function useLogout() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const supabase = createClient();
 
@@ -23,6 +25,10 @@ export function useLogout() {
       if (typeof window !== 'undefined') {
         localStorage.removeItem(SESSION_TIMEOUT_CONFIG.LAST_ACTIVITY_KEY);
       }
+
+      // CRITICAL FIX: Clear auth cache BEFORE API call and redirect
+      queryClient.removeQueries({ queryKey: ['auth'] });
+      queryClient.clear(); // Clear all queries to ensure clean state
 
       // Call logout API endpoint
       const response = await fetch('/api/auth/logout', {
@@ -35,6 +41,9 @@ export function useLogout() {
       if (!response.ok) {
         throw new Error('Logout API failed');
       }
+
+      // CRITICAL FIX: Wait for cache invalidation to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Show success message
       const isSessionTimeout = reason && reason.includes('session') || reason?.includes('timeout');
@@ -52,6 +61,10 @@ export function useLogout() {
       router.push(redirectPath);
 
     } catch (error: any) {
+      // Enhanced error handling with forced cache clear
+      queryClient.removeQueries({ queryKey: ['auth'] });
+      queryClient.clear();
+      
       // Even if logout fails, clear preferences and timeout data
       SessionService.clearAllPreferences();
       if (typeof window !== 'undefined') {

@@ -50,12 +50,13 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // GSAP animation setup
+  // GSAP animation setup with proper cleanup
   useEffect(() => {
     setMounted(true);
     
-    // Animate cards on mount
-    gsap.fromTo(
+    // Create timeline for better memory management
+    const tl = gsap.timeline();
+    tl.fromTo(
       ".dashboard-card",
       { y: 30, opacity: 0 },
       { 
@@ -66,6 +67,11 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         ease: "power2.out"
       }
     );
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      tl.kill(); // Kill the timeline and all its tweens
+    };
   }, [sessionState]);
   
   // Video element ref for screen preview
@@ -128,17 +134,19 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
     }
   };
 
-  // Auto-hide controls after inactivity (mobile-friendly)
+  // Auto-hide controls after inactivity (mobile-friendly) with improved cleanup
   useEffect(() => {
     const resetControlsTimeout = () => {
       setShowControls(true);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
       }
       // Longer timeout on mobile for better UX
       const timeout = window.innerWidth < 768 ? 5000 : 3000;
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
+        controlsTimeoutRef.current = null; // Clear ref after timeout
       }, timeout);
     };
 
@@ -155,6 +163,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
       resetControlsTimeout();
     }
 
+    // Enhanced cleanup to prevent memory leaks
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('click', handleMouseClick);
@@ -162,12 +171,15 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
       document.removeEventListener('touchmove', handleTouchMove);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
       }
     };
   }, [interviewStarted]);
 
   // Get user camera for video preview (while screen recording happens in background)
   useEffect(() => {
+    let currentStream: MediaStream | null = null;
+    
     if (interviewStarted && videoRef.current) {
       navigator.mediaDevices.getUserMedia({
         video: {
@@ -177,7 +189,8 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         },
         audio: false // Audio is handled separately
       }).then(stream => {
-        // Store stream reference for cleanup
+        // Store stream reference for cleanup (both local and ref)
+        currentStream = stream;
         displayStreamRef.current = stream;
         
         if (videoRef.current) {
@@ -189,10 +202,21 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
       });
     }
     
-    // Cleanup function to stop the display stream
+    // Enhanced cleanup function to prevent memory leaks
     return () => {
+      // Clean up the local stream reference first
+      if (currentStream) {
+        console.log('🎥 Cleaning up local video display stream');
+        currentStream.getTracks().forEach(track => {
+          track.stop();
+          console.log(`🔌 Stopped ${track.kind} track:`, track.label);
+        });
+        currentStream = null;
+      }
+      
+      // Clean up the ref stream reference
       if (displayStreamRef.current) {
-        console.log('🎥 Cleaning up video display stream');
+        console.log('🎥 Cleaning up ref video display stream');
         displayStreamRef.current.getTracks().forEach(track => {
           track.stop();
           console.log(`🔌 Stopped ${track.kind} track:`, track.label);
@@ -200,7 +224,7 @@ export function LiveInterviewInterface({ onComplete }: LiveInterviewInterfacePro
         displayStreamRef.current = null;
       }
       
-      // Also clear video element source
+      // Clear video element source
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }

@@ -76,15 +76,16 @@ export async function GET(request: NextRequest) {
     // 3. Calculate range for pagination
     const { from, to } = calculatePaginationRange(page, pageSize);
 
-    // 🚀 PHASE 1 OPTIMIZATION: Single RPC call replaces multiple queries
-    // This replaces:
-    // 1. clients count query
-    // 2. clients data query with join to products
-    // 3. client_product_assignments subquery
-    // Total: 3 database calls → 1 database call (67% reduction)
+    // 🚀 PHASE 2 OPTIMIZATION: Enhanced RPC with server-side filtering
+    // This eliminates client-side filtering and moves logic to database
+    // Provides better performance and reduces data transfer
+    const statusFilterBoolean = statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : null;
+    
     const { data: clientsData, error: rpcError } = await supabase
-      .rpc('get_client_dashboard_data', {
+      .rpc('get_client_dashboard_data_enhanced', {
         p_client_id: null, // Get all clients
+        p_search_text: search || null,
+        p_status_filter: statusFilterBoolean,
         p_limit: pageSize,
         p_offset: from
       });
@@ -93,22 +94,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });
     }
 
-    // Extract total count from first record (all records have same total_count)
-    const totalCount = clientsData?.[0]?.total_count || 0;
+    // No client-side filtering needed - all filtering is done at database level
+    const filteredClients: ClientDashboardData[] = (clientsData as ClientDashboardData[]) || [];
 
-    // Apply client-side filtering if needed (until we enhance the RPC)
-    let filteredClients: ClientDashboardData[] = (clientsData as ClientDashboardData[]) || [];
-    
-    if (search) {
-      filteredClients = filteredClients.filter((client: ClientDashboardData) => 
-        client.name?.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    
-    if (statusFilter) {
-      const isActive = statusFilter === 'active';
-      filteredClients = filteredClients.filter((client: ClientDashboardData) => client.is_active === isActive);
-    }
+    // Extract total count from first record (all records have same total_count)
+    const totalCount = filteredClients?.[0]?.total_count || 0;
 
     // Transform the data to match expected structure
     const transformedClients = filteredClients.map((client: ClientDashboardData) => ({

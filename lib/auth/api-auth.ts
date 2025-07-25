@@ -7,6 +7,7 @@ import { securityLogger, SecurityEventType, SecuritySeverity, SecurityCategory }
 import { authCacheManager } from './auth-cache-manager';
 import { cachedRoleService } from './cached-role-service';
 import { validateJWTFast } from './jwt-validation-cache';
+import { jwtVerificationService } from './jwt-verification-service';
 import { cookies } from 'next/headers';
 
 export interface ApiAuthResult {
@@ -640,33 +641,51 @@ export async function authenticateApiRequestUltraFast(
       token = session.access_token;
     }
 
-    // Fast JWT validation using JWKS endpoint and caching
+    // OPTIMIZED: Use new JWT verification service with JWKS and request-level caching
     const jwtStart = Date.now();
-    const jwtResult = await validateJWTFast(token);
+    const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const jwtResult = await jwtVerificationService.verifyJWT(token, projectUrl);
     jwtValidationTime = Date.now() - jwtStart;
 
-    if (!jwtResult) {
+    if (!jwtResult.isValid || !jwtResult.user) {
       securityLogger.logAuthEvent(SecurityEventType.AUTH_FAILURE, {
-        error: 'JWT validation failed',
-        function: 'authenticateApiRequestUltraFast'
+        error: 'JWT verification failed',
+        function: 'authenticateApiRequestUltraFast',
+        verificationSource: jwtResult.source
       }, request);
       return { error: "Unauthorized", status: 401 };
     }
 
     const { user, payload } = jwtResult;
 
-    // Try Redis cache first for user auth data
-    const cacheStart = Date.now();
-    const cachedData = await authCacheManager.getCachedUserAuth(user.id);
-    cacheTime = Date.now() - cacheStart;
-    
     let claims: CustomJWTClaims;
     let cacheHit = false;
+    const cacheStart = Date.now();
 
-    if (cachedData) {
-      claims = cachedData.claims;
-      cacheHit = true;
+    // OPTIMIZED: Try to extract claims directly from JWT payload first (fastest)
+    if (payload && payload.user_role) {
+      claims = {
+        user_role: payload.user_role as 'Admin' | 'Staff' | 'Client Staff' | 'student',
+        client_id: (payload.client_id as string) || '',
+        profile_is_active: (payload.profile_is_active as boolean) ?? true,
+        is_student: (payload.is_student as boolean) ?? false,
+        student_is_active: (payload.student_is_active as boolean) ?? true,
+        job_readiness_star_level: (typeof payload.job_readiness_star_level === 'number' && payload.job_readiness_star_level >= 1 && payload.job_readiness_star_level <= 5) ? 
+          (['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'] as const)[payload.job_readiness_star_level - 1] : 
+          undefined,
+        job_readiness_tier: payload.job_readiness_tier as 'BRONZE' | 'SILVER' | 'GOLD' | undefined,
+      };
+      cacheHit = true; // JWT extraction counts as cache hit
+      cacheTime = Date.now() - cacheStart;
     } else {
+      // Fallback to Redis cache
+      const cachedData = await authCacheManager.getCachedUserAuth(user.id);
+      cacheTime = Date.now() - cacheStart;
+      
+      if (cachedData) {
+        claims = cachedData.claims;
+        cacheHit = true;
+      } else {
       // Cache miss - create Supabase client and use RPC function
       const supabaseStart = Date.now();
       const supabase = await createClient();
@@ -707,8 +726,9 @@ export async function authenticateApiRequestUltraFast(
         job_readiness_tier: profileData.job_readiness_tier as 'BRONZE' | 'SILVER' | 'GOLD' | undefined,
       };
 
-      // Cache the result for future use
-      authCacheManager.setCachedUserAuth(user.id, user, claims).catch(console.error);
+        // Cache the result for future use
+        authCacheManager.setCachedUserAuth(user.id, user, claims).catch(console.error);
+      }
     }
 
     // Role validation using ultra-fast claims
@@ -739,7 +759,8 @@ export async function authenticateApiRequestUltraFast(
         function: 'authenticateApiRequestUltraFast',
         processingTime,
         cacheHit,
-        method: cacheHit ? 'jwt-cache-redis' : 'jwt-cache-rpc',
+        method: cacheHit ? (payload?.user_role ? 'jwt-direct' : 'jwt-cache-redis') : 'jwt-cache-rpc',
+        optimizationSource: jwtResult.source,
         performanceBreakdown: {
           jwtValidationTime,
           cacheTime,

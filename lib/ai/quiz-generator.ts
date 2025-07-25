@@ -37,7 +37,7 @@ interface QuestionBankMapping {
  */
 export async function generateQuizForLesson(
   lessonId: string,
-  moduleId: string,
+  _moduleId: string, // Deprecated: now fetched via RPC, kept for API compatibility
   studentTier: 'beginner' | 'intermediate' | 'advanced',
   isDeterministicAttempt = false
 ): Promise<QuizQuestion[] | null> {
@@ -47,39 +47,24 @@ export async function generateQuizForLesson(
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Step 1: Fetch lesson and module configuration
-    const { data: lessonData, error: lessonError } = await supabase
-      .from('lessons')
-      .select('id, quiz_data')
-      .eq('id', lessonId)
-      .single();
+    // Step 1: Fetch lesson and module configuration with consolidated RPC call
+    const { data: configData, error: configError } = await supabase
+      .rpc('get_lesson_quiz_config', { p_lesson_id: lessonId });
       
-    if (lessonError || !lessonData) {
-      console.error('Error fetching lesson data:', lessonError);
+    if (configError || !configData || configData.length === 0) {
+      console.error('Error fetching lesson quiz config:', configError);
       return null;
     }
     
-    const { data: moduleData, error: moduleError } = await supabase
-      .from('modules')
-      .select('id, configuration')
-      .eq('id', moduleId)
-      .single();
-      
-    if (moduleError || !moduleData) {
-      console.error('Error fetching module data:', moduleError);
-      return null;
-    }
+    const config = configData[0];
     
     // Check if AI quizzes are enabled for this module
-    const aiQuizEnabled = moduleData.configuration?.ai_quiz_enabled || 
-                          moduleData.configuration?.enable_ai_quizzes || 
-                          false;
-    if (!aiQuizEnabled) {
+    if (!config.ai_quiz_enabled) {
       return null;
     }
     
-    const questionCount = moduleData.configuration?.ai_quiz_question_count ?? 5;
-    const quizGenerationPrompt = lessonData.quiz_data?.quiz_generation_prompt;
+    const questionCount = config.ai_quiz_question_count ?? 5;
+    const quizGenerationPrompt = config.quiz_generation_prompt;
     
     if (!quizGenerationPrompt) {
       console.error('No quiz generation prompt found for lesson', lessonId);
@@ -89,7 +74,11 @@ export async function generateQuizForLesson(
     // Step 2: Determine quiz prompt based on configuration and student tier
     const prompt = generatePromptForQuiz(quizGenerationPrompt, studentTier, questionCount);
     
-    // Step 3: Call Gemini API with structured output schema
+    // Step 3: Create consistent cache key for different temperature modes
+    const cacheKeyMode = isDeterministicAttempt ? 'deterministic' : 'display';
+    const cacheKey = `quiz_${lessonId}_${studentTier}_${cacheKeyMode}`;
+    
+    // Step 4: Call Gemini API with structured output schema
     // Set temperature = 0 for deterministic output (CRITICAL for submission matching)
     const structuredOutputSchema = {
       type: 'array',
@@ -132,10 +121,11 @@ export async function generateQuizForLesson(
     // Log the AI call (excluding full prompt/response in production)
     logAICall('quiz-generator', prompt, result, {
       lessonId,
-      moduleId,
+      moduleId: config.module_id,
       studentTier,
       isDeterministicAttempt,
-      questionCount
+      questionCount,
+      cacheKey
     });
     
     if (!result.success || !result.data) {

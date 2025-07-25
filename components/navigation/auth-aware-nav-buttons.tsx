@@ -1,6 +1,7 @@
 "use client"
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
@@ -8,9 +9,10 @@ import { Button } from '@/components/ui/button';
 export function AuthAwareNavButtons() {
   const { user, role, isLoading } = useCurrentUser();
   const { logout } = useLogout();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Show loading state
-  if (isLoading) {
+  // Show loading state during authentication check or logout
+  if (isLoading || isLoggingOut) {
     return (
       <div className="flex gap-2 sm:gap-3 md:gap-4 items-center">
         <div className="px-2 py-1.5 sm:px-3 sm:py-2 md:px-4 md:py-2 bg-white/20 backdrop-blur-md rounded-md animate-pulse border border-black/10 dark:border-white/10 w-12 sm:w-14 md:w-16 h-7 sm:h-8 md:h-9" />
@@ -40,11 +42,19 @@ export function AuthAwareNavButtons() {
     );
   }
 
-  // Authenticated state - show dashboard and logout buttons
-  const handleLogout = () => {
-    // Determine user type for proper redirect
-    const userType = ['Admin', 'Staff', 'Viewer', 'Client Staff'].includes(role || '') ? 'admin' : 'student';
-    logout(userType);
+  // Enhanced logout handler with loading state
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      // Determine user type for proper redirect
+      const userType = ['Admin', 'Staff', 'Viewer', 'Client Staff'].includes(role || '') ? 'admin' : 'student';
+      await logout(userType);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Error handling is already done in useLogout hook
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   // Determine dashboard URL based on role
@@ -65,10 +75,20 @@ export function AuthAwareNavButtons() {
       </Link>
       <button 
         onClick={handleLogout}
-        className={buttonClass}
+        disabled={isLoggingOut}
+        className={`${buttonClass} ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <span className="hidden sm:inline">Logout</span>
-        <span className="sm:hidden">Exit</span>
+        {isLoggingOut ? (
+          <>
+            <span className="hidden sm:inline animate-pulse">Logging out...</span>
+            <span className="sm:hidden animate-pulse">...</span>
+          </>
+        ) : (
+          <>
+            <span className="hidden sm:inline">Logout</span>
+            <span className="sm:hidden">Exit</span>
+          </>
+        )}
       </button>
     </div>
   );

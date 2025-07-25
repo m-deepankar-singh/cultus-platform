@@ -32,25 +32,8 @@ export function AdvancedPageTransition({ children }: AdvancedPageTransitionProps
     const content = contentRef.current;
     const overlay = overlayRef.current;
     
-    // Create particles for dark mode
-    const particles: HTMLDivElement[] = [];
-    
     if (theme === "dark") {
-      // Dark mode transition with particles
-      
-      // Create particle elements
-      for (let i = 0; i < 20; i++) {
-        const particle = document.createElement("div");
-        particle.className = "absolute rounded-full bg-primary/20 pointer-events-none";
-        const size = Math.random() * 10 + 5;
-        particle.style.width = `${size}px`;
-        particle.style.height = `${size}px`;
-        particle.style.top = `${Math.random() * 100}%`;
-        particle.style.left = `${Math.random() * 100}%`;
-        particle.style.opacity = "0";
-        overlay.appendChild(particle);
-        particles.push(particle);
-      }
+      // Dark mode transition - optimized without particles
       
       // Set initial state
       gsap.set(content, { opacity: 0, scale: 0.98 });
@@ -63,42 +46,30 @@ export function AdvancedPageTransition({ children }: AdvancedPageTransitionProps
       const tl = gsap.timeline({
         onComplete: () => {
           setTransitioning(false);
-          particles.forEach(p => p.remove());
         }
       });
       
       // Fade in overlay
       tl.to(overlay, {
         opacity: 1,
-        duration: 0.4,
+        duration: 0.2,
         ease: "power2.inOut"
-      });
-      
-      // Animate particles
-      particles.forEach(particle => {
-        tl.to(particle, {
-          opacity: 1,
-          x: (Math.random() - 0.5) * 100,
-          y: (Math.random() - 0.5) * 100,
-          duration: 0.8,
-          ease: "power2.out"
-        }, "-=0.7");
       });
       
       // Fade out overlay
       tl.to(overlay, {
         opacity: 0,
-        duration: 0.5,
+        duration: 0.3,
         ease: "power2.inOut"
-      }, "-=0.3");
+      }, "-=0.1");
       
       // Fade in content
       tl.to(content, {
         opacity: 1,
         scale: 1,
-        duration: 0.5,
+        duration: 0.3,
         ease: "power2.out"
-      }, "-=0.4");
+      }, "-=0.2");
       
     } else {
       // Light mode transition with simple fade

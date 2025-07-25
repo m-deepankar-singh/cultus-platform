@@ -101,7 +101,10 @@ export function ModuleNavigation() {
         {moduleGroups.moduleGroups.map((moduleGroup, index) => {
           const isUnlocked = moduleGroup.isUnlocked
           const isCompleted = moduleGroup.isCompleted
-          const isCurrent = currentStars === moduleGroup.requiredStars
+          // Fix isCurrent logic: current module is the one that should be worked on next
+          // For star 0 modules (assessments), current when user has 0 stars
+          // For other modules, current when user has exactly the required stars
+          const isCurrent = currentStars === moduleGroup.requiredStars && !isCompleted
           const IconComponent = iconMap[moduleGroup.icon] || FileText
           
           return (
@@ -164,7 +167,7 @@ export function ModuleNavigation() {
                       </Badge>
                       
                       <Badge variant="outline" className="text-xs px-1.5 sm:px-2 py-0.5 shrink-0">
-                        Star {moduleGroup.requiredStars + 1}
+                        Star {moduleGroup.requiredStars}
                       </Badge>
                     </div>
                   </div>
@@ -191,7 +194,7 @@ export function ModuleNavigation() {
                               : "bg-primary"
                           )}
                           style={{ 
-                            width: `${moduleGroup.isCompleted ? 100 : (moduleGroup.completedCount / moduleGroup.totalCount) * 100}%`
+                            width: `${moduleGroup.isCompleted ? 100 : Math.min(100, (moduleGroup.completedCount / moduleGroup.totalCount) * 100)}%`
                           }}
                         />
                       </div>

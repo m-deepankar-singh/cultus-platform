@@ -142,7 +142,8 @@ export function useJobReadinessModuleGroups() {
         // Default handling for other module types
         const completedCount = modules.filter(m => m.progress?.status === 'Completed').length
         const totalCount = modules.length
-        const isUnlocked = currentStars >= requiredStars || requiredStars === 0
+        // Clearer unlock logic: assessments (star 0) are always unlocked, others require appropriate star level
+        const isUnlocked = requiredStars === 0 || currentStars >= requiredStars
         const isCompleted = totalCount > 0 && completedCount === totalCount
         
         return { completedCount, totalCount, isUnlocked, isCompleted }

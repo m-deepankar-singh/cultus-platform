@@ -3,7 +3,7 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { AppLoginSchema, type AppLoginFormValues } from "@/lib/schemas/auth";
 import { SessionService } from "@/lib/auth/session-service";
-import { Loader2, AlertCircle, ShieldX, GraduationCap } from "lucide-react";
+import { Loader2, AlertCircle, ShieldX, GraduationCap, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function AppLoginForm() {
@@ -29,6 +29,8 @@ export function AppLoginForm() {
 	const [isInvalidCredentials, setIsInvalidCredentials] = React.useState(false);
 	const router = useRouter();
 	const { toast } = useToast();
+	const searchParams = useSearchParams();
+	const sessionExpired = searchParams.get('sessionExpired') === 'true';
 
 	// Load remember me preference from localStorage
 	const [rememberMeDefault] = React.useState(() => SessionService.getRememberMe());
@@ -115,6 +117,16 @@ export function AppLoginForm() {
 					Enter your credentials to access your learning dashboard
 				</p>
 			</div>
+			
+			{sessionExpired && (
+				<Alert variant="default" className="mb-4 sm:mb-6 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-amber-500/50 text-amber-700 dark:border-amber-500/30 dark:text-amber-300 [&>svg]:text-amber-500 dark:[&>svg]:text-amber-400">
+					<Clock className="h-4 w-4" />
+					<AlertTitle className="font-medium text-sm sm:text-base">Session Expired</AlertTitle>
+					<AlertDescription className="mt-1 text-sm">
+						Your session has expired. Please log in again.
+					</AlertDescription>
+				</Alert>
+			)}
 			
 			{isInvalidCredentials && (
 				<Alert variant="destructive" className="mb-4 sm:mb-6 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-500/50">
