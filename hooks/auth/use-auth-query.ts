@@ -64,15 +64,13 @@ export function useAuthQuery(): AuthData {
         session,
       };
     },
-    staleTime: 15 * 60 * 1000, // 15 minutes - auth data is relatively stable
-    gcTime: 30 * 60 * 1000, // 30 minutes in cache
+    staleTime: 30 * 1000, // REDUCED: 30 seconds instead of 15 minutes
+    gcTime: 2 * 60 * 1000, // REDUCED: 2 minutes instead of 30 minutes
     retry: 1,
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
-    refetchOnMount: false, // Use cached data when available
-    // Enable persistence to reduce auth/v1/user API calls across browser sessions
-    meta: {
-      persist: true,
-    },
+    refetchOnWindowFocus: true, // CHANGED: Enable refetch on focus
+    refetchOnMount: true, // CHANGED: Always refetch on mount
+    // REMOVED: Disable persistence for auth queries to prevent stale data
+    // meta: { persist: true },
   });
 
   // Query for user profile data when user exists

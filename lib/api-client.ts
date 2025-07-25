@@ -93,9 +93,24 @@ export async function apiClient<T>(
         if (authError.includes('session') || authError.includes('expired') || authError.includes('timeout')) {
           // Clear session data and redirect to login
           localStorage.removeItem(SESSION_TIMEOUT_CONFIG.LAST_ACTIVITY_KEY);
-          window.location.href = '/admin/login?sessionExpired=true';
+          
+          // Determine redirect based on endpoint - student APIs should go to student login
+          const isStudentApi = endpoint.startsWith('/api/app/') || url.includes('/api/app/');
+          const redirectUrl = isStudentApi ? '/app/login?sessionExpired=true' : '/admin/login?sessionExpired=true';
+          
+          window.location.href = redirectUrl;
           return null as T;
         }
+        
+        // Handle general 401 errors (not session timeouts)
+        // Clear session data and redirect based on API endpoint
+        localStorage.removeItem(SESSION_TIMEOUT_CONFIG.LAST_ACTIVITY_KEY);
+        
+        const isStudentApi = endpoint.startsWith('/api/app/') || url.includes('/api/app/');
+        const redirectUrl = isStudentApi ? '/app/login' : '/admin/login';
+        
+        window.location.href = redirectUrl;
+        return null as T;
       }
       
       throw new ApiError(errorMessage, response.status);
