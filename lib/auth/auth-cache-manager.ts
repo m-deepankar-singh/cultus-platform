@@ -3,11 +3,65 @@ import { createClient } from '@/lib/supabase/server';
 import { CustomJWTClaims } from './jwt-utils';
 import { User } from '@supabase/supabase-js';
 
-// Redis configuration
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+// Redis connection pool configuration
+const REDIS_POOL_CONFIG = {
+  POOL_SIZE: 5,
+  CONNECTION_TIMEOUT: 5000,
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 1000,
+} as const;
+
+// Redis connection pool
+class RedisConnectionPool {
+  private connections: Redis[] = [];
+  private currentIndex = 0;
+
+  constructor() {
+    // Initialize connection pool
+    for (let i = 0; i < REDIS_POOL_CONFIG.POOL_SIZE; i++) {
+      this.connections.push(new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL!,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      }));
+    }
+  }
+
+  /**
+   * Get a Redis connection from the pool (round-robin)
+   */
+  getConnection(): Redis {
+    const connection = this.connections[this.currentIndex];
+    this.currentIndex = (this.currentIndex + 1) % this.connections.length;
+    return connection;
+  }
+
+  /**
+   * Execute Redis operation with retry logic
+   */
+  async executeWithRetry<T>(operation: (redis: Redis) => Promise<T>): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= REDIS_POOL_CONFIG.RETRY_ATTEMPTS; attempt++) {
+      try {
+        const redis = this.getConnection();
+        return await operation(redis);
+      } catch (error) {
+        lastError = error as Error;
+        
+        if (attempt < REDIS_POOL_CONFIG.RETRY_ATTEMPTS) {
+          // Exponential backoff
+          const delay = REDIS_POOL_CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw lastError || new Error('Redis operation failed after all retries');
+  }
+}
+
+// Global Redis pool instance
+const redisPool = new RedisConnectionPool();
 
 // Cache configuration
 const AUTH_CACHE_CONFIG = {
@@ -77,15 +131,17 @@ export class AuthCacheManager {
   }
 
   /**
-   * Get cached user authentication data with Redis-first approach
+   * Get cached user authentication data with Redis-first approach (with connection pooling)
    */
   async getCachedUserAuth(userId: string): Promise<CachedUserData | null> {
     const startTime = Date.now();
     
     try {
-      // Try Redis first
+      // Use Redis connection pool with retry logic
       const cacheKey = CACHE_KEYS.USER_AUTH(userId);
-      const cachedData = await redis.get<CachedUserData>(cacheKey);
+      const cachedData = await redisPool.executeWithRetry(async (redis) => {
+        return await redis.get<CachedUserData>(cacheKey);
+      });
       
       if (cachedData) {
         this.metrics.cache_hits++;
@@ -120,7 +176,9 @@ export class AuthCacheManager {
         cached_at: Date.now(),
       };
       
-      await redis.set(cacheKey, userData, { ex: AUTH_CACHE_CONFIG.USER_DATA_TTL });
+      await redisPool.executeWithRetry(async (redis) => {
+        return await redis.set(cacheKey, userData, { ex: AUTH_CACHE_CONFIG.USER_DATA_TTL });
+      });
     } catch (error) {
       this.metrics.redis_errors++;
       console.error('Redis cache error in setCachedUserAuth:', error);
@@ -136,7 +194,9 @@ export class AuthCacheManager {
     
     try {
       const cacheKey = CACHE_KEYS.USER_ROLE(userId);
-      const cachedData = await redis.get<CachedRoleData>(cacheKey);
+      const cachedData = await redisPool.executeWithRetry(async (redis) => {
+        return await redis.get<CachedRoleData>(cacheKey);
+      });
       
       if (cachedData) {
         this.metrics.cache_hits++;
@@ -166,7 +226,9 @@ export class AuthCacheManager {
         cached_at: Date.now(),
       };
       
-      await redis.set(cacheKey, cacheData, { ex: AUTH_CACHE_CONFIG.ROLE_CACHE_TTL });
+      await redisPool.executeWithRetry(async (redis) => {
+        return await redis.set(cacheKey, cacheData, { ex: AUTH_CACHE_CONFIG.ROLE_CACHE_TTL });
+      });
     } catch (error) {
       this.metrics.redis_errors++;
       console.error('Redis cache error in setCachedRoleData:', error);
@@ -342,10 +404,13 @@ export class AuthCacheManager {
       const userAuthKey = CACHE_KEYS.USER_AUTH(userId);
       const userRoleKey = CACHE_KEYS.USER_ROLE(userId);
       
-      await Promise.all([
-        redis.del(userAuthKey),
-        redis.del(userRoleKey),
-      ]);
+      // Use batch deletion with connection pool
+      await redisPool.executeWithRetry(async (redis) => {
+        return await Promise.all([
+          redis.del(userAuthKey),
+          redis.del(userRoleKey),
+        ]);
+      });
     } catch (error) {
       console.error('Redis cache invalidation error:', error);
     }
@@ -357,11 +422,14 @@ export class AuthCacheManager {
   async clearAllAuthCache(): Promise<void> {
     try {
       const pattern = 'auth:*';
-      const keys = await redis.keys(pattern);
-      
-      if (keys.length > 0) {
-        await redis.del(...keys);
-      }
+      await redisPool.executeWithRetry(async (redis) => {
+        const keys = await redis.keys(pattern);
+        
+        if (keys.length > 0) {
+          return await redis.del(...keys);
+        }
+        return 0;
+      });
       
       // Clear local cache
       this.routePatternCache.clear();
@@ -445,7 +513,9 @@ export class AuthCacheManager {
    */
   async healthCheck(): Promise<{ redis: boolean; metrics: AuthCacheMetrics }> {
     try {
-      await redis.ping();
+      await redisPool.executeWithRetry(async (redis) => {
+        return await redis.ping();
+      });
       return {
         redis: true,
         metrics: this.getMetrics(),

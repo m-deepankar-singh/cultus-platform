@@ -212,9 +212,9 @@ export function VirtualizedClientsTable() {
     refetch
   } = useClientsInfinite(filters);
   
-  // Flatten all pages into single array
-  const clients = React.useMemo(() => flattenClientsPages(data), [data]);
-  const totalCount = React.useMemo(() => getTotalClientsCount(data), [data]);
+  // Flatten all pages into single array - optimized to prevent unnecessary recalculations
+  const clients = React.useMemo(() => flattenClientsPages(data), [data?.pages]);
+  const totalCount = React.useMemo(() => getTotalClientsCount(data), [data?.pages]);
   
   // Refs for infinite loader
   const infiniteLoaderRef = useRef<InfiniteLoader>(null);
@@ -247,13 +247,13 @@ export function VirtualizedClientsTable() {
   // Toggle client status mutation
   const toggleClientStatusMutation = useToggleClientStatus();
   
-  // Handle edit client
+  // Handle edit client - stable reference
   const handleEditClient = useCallback((client: Client) => {
     setEditClient(client);
     setShowEditForm(true);
   }, []);
   
-  // Handle toggle status
+  // Handle toggle status - stable reference
   const handleToggleStatus = useCallback(async (id: string, isActive: boolean) => {
     try {
       await toggleClientStatusMutation.mutateAsync({

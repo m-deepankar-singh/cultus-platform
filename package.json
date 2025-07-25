@@ -16,6 +16,7 @@
     "test:cache-performance": "npx tsx scripts/test-cache-performance.ts",
     "validate:cache": "npx tsx scripts/validate-cache-performance.ts",
     "test:cache-load": "npx tsx scripts/load-test-cache.ts",
+    "test:middleware-performance": "npx tsx scripts/test-middleware-performance.ts",
     "test:email": "npx tsx scripts/test-resend-email.ts",
     "analyze": "ANALYZE=true pnpm build",
     "analyze:server": "BUNDLE_ANALYZE=server pnpm build",
